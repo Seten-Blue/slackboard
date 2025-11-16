@@ -1,0 +1,21 @@
+<div class="flex flex-col h-screen">
+  <!-- Header del canal -->
+  <div class="bg-white border-b border-gray-200 px-6 py-4">
+    <div *ngIf="currentChannel">
+      <h2 class="text-xl font-bold text-gray-800 flex items-center">
+        <span class="mr-2">{{ currentChannel.isPrivate ? '🔒' : '#' }}</span>
+        {{ currentChannel.name }}
+      </h2>
+      <p class="text-sm text-gray-600">{{ currentChannel.description || 'Sin descripción' }}</p>
+    </div>
+    <div *ngIf="!currentChannel" class="text-gray-500">
+      Selecciona un canal
+    </div>
+  </div>
+
+  <!-- Área de mensajes -->
+  <app-message-area 
+    [channel]="currentChannel"
+    class="flex-1">
+  </app-message-area>
+</div>

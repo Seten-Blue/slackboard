@@ -1,0 +1,125 @@
+<div class="flex flex-col h-full bg-gray-50">
+  <!-- Área de mensajes con scroll -->
+  <div #messageContainer class="flex-1 overflow-y-auto p-6 space-y-4">
+    <!-- Estado de carga -->
+    <div *ngIf="loading" class="flex justify-center items-center h-full">
+      <div class="animate-pulse text-gray-500">Cargando mensajes...</div>
+    </div>
+
+    <!-- Sin canal seleccionado -->
+    <div *ngIf="!channel && !loading" class="flex flex-col items-center justify-center h-full text-gray-500">
+      <div class="text-6xl mb-4">💬</div>
+      <p class="text-xl font-semibold">Selecciona un canal</p>
+      <p class="text-sm">Elige un canal de la lista para comenzar a chatear</p>
+    </div>
+
+    <!-- Sin mensajes -->
+    <div *ngIf="channel && messages.length === 0 && !loading" class="flex flex-col items-center justify-center h-full text-gray-500">
+      <div class="text-6xl mb-4">✨</div>
+      <p class="text-xl font-semibold">Sin mensajes aún</p>
+      <p class="text-sm">Sé el primero en escribir en #{{ channel.name }}</p>
+    </div>
+
+    <!-- Lista de mensajes -->
+    <div *ngFor="let message of messages" class="flex items-start space-x-3 hover:bg-gray-100 p-2 rounded transition">
+      <!-- Avatar -->
+      <img 
+        [src]="message.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" 
+        [alt]="message.sender?.username"
+        class="w-10 h-10 rounded-full flex-shrink-0">
+
+      <!-- Contenido del mensaje -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-baseline space-x-2">
+          <span class="font-semibold text-gray-900">{{ message.sender?.username || 'Usuario' }}</span>
+          <span class="text-xs text-gray-500">{{ formatTime(message.createdAt) }}</span>
+          <span *ngIf="message.isEdited" class="text-xs text-gray-400">(editado)</span>
+        </div>
+
+        <!-- Texto del mensaje -->
+        <p class="text-gray-800 mt-1 break-words">{{ message.content }}</p>
+
+        <!-- Reacciones -->
+        <div *ngIf="message.reactions && message.reactions.length > 0" class="flex flex-wrap gap-1 mt-2">
+          <button 
+            *ngFor="let reaction of message.reactions"
+            (click)="addReaction(message._id, reaction.emoji)"
+            class="inline-flex items-center px-2 py-1 bg-white border border-gray-300 rounded-full text-sm hover:bg-gray-100 transition">
+            <span>{{ reaction.emoji }}</span>
+            <span class="ml-1 text-xs text-gray-600">{{ reaction.users?.length || 0 }}</span>
+          </button>
+        </div>
+
+        <!-- Acciones del mensaje (al hacer hover) -->
+        <div class="flex items-center space-x-2 mt-1 opacity-0 hover:opacity-100 transition">
+          <button 
+            (click)="addReaction(message._id, '👍')"
+            class="text-xs text-gray-500 hover:text-blue-600"
+            title="Reaccionar">
+            👍
+          </button>
+          <button 
+            (click)="addReaction(message._id, '❤️')"
+            class="text-xs text-gray-500 hover:text-red-600"
+            title="Reaccionar">
+            ❤️
+          </button>
+          <button 
+            (click)="addReaction(message._id, '😂')"
+            class="text-xs text-gray-500 hover:text-yellow-600"
+            title="Reaccionar">
+            😂
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Usuario escribiendo -->
+    <div *ngIf="userTyping" class="flex items-center space-x-2 text-gray-500 text-sm italic">
+      <div class="flex space-x-1">
+        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+      </div>
+      <span>{{ userTyping }} está escribiendo...</span>
+    </div>
+  </div>
+
+  <!-- Input para enviar mensajes -->
+  <div *ngIf="channel" class="border-t border-gray-300 bg-white p-4">
+    <div class="flex items-end space-x-3">
+      <!-- Campo de texto -->
+      <div class="flex-1 relative">
+        <textarea
+          [(ngModel)]="newMessage"
+          (keydown.enter)="onEnterPress($event)"
+          (input)="onTyping()"
+          placeholder="Escribe un mensaje en #{{ channel.name }}"
+          rows="1"
+          class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          style="max-height: 120px; overflow-y: auto;"></textarea>
+        
+        <!-- Botón emoji (decorativo por ahora) -->
+        <button 
+          class="absolute right-3 bottom-3 text-gray-400 hover:text-gray-600"
+          title="Agregar emoji">
+          😊
+        </button>
+      </div>
+
+      <!-- Botón enviar -->
+      <button
+        (click)="sendMessage()"
+        [disabled]="!newMessage.trim()"
+        class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium">
+        Enviar
+      </button>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+      <span>Presiona Enter para enviar, Shift+Enter para nueva línea</span>
+      <span *ngIf="channel.members">{{ channel.members.length }} miembros</span>
+    </div>
+  </div>
+</div>
