@@ -1,0 +1,158 @@
+<div class="h-screen overflow-y-auto bg-gray-50 p-6">
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard Analytics</h1>
+    <p class="text-gray-600">Estadísticas en tiempo real de tu workspace</p>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="flex justify-center items-center h-64">
+    <div class="animate-pulse text-gray-500 text-xl">Cargando estadísticas...</div>
+  </div>
+
+  <div *ngIf="!loading && stats">
+    <!-- Tarjetas de estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <!-- Total Usuarios -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500 transform hover:scale-105 transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm font-medium mb-1">Total Usuarios</p>
+            <p class="text-3xl font-bold text-gray-900">{{ stats.overview.totalUsers }}</p>
+          </div>
+          <div class="text-4xl">👥</div>
+        </div>
+        <p class="text-green-600 text-sm mt-2">
+          {{ stats.overview.activeUsers }} en línea
+        </p>
+      </div>
+
+      <!-- Total Canales -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500 transform hover:scale-105 transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm font-medium mb-1">Total Canales</p>
+            <p class="text-3xl font-bold text-gray-900">{{ stats.overview.totalChannels }}</p>
+          </div>
+          <div class="text-4xl">#</div>
+        </div>
+        <p class="text-blue-600 text-sm mt-2">
+          Activos
+        </p>
+      </div>
+
+      <!-- Total Mensajes -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500 transform hover:scale-105 transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm font-medium mb-1">Total Mensajes</p>
+            <p class="text-3xl font-bold text-gray-900">{{ stats.overview.totalMessages }}</p>
+          </div>
+          <div class="text-4xl">💬</div>
+        </div>
+        <p class="text-green-600 text-sm mt-2">
+          +{{ stats.overview.messagesToday || 0 }} hoy
+        </p>
+      </div>
+
+      <!-- Usuarios Activos -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500 transform hover:scale-105 transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm font-medium mb-1">Usuarios Activos</p>
+            <p class="text-3xl font-bold text-gray-900">{{ stats.overview.activeUsers }}</p>
+          </div>
+          <div class="text-4xl">🟢</div>
+        </div>
+        <p class="text-gray-600 text-sm mt-2">
+          En este momento
+        </p>
+      </div>
+    </div>
+
+    <!-- Gráficas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Mensajes por Canal -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Mensajes por Canal</h3>
+        <div class="h-64">
+          <canvas 
+            baseChart
+            *ngIf="channelChartData"
+            [data]="channelChartData"
+            [options]="chartOptions"
+            [type]="'bar'">
+          </canvas>
+        </div>
+      </div>
+
+      <!-- Horas Pico -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Horas Pico (Últimos 7 días)</h3>
+        <div class="h-64">
+          <canvas 
+            baseChart
+            *ngIf="peakHoursChartData"
+            [data]="peakHoursChartData"
+            [options]="chartOptions"
+            [type]="'line'">
+          </canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Usuarios -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Usuarios Más Activos</h3>
+      <div class="space-y-4">
+        <div 
+          *ngFor="let user of stats.topUsers; let i = index"
+          class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+          <div class="flex items-center space-x-4">
+            <div class="text-2xl font-bold text-gray-400">{{ i + 1 }}</div>
+            <img 
+              [src]="user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username" 
+              [alt]="user.username"
+              class="w-10 h-10 rounded-full">
+            <div>
+              <p class="font-semibold text-gray-900">{{ user.username }}</p>
+              <p class="text-sm text-gray-500">{{ user.messageCount }} mensajes</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+              {{ user.messageCount }}
+            </div>
+            <div *ngIf="i === 0" class="text-2xl">🏆</div>
+            <div *ngIf="i === 1" class="text-2xl">🥈</div>
+            <div *ngIf="i === 2" class="text-2xl">🥉</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat IA (Simple por ahora) -->
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg shadow-md p-6 text-white">
+      <h3 class="text-lg font-semibold mb-4 flex items-center">
+        <span class="mr-2">🤖</span>
+        Pregúntale a la IA sobre tus datos
+      </h3>
+      <div class="flex space-x-3">
+        <input 
+          type="text"
+          [(ngModel)]="aiQuestion"
+          (keyup.enter)="askAI()"
+          placeholder="Ej: ¿Cuál es el canal más activo?"
+          class="flex-1 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-white">
+        <button 
+          (click)="askAI()"
+          class="px-6 py-3 bg-white text-purple-600 rounded-lg font-medium hover:bg-gray-100 transition">
+          Preguntar
+        </button>
+      </div>
+      <div *ngIf="aiResponse" class="mt-4 p-4 bg-white bg-opacity-20 rounded-lg">
+        <p class="text-sm">{{ aiResponse }}</p>
+      </div>
+    </div>
+  </div>
+</div>
