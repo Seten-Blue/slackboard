@@ -11,12 +11,12 @@ export class ChatService {
   private currentChannelSubject = new BehaviorSubject<any>(null);
   public currentChannel$ = this.currentChannelSubject.asObservable();
 
-  private currentUser = {
-    _id: '69196dd00a60b097f35f3587',
-    username: 'Admin',
-    email: 'admin@slackboard.com',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-  };
+private currentUser = {
+  _id: '6919a0db706e457a375910e8',  // ← Este debe ser el ID correcto
+  username: 'Admin',
+  email: 'admin@slackboard.com',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
+};
 
   constructor(private http: HttpClient) {}
 
