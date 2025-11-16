@@ -32,7 +32,55 @@
     </div>
 
     <!-- Channel List -->
-    <app-channel-list></app-channel-list>
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-xs uppercase text-purple-300 font-semibold">Canales</h3>
+        <button 
+          (click)="showCreateChannel = !showCreateChannel"
+          class="text-purple-300 hover:text-white text-xl">
+          +
+        </button>
+      </div>
+
+      <!-- Crear canal -->
+      <div *ngIf="showCreateChannel" class="mb-3 p-2 bg-purple-900 rounded">
+        <input 
+          type="text" 
+          [(ngModel)]="newChannelName"
+          placeholder="Nombre del canal"
+          class="w-full px-2 py-1 bg-purple-800 text-white text-sm rounded mb-2 outline-none"
+          (keyup.enter)="createChannel()">
+        <button 
+          (click)="createChannel()"
+          class="w-full px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white text-sm rounded">
+          Crear
+        </button>
+      </div>
+
+      <!-- Lista de canales -->
+      <ul class="space-y-1">
+        <li *ngFor="let channel of channels" 
+            (click)="selectChannel(channel)"
+            [class.bg-purple-900]="currentChannel?._id === channel._id"
+            class="flex items-center px-3 py-2 rounded hover:bg-purple-900 transition cursor-pointer">
+          <span class="mr-2">{{ channel.isPrivate ? '🔒' : '#' }}</span>
+          <span class="text-sm">{{ channel.name }}</span>
+          <span *ngIf="channel.members?.length" class="ml-auto text-xs text-purple-300">
+            {{ channel.members.length }}
+          </span>
+        </li>
+      </ul>
+
+      <!-- Estado de carga -->
+      <div *ngIf="loading" class="text-center py-4">
+        <div class="animate-pulse text-purple-300">Cargando...</div>
+      </div>
+
+      <!-- Sin canales -->
+      <div *ngIf="!loading && channels.length === 0" class="text-center py-4 text-purple-300 text-sm">
+        No hay canales
+      </div>
+    </div>
   </nav>
 
   <!-- Footer -->

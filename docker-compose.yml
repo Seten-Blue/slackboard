@@ -29,11 +29,11 @@ services:
     depends_on:
       - mongodb
     volumes:
-      - ./backend:/app
       - /app/node_modules
     networks:
       - slackboard-network
-    command: npm run dev
+    command: node dist/index.js
+
 
   # Frontend Angular
   frontend:

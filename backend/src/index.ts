@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import channelsRouter from './routes/channels';
 import messagesRouter from './routes/messages';
 import analyticsRouter from './routes/analytics';
+import slackRouter from './routes/slack';
 
 // Configurar variables de entorno
 dotenv.config();
@@ -52,6 +53,7 @@ app.get('/', (req: Request, res: Response) => {
       channels: '/api/channels',
       messages: '/api/messages',
       analytics: '/api/analytics',
+      slack: '/api/slack'
     }
   });
 });
@@ -68,6 +70,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/api/channels', channelsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/slack', slackRouter);
 
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
