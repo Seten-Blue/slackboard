@@ -9,7 +9,6 @@ import { AppComponent } from './app.component';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { ChatComponent } from './components/chat/chat.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { ChannelListComponent } from './components/channel-list/channel-list.component';
 import { MessageAreaComponent } from './components/message-area/message-area.component';
 
 @NgModule({
@@ -18,7 +17,6 @@ import { MessageAreaComponent } from './components/message-area/message-area.com
     SidebarComponent,
     ChatComponent,
     DashboardComponent,
-    ChannelListComponent,
     MessageAreaComponent
   ],
   imports: [

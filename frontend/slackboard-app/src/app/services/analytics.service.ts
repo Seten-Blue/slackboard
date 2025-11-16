@@ -1,32 +1,31 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AnalyticsService {
-  private apiUrl = 'http://localhost:3000/api/analytics';
+  private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 
-  // Obtener estadísticas generales
   getGeneralStats(): Observable<any> {
-    return this.http.get(this.apiUrl);
+    return this.http.get(`${this.apiUrl}/analytics`);
   }
 
-  // Obtener estadísticas por fecha
   getStatsByDate(startDate: string, endDate: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/by-date?startDate=${startDate}&endDate=${endDate}`);
+    return this.http.get(`${this.apiUrl}/analytics/by-date`, {
+      params: { startDate, endDate }
+    });
   }
 
-  // Obtener tendencias de mensajes
   getMessageTrends(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/trends`);
+    return this.http.get(`${this.apiUrl}/analytics/trends`);
   }
 
-  // Generar reporte diario
   generateDailyReport(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/generate-report`, {});
+    return this.http.post(`${this.apiUrl}/analytics/generate-report`, {});
   }
 }

@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
 import { Subscription } from 'rxjs';
@@ -8,7 +8,7 @@ import { Subscription } from 'rxjs';
   templateUrl: './message-area.component.html',
   styleUrls: ['./message-area.component.scss']
 })
-export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked {
+export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked, OnChanges {
   @Input() channel: any;
   @ViewChild('messageContainer') messageContainer!: ElementRef;
 
@@ -135,7 +135,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     });
   }
 
-  onEnterPress(event: KeyboardEvent) {
+  onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       this.sendMessage();

@@ -92,7 +92,7 @@
       <div class="flex-1 relative">
         <textarea
           [(ngModel)]="newMessage"
-          (keydown.enter)="onEnterPress($event)"
+          (keydown)="onKeyDown($event)"
           (input)="onTyping()"
           placeholder="Escribe un mensaje en #{{ channel.name }}"
           rows="1"

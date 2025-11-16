@@ -65,6 +65,22 @@ export const createMessage = async (req: Request, res: Response) => {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'username email avatar status');
 
+    // 🔥 INTEGRACIÓN SLACK: Enviar mensaje a Slack
+    try {
+      const slackService = require('../services/slackService').default;
+      if (slackService.isConfigured()) {
+        await slackService.sendMessage(
+          channelExists.name,
+          content,
+          userExists.username
+        );
+        console.log('✅ Mensaje sincronizado con Slack');
+      }
+    } catch (slackError: any) {
+      console.error('⚠️ Error enviando a Slack:', slackError.message);
+      // No falla la petición si Slack falla
+    }
+
     res.status(201).json({
       success: true,
       message: 'Mensaje enviado',

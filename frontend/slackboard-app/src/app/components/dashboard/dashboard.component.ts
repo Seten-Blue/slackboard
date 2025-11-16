@@ -13,8 +13,9 @@ export class DashboardComponent implements OnInit {
   aiQuestion = '';
   aiResponse = '';
 
-  channelChartData: any;
-  peakHoursChartData: any;
+  channelChartData: ChartConfiguration['data'] | null = null;
+  peakHoursChartData: ChartConfiguration['data'] | null = null;
+  
   chartOptions: ChartConfiguration['options'] = {
     responsive: true,
     maintainAspectRatio: false,

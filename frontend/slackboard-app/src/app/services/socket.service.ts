@@ -1,69 +1,74 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
+import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class SocketService {
-  private socket: Socket;
-  private readonly uri: string = 'http://localhost:3000';
+  private socket: Socket | null = null;
 
-  constructor() {
-    this.socket = io(this.uri, {
-      transports: ['websocket', 'polling']
-    });
-  }
+  constructor() {}
 
-  // Conectar al socket
-  connect(): void {
-    if (!this.socket.connected) {
-      this.socket.connect();
+  connect() {
+    if (!this.socket) {
+      this.socket = io(environment.socketUrl, {
+        transports: ['websocket', 'polling']
+      });
+      
+      this.socket.on('connect', () => {
+        console.log('✅ Conectado a Socket.IO');
+      });
+
+      this.socket.on('disconnect', () => {
+        console.log('❌ Desconectado de Socket.IO');
+      });
     }
   }
 
-  // Desconectar
-  disconnect(): void {
-    if (this.socket.connected) {
-      this.socket.disconnect();
+  joinChannel(channelId: string) {
+    if (this.socket) {
+      this.socket.emit('join-channel', channelId);
     }
   }
 
-  // Unirse a un canal
-  joinChannel(channelId: string): void {
-    this.socket.emit('join-channel', channelId);
+  sendMessage(data: any) {
+    if (this.socket) {
+      this.socket.emit('send-message', data);
+    }
   }
 
-  // Enviar mensaje
-  sendMessage(data: any): void {
-    this.socket.emit('send-message', data);
-  }
-
-  // Escuchar nuevos mensajes
   onNewMessage(): Observable<any> {
-    return new Observable((observer) => {
-      this.socket.on('new-message', (data) => {
-        observer.next(data);
-      });
+    return new Observable(observer => {
+      if (this.socket) {
+        this.socket.on('new-message', (data: any) => {
+          observer.next(data);
+        });
+      }
     });
   }
 
-  // Notificar que el usuario está escribiendo
-  sendTyping(data: any): void {
-    this.socket.emit('typing', data);
+  sendTyping(data: any) {
+    if (this.socket) {
+      this.socket.emit('typing', data);
+    }
   }
 
-  // Escuchar cuando alguien está escribiendo
   onUserTyping(): Observable<any> {
-    return new Observable((observer) => {
-      this.socket.on('user-typing', (data) => {
-        observer.next(data);
-      });
+    return new Observable(observer => {
+      if (this.socket) {
+        this.socket.on('user-typing', (data: any) => {
+          observer.next(data);
+        });
+      }
     });
   }
 
-  // Verificar conexión
-  isConnected(): boolean {
-    return this.socket.connected;
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
   }
 }
