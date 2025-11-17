@@ -1,45 +1,45 @@
-
 services:
-  # Base de datos MongoDB
+  # MongoDB
   mongodb:
-    image: mongo:6
-    container_name: slackboard-mongo
-    restart: always
+    image: mongo:7.0
+    container_name: slackboard-mongodb
+    restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: slackboard
     volumes:
-      - mongo-data:/data/db
+      - mongodb_data:/data/db
     networks:
       - slackboard-network
 
-  # Backend API
+  # Backend
   backend:
     build: ./backend
     container_name: slackboard-backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/slackboard?authSource=admin
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/slackboard
       - PORT=3000
+    env_file:
+      - ./backend/.env
     depends_on:
       - mongodb
     volumes:
+      - ./backend:/app
       - /app/node_modules
     networks:
       - slackboard-network
-    command: node dist/index.js
+    command: npm run dev
 
-
-  # Frontend Angular
+  # Frontend
   frontend:
     build: ./frontend/slackboard-app
     container_name: slackboard-frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "4200:4200"
     volumes:
@@ -47,10 +47,10 @@ services:
       - /app/node_modules
     networks:
       - slackboard-network
-    command: npm start
+    command: ng serve --host 0.0.0.0
 
 volumes:
-  mongo-data:
+  mongodb_data:
 
 networks:
   slackboard-network:

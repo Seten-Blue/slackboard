@@ -1,0 +1,55 @@
+<div class="flex flex-col h-screen bg-gray-50">
+  <!-- Header -->
+  <div class="bg-white border-b border-gray-200 px-6 py-4">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-gray-800">🤖 Gemini AI Chat</h1>
+      <button 
+        (click)="clearHistory()"
+        class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+        🗑️ Limpiar Historial
+      </button>
+    </div>
+  </div>
+
+  <!-- Messages Area -->
+  <div class="flex-1 overflow-y-auto px-6 py-4 chat-messages">
+    <div *ngFor="let message of messages" 
+         [class]="message.role === 'user' ? 'flex justify-end mb-4' : 'flex justify-start mb-4'">
+      <div [class]="message.role === 'user' 
+           ? 'bg-blue-500 text-white rounded-lg px-4 py-2 max-w-xl' 
+           : 'bg-gray-200 text-gray-800 rounded-lg px-4 py-2 max-w-xl'">
+        <p class="whitespace-pre-wrap">{{ message.content }}</p>
+        <span class="text-xs opacity-75">{{ message.timestamp | date:'short' }}</span>
+      </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div *ngIf="isLoading" class="flex justify-start mb-4">
+      <div class="bg-gray-200 rounded-lg px-4 py-2">
+        <div class="flex space-x-2">
+          <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+          <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+          <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="bg-white border-t border-gray-200 px-6 py-4">
+    <div class="flex space-x-4">
+      <input
+        [(ngModel)]="userMessage"
+        (keyup.enter)="sendMessage()"
+        [disabled]="isLoading || !isConfigured"
+        placeholder="Escribe tu mensaje aquí..."
+        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button
+        (click)="sendMessage()"
+        [disabled]="isLoading || !isConfigured || !userMessage.trim()"
+        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+        {{ isLoading ? 'Enviando...' : 'Enviar' }}
+      </button>
+    </div>
+  </div>
+</div>

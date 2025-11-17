@@ -315,7 +315,7 @@ router.get('/holidays', async (req: Request, res: Response) => {
   }
 });
 
-// Endpoint para crear un nuevo evento
+
 router.post('/events', async (req: Request, res: Response) => {
   try {
     if (!checkAuth()) {
@@ -336,16 +336,34 @@ router.post('/events', async (req: Request, res: Response) => {
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
     
+    // ✅ CORREGIDO: Formato de fecha correcto
+    let start, end;
+    
+    if (allDay) {
+      // Para eventos de todo el día, solo usar fecha
+      start = { date: startDateTime.split('T')[0] };
+      end = { date: endDateTime.split('T')[0] };
+    } else {
+      // Para eventos con hora específica, usar ISO string completo
+      const startDate = new Date(startDateTime);
+      const endDate = new Date(endDateTime);
+      
+      start = {
+        dateTime: startDate.toISOString(), // ← CAMBIO: usar ISO completo
+        timeZone: 'America/Bogota'
+      };
+      end = {
+        dateTime: endDate.toISOString(), // ← CAMBIO: usar ISO completo
+        timeZone: 'America/Bogota'
+      };
+    }
+
     const event: any = {
       summary,
       description,
       location,
-      start: allDay 
-        ? { date: startDateTime.split('T')[0] }
-        : { dateTime: startDateTime, timeZone: 'America/Bogota' },
-      end: allDay
-        ? { date: endDateTime.split('T')[0] }
-        : { dateTime: endDateTime, timeZone: 'America/Bogota' },
+      start,
+      end,
     };
 
     const response = await calendar.events.insert({
@@ -369,7 +387,10 @@ router.post('/events', async (req: Request, res: Response) => {
       });
     }
     
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      details: error.response?.data || 'Error desconocido'
+    });
   }
 });
 

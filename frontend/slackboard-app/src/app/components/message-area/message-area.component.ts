@@ -18,9 +18,11 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   userTyping: string | null = null;
   typingTimeout: any;
   currentUser: any;
+  isTyping = false;
 
   private subscriptions: Subscription[] = [];
   private shouldScrollToBottom = false;
+  private userTypingTimeout: any;
 
   constructor(
     private chatService: ChatService,
@@ -34,13 +36,24 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     
     setTimeout(() => {
       this.currentUser = this.chatService.getCurrentUser();
+      console.log('👤 Usuario actual:', this.currentUser);
     }, 1000);
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
+    
     if (this.typingTimeout) {
       clearTimeout(this.typingTimeout);
+    }
+    
+    if (this.userTypingTimeout) {
+      clearTimeout(this.userTypingTimeout);
+    }
+
+    // Salir del canal actual
+    if (this.channel) {
+      this.socketService.leaveChannel(this.channel._id);
     }
   }
 
@@ -54,38 +67,65 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   ngOnChanges() {
     if (this.channel) {
       this.loadMessages();
-      this.socketService.joinChannel(this.channel._id);
+      
+      // Unirse al nuevo canal
+      if (this.socketService.isConnected()) {
+        this.socketService.joinChannel(this.channel._id);
+        console.log('✅ Unido al canal:', this.channel.name);
+      }
     }
   }
 
   setupSocketListeners() {
+    // Escuchar nuevos mensajes
     const newMessageSub = this.socketService.onNewMessage().subscribe((data: any) => {
       console.log('🔔 Mensaje recibido por Socket.IO:', data);
       
-      if (data.channelId === this.channel?._id) {
-        const exists = this.messages.some(m => m._id === data.message._id);
+      // Verificar si el mensaje es del canal actual
+      const messageChannelId = data.channel || data.channelId || data.message?.channel;
+      
+      if (messageChannelId === this.channel?._id) {
+        // Obtener el mensaje correcto del objeto de datos
+        const message = data.message || data;
+        
+        const exists = this.messages.some(m => m._id === message._id);
         if (!exists) {
-          console.log('➕ Agregando mensaje');
-          this.messages.push(data.message);
+          console.log('➕ Agregando mensaje a la lista');
+          this.messages.push(message);
           this.shouldScrollToBottom = true;
+        } else {
+          console.log('⚠️ Mensaje duplicado ignorado');
         }
       }
     });
 
+    // Escuchar usuario escribiendo
     const typingSub = this.socketService.onUserTyping().subscribe((data: any) => {
-      if (data.channelId === this.channel?._id && data.username !== this.currentUser?.username) {
+      console.log('⌨️ Usuario escribiendo:', data);
+      
+      if (data.channelId === this.channel?._id && data.userId !== this.currentUser?._id) {
         this.userTyping = data.username;
         
-        if (this.typingTimeout) {
-          clearTimeout(this.typingTimeout);
+        // Limpiar timeout anterior
+        if (this.userTypingTimeout) {
+          clearTimeout(this.userTypingTimeout);
         }
-        this.typingTimeout = setTimeout(() => {
+        
+        // Ocultar después de 3 segundos
+        this.userTypingTimeout = setTimeout(() => {
           this.userTyping = null;
         }, 3000);
       }
     });
 
-    this.subscriptions.push(newMessageSub, typingSub);
+    // Escuchar usuario dejó de escribir
+    const stopTypingSub = this.socketService.onUserStopTyping().subscribe((data: any) => {
+      if (data.channelId === this.channel?._id && data.userId !== this.currentUser?._id) {
+        this.userTyping = null;
+      }
+    });
+
+    this.subscriptions.push(newMessageSub, typingSub, stopTypingSub);
   }
 
   loadMessages() {
@@ -96,12 +136,13 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
     this.chatService.getMessagesByChannel(this.channel._id).subscribe({
       next: (response) => {
+        console.log('📥 Mensajes cargados:', response);
         this.messages = response.data || [];
         this.loading = false;
         this.shouldScrollToBottom = true;
       },
       error: (error) => {
-        console.error('Error cargando mensajes:', error);
+        console.error('❌ Error cargando mensajes:', error);
         this.loading = false;
       }
     });
@@ -111,30 +152,39 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     if (!this.newMessage.trim() || !this.channel) return;
 
     if (!this.currentUser || !this.currentUser._id) {
-      alert('Error: No se pudo identificar el usuario');
+      alert('Error: No se pudo identificar el usuario. Por favor recarga la página.');
+      console.error('❌ currentUser no está definido:', this.currentUser);
       return;
     }
 
     const messageData = {
       content: this.newMessage.trim(),
       channel: this.channel._id,
+      sender: this.currentUser._id, // Agregar sender
       type: 'text'
     };
 
+    console.log('📤 Enviando mensaje:', messageData);
+
     this.chatService.sendMessage(messageData).subscribe({
       next: (response) => {
-        console.log('✅ Mensaje enviado:', response);
+        console.log('✅ Mensaje enviado exitosamente:', response);
         
-        this.socketService.sendMessage({
-          channelId: this.channel._id,
-          message: response.data
-        });
-
+        // Limpiar el input
         this.newMessage = '';
+        
+        // Detener indicador de escritura
+        if (this.isTyping) {
+          this.isTyping = false;
+          this.socketService.sendStopTyping(this.channel._id, this.currentUser._id);
+        }
+
+        // El mensaje se agregará automáticamente vía Socket.IO
+        // No es necesario agregarlo manualmente aquí
       },
       error: (error) => {
-        console.error('❌ Error:', error);
-        alert('Error al enviar el mensaje');
+        console.error('❌ Error enviando mensaje:', error);
+        alert('Error al enviar el mensaje. Por favor intenta de nuevo.');
       }
     });
   }
@@ -147,29 +197,64 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   onTyping() {
-    if (!this.channel || !this.currentUser) return;
+    if (!this.channel || !this.currentUser || !this.currentUser._id) {
+      return;
+    }
 
-    this.socketService.sendTyping({
-      channelId: this.channel._id,
-      username: this.currentUser.username
-    });
+    // Solo emitir si no estamos ya escribiendo
+    if (!this.isTyping && this.newMessage.trim().length > 0) {
+      this.isTyping = true;
+      
+      // ✅ CORRECCIÓN: Pasar los 3 argumentos correctamente
+      this.socketService.sendTyping(
+        this.channel._id,
+        this.currentUser._id,
+        this.currentUser.username || 'Usuario'
+      );
+      
+      console.log('⌨️ Emitiendo evento de escritura');
+    }
+
+    // Limpiar timeout anterior
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+    }
+
+    // Después de 2 segundos sin escribir, emitir stop typing
+    this.typingTimeout = setTimeout(() => {
+      if (this.isTyping) {
+        this.isTyping = false;
+        this.socketService.sendStopTyping(this.channel._id, this.currentUser._id);
+        console.log('⏹️ Deteniendo indicador de escritura');
+      }
+    }, 2000);
   }
 
   addReaction(messageId: string, emoji: string) {
-    this.chatService.addReaction(messageId, emoji).subscribe({
+    if (!this.currentUser || !this.currentUser._id) {
+      console.error('❌ No se puede agregar reacción: usuario no identificado');
+      return;
+    }
+
+    this.chatService.addReaction(messageId, emoji, this.currentUser._id).subscribe({
       next: (response) => {
+        console.log('✅ Reacción agregada:', response);
+        
+        // Actualizar el mensaje en la lista
         const index = this.messages.findIndex(m => m._id === messageId);
         if (index !== -1) {
           this.messages[index] = response.data;
         }
       },
       error: (error) => {
-        console.error('Error agregando reacción:', error);
+        console.error('❌ Error agregando reacción:', error);
       }
     });
   }
 
   formatTime(timestamp: string): string {
+    if (!timestamp) return '';
+    
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -196,6 +281,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         const element = this.messageContainer.nativeElement;
         element.scrollTop = element.scrollHeight;
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error('Error al hacer scroll:', err);
+    }
   }
 }

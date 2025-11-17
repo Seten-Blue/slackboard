@@ -3,126 +3,126 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Flag para silenciar errores de Slack
-const SILENT_MODE = true; // Cambiar a false para ver errores de Slack
-
 class SlackService {
-  private client: WebClient;
-  private botToken: string;
+  private client: WebClient | null = null;
   private channelMap: Map<string, string> = new Map();
 
   constructor() {
-    this.botToken = process.env.SLACK_BOT_TOKEN || '';
-    this.client = new WebClient(this.botToken);
+    this.initialize();
   }
 
-  isConfigured(): boolean {
-    return !!this.botToken && this.botToken.startsWith('xoxb-');
-  }
-
-  getClient(): WebClient {
-    return this.client;
-  }
-
-  async syncChannels() {
-    if (!this.isConfigured()) {
-      if (!SILENT_MODE) console.log('⚠️ Slack no configurado');
-      return [];
-    }
-
-    try {
-      const result = await this.client.conversations.list({
-        types: 'public_channel,private_channel',
-        exclude_archived: true
-      });
-
-      return result.channels || [];
-    } catch (error: any) {
-      // Silenciar errores de autenticación
-      if (error.data?.error === 'invalid_auth' || error.data?.error === 'account_inactive') {
-        if (!SILENT_MODE) console.log('⚠️ Slack no disponible (token inválido)');
-      } else {
-        console.error('Error obteniendo canales de Slack:', error.message);
-      }
-      return [];
-    }
-  }
-
-  async refreshChannelMap() {
-    if (!this.isConfigured()) {
+  private initialize() {
+    const token = process.env.SLACK_BOT_TOKEN;
+    
+    if (!token) {
+      console.warn('⚠️ SLACK_BOT_TOKEN no configurado');
       return;
     }
 
     try {
-      const channels = await this.syncChannels();
-      this.channelMap.clear();
-      
-      channels.forEach((channel: any) => {
-        if (channel.name && channel.id) {
-          this.channelMap.set(channel.name.toLowerCase(), channel.id);
-        }
+      this.client = new WebClient(token);
+      console.log('✅ Slack client inicializado correctamente');
+      this.refreshChannelMap();
+    } catch (error: any) {
+      console.error('❌ Error inicializando Slack client:', error.message);
+    }
+  }
+
+  isConfigured(): boolean {
+    return this.client !== null;
+  }
+
+  getClient(): WebClient {
+    if (!this.client) {
+      throw new Error('Slack client no está configurado');
+    }
+    return this.client;
+  }
+
+  async refreshChannelMap() {
+    if (!this.isConfigured()) return;
+
+    try {
+      const result = await this.client!.conversations.list({
+        exclude_archived: true,
+        types: 'public_channel,private_channel',
       });
 
-      if (!SILENT_MODE) {
-        console.log(`✅ Mapa de canales actualizado: ${this.channelMap.size} canales`);
+      if (result.channels) {
+        this.channelMap.clear();
+        result.channels.forEach((channel: any) => {
+          if (channel.name) {
+            this.channelMap.set(channel.name, channel.id);
+          }
+        });
+        console.log(`✅ ${this.channelMap.size} canales de Slack mapeados`);
       }
     } catch (error: any) {
-      if (error.data?.error === 'invalid_auth' || error.data?.error === 'account_inactive') {
-        // Silenciar
-      } else {
-        console.error('Error refrescando mapa de canales:', error.message);
+      if (error.data?.error !== 'invalid_auth' && error.data?.error !== 'account_inactive') {
+        console.error('❌ Error refrescando canales:', error.message);
       }
     }
   }
 
-  async sendMessage(channelName: string, text: string, username?: string) {
+  async sendMessage(channelName: string, text: string, username: string = 'SlackBoard'): Promise<any> {
     if (!this.isConfigured()) {
-      if (!SILENT_MODE) console.log('💬 Mensaje guardado solo en MongoDB (Slack no configurado)');
-      return null;
+      throw new Error('Slack no está configurado');
     }
 
     try {
-      const channelId = this.channelMap.get(channelName.toLowerCase());
-      
+      const channelId = this.channelMap.get(channelName);
+
       if (!channelId) {
-        if (!SILENT_MODE) {
-          console.log(`⚠️ Canal "${channelName}" no encontrado en Slack`);
+        await this.refreshChannelMap();
+        const newChannelId = this.channelMap.get(channelName);
+        
+        if (!newChannelId) {
+          throw new Error(`Canal "${channelName}" no encontrado en Slack`);
         }
-        return null;
       }
 
-      const result = await this.client.chat.postMessage({
-        channel: channelId,
+      const result = await this.client!.chat.postMessage({
+        channel: this.channelMap.get(channelName)!,
         text: text,
-        username: username || 'SlackBoard Bot'
+        username: username,
+        icon_emoji: ':speech_balloon:',
       });
 
-      if (!SILENT_MODE) console.log('✅ Mensaje enviado a Slack');
       return result;
     } catch (error: any) {
-      if (error.data?.error === 'invalid_auth' || error.data?.error === 'account_inactive') {
-        if (!SILENT_MODE) console.log('⚠️ Slack no disponible, mensaje guardado solo en MongoDB');
-      } else {
-        console.error('Error enviando mensaje a Slack:', error.message);
-      }
-      return null;
+      console.error('❌ Error enviando mensaje a Slack:', error.message);
+      throw error;
     }
   }
 
-  async getUserInfo(userId: string) {
+  async syncChannels(): Promise<any[]> {
     if (!this.isConfigured()) {
-      return null;
+      throw new Error('Slack no está configurado');
     }
 
     try {
-      const result = await this.client.users.info({ user: userId });
+      const result = await this.client!.conversations.list({
+        exclude_archived: true,
+        types: 'public_channel,private_channel',
+      });
+
+      return result.channels || [];
+    } catch (error: any) {
+      console.error('❌ Error sincronizando canales:', error.message);
+      throw error;
+    }
+  }
+
+  async getUserInfo(userId: string): Promise<any> {
+    if (!this.isConfigured()) {
+      throw new Error('Slack no está configurado');
+    }
+
+    try {
+      const result = await this.client!.users.info({ user: userId });
       return result.user;
     } catch (error: any) {
-      if (error.data?.error === 'invalid_auth' || error.data?.error === 'account_inactive') {
-        // Silenciar
-      } else {
-        console.error('Error obteniendo info de usuario:', error.message);
-      }
+      console.error('❌ Error obteniendo info de usuario:', error.message);
       return null;
     }
   }

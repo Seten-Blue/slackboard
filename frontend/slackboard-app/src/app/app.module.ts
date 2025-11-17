@@ -10,6 +10,9 @@ import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { ChatComponent } from './components/chat/chat.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { MessageAreaComponent } from './components/message-area/message-area.component';
+import { CalendarComponent } from './components/calendar/calendar.component'; // ✅ Agregar
+import { GeminiChatComponent } from './components/gemini/gemini-chat.component';
+import { TrelloBoardComponent } from './components/trello-board/trello-board.component'; // ✅ Agregar
 
 @NgModule({
   declarations: [
@@ -17,7 +20,9 @@ import { MessageAreaComponent } from './components/message-area/message-area.com
     SidebarComponent,
     ChatComponent,
     DashboardComponent,
-    MessageAreaComponent
+    MessageAreaComponent,
+    CalendarComponent,      // ✅ Declarar aquí
+    GeminiChatComponent, TrelloBoardComponent     // ✅ Declarar aquí
   ],
   imports: [
     BrowserModule,
