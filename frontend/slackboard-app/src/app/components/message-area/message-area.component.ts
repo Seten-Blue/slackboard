@@ -31,6 +31,12 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   ngOnInit() {
     this.setupSocketListeners();
+    
+    // Esperar a que el usuario esté cargado
+    setTimeout(() => {
+      this.currentUser = this.chatService.getCurrentUser();
+      console.log('👤 Usuario actual en message-area:', this.currentUser);
+    }, 1000);
   }
 
   ngOnDestroy() {
@@ -69,7 +75,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
     // Escuchar cuando alguien está escribiendo
     const typingSub = this.socketService.onUserTyping().subscribe((data: any) => {
-      if (data.channelId === this.channel?._id && data.username !== this.currentUser.username) {
+      if (data.channelId === this.channel?._id && data.username !== this.currentUser?.username) {
         this.userTyping = data.username;
         
         // Limpiar después de 3 segundos
@@ -105,7 +111,17 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   sendMessage() {
-    if (!this.newMessage.trim() || !this.channel) return;
+    if (!this.newMessage.trim() || !this.channel) {
+      console.warn('⚠️ Mensaje vacío o sin canal');
+      return;
+    }
+
+    // Verificar que tenemos usuario
+    if (!this.currentUser || !this.currentUser._id) {
+      console.error('❌ No hay usuario actual configurado');
+      alert('Error: No se pudo identificar el usuario. Por favor recarga la página.');
+      return;
+    }
 
     const messageData = {
       content: this.newMessage.trim(),
@@ -113,10 +129,18 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       type: 'text'
     };
 
+    console.log('📨 Intentando enviar mensaje:', messageData);
+    console.log('👤 Usuario actual:', this.currentUser);
+
     this.chatService.sendMessage(messageData).subscribe({
       next: (response) => {
-        // Agregar el mensaje a la lista local
-        this.messages.push(response.data);
+        console.log('✅ Mensaje enviado exitosamente:', response);
+        
+        // Agregar el mensaje a la lista local solo si no existe
+        const exists = this.messages.some(m => m._id === response.data._id);
+        if (!exists) {
+          this.messages.push(response.data);
+        }
         
         // Emitir a través de Socket.IO
         this.socketService.sendMessage({
@@ -129,8 +153,17 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         this.shouldScrollToBottom = true;
       },
       error: (error) => {
-        console.error('Error enviando mensaje:', error);
-        alert('Error al enviar el mensaje');
+        console.error('❌ Error enviando mensaje:', error);
+        console.error('Detalles del error:', error.error);
+        
+        let errorMessage = 'Error al enviar el mensaje';
+        if (error.status === 404) {
+          errorMessage = 'Error: Canal o usuario no encontrado';
+        } else if (error.error && error.error.message) {
+          errorMessage = error.error.message;
+        }
+        
+        alert(errorMessage);
       }
     });
   }
@@ -143,7 +176,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   onTyping() {
-    if (!this.channel) return;
+    if (!this.channel || !this.currentUser) return;
 
     // Notificar que el usuario está escribiendo
     this.socketService.sendTyping({

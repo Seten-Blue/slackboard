@@ -1,0 +1,407 @@
+<div class="calendar-container">
+  <div class="calendar-header">
+    <h1>📅 Google Calendar</h1>
+    
+    <div class="header-actions" *ngIf="isAuthenticated">
+      <button (click)="openCreateModal()" class="btn-create" title="Crear evento">
+        ➕ Nuevo Evento
+      </button>
+      <div class="view-switcher">
+        <button 
+          [class.active]="selectedView === 'month'" 
+          (click)="switchView('month')"
+          class="btn-view">
+          Mes
+        </button>
+        <button 
+          [class.active]="selectedView === 'week'" 
+          (click)="switchView('week')"
+          class="btn-view">
+          Lista
+        </button>
+      </div>
+      <button (click)="loadEvents(); loadHolidays()" class="btn-refresh" title="Actualizar">
+        🔄
+      </button>
+      <button (click)="revokeAccess()" class="btn-revoke" title="Desconectar">
+        🔌
+      </button>
+    </div>
+  </div>
+
+  <!-- Estado de carga -->
+  <div *ngIf="isLoading" class="loading">
+    <div class="spinner"></div>
+    <p>Cargando eventos...</p>
+  </div>
+
+  <!-- Mensaje de error -->
+  <div *ngIf="errorMessage" class="error-message">
+    ⚠️ {{ errorMessage }}
+  </div>
+
+  <!-- No autenticado -->
+  <div *ngIf="!isAuthenticated && !isLoading" class="auth-prompt">
+    <div class="auth-card">
+      <h2>🔐 Conecta tu Google Calendar</h2>
+      <p>Para ver tus eventos, necesitas autorizar el acceso a tu calendario de Google.</p>
+      <button (click)="authorize()" class="btn-authorize">
+        Conectar con Google Calendar
+      </button>
+      <p class="auth-note">
+        Se abrirá una ventana nueva para que autorices el acceso.
+        Después de autorizar, vuelve a esta página.
+      </p>
+    </div>
+  </div>
+
+  <!-- Vista de Calendario (Mes) -->
+  <div *ngIf="isAuthenticated && !isLoading && selectedView === 'month'" class="calendar-view">
+    <!-- Controles del mes -->
+    <div class="month-controls">
+      <button (click)="previousMonth()" class="btn-nav">←</button>
+      <h2 class="month-title">{{ currentMonthYear }}</h2>
+      <button (click)="nextMonth()" class="btn-nav">→</button>
+      <button (click)="goToToday()" class="btn-today">Hoy</button>
+    </div>
+
+    <!-- Leyenda de colores -->
+    <div class="urgency-legend">
+      <div class="legend-item">
+        <span class="legend-color high"></span>
+        <span>Urgente (menos de 2h)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-color medium"></span>
+        <span>Próximo (menos de 24h)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-color low"></span>
+        <span>Programado</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-color holiday"></span>
+        <span>🎉 Día Festivo</span>
+      </div>
+    </div>
+
+    <!-- Grid del calendario -->
+    <div class="calendar-grid">
+      <!-- Días de la semana -->
+      <div *ngFor="let day of weekDays" class="weekday-header">
+        {{ day }}
+      </div>
+
+      <!-- Días del mes -->
+      <div 
+        *ngFor="let day of calendarDays" 
+        class="calendar-day"
+        [class.other-month]="!day.isCurrentMonth"
+        [class.today]="isToday(day.date)"
+        [class.holiday]="day.isHoliday"
+        (dblclick)="openCreateModal(day.date)">
+        
+        <div class="day-number">
+          {{ day.date.getDate() }}
+          <span *ngIf="day.isHoliday" class="holiday-indicator" [title]="day.holidayName">🎉</span>
+        </div>
+        
+        <div *ngIf="day.isHoliday && day.holidayName" class="holiday-name">
+          {{ day.holidayName }}
+        </div>
+        
+        <div class="day-events">
+          <div 
+            *ngFor="let event of day.events.slice(0, 3)" 
+            class="event-dot"
+            [style.background-color]="getEventColor(event)"
+            [title]="event.summary"
+            (click)="selectEvent(event)">
+            <span class="event-time">{{ getEventTime(event) }}</span>
+            <span class="event-title">{{ event.summary }}</span>
+          </div>
+          <div *ngIf="day.events.length > 3" class="more-events" (click)="openCreateModal(day.date)">
+            +{{ day.events.length - 3 }} más
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="calendar-tip">💡 Haz doble clic en cualquier día para crear un evento</p>
+  </div>
+
+  <!-- Vista de Lista (Semana) -->
+  <div *ngIf="isAuthenticated && !isLoading && selectedView === 'week'" class="events-container">
+    <div *ngIf="displayEvents.length === 0" class="no-events">
+      <p>📭 No hay eventos este mes</p>
+      <button (click)="openCreateModal()" class="btn-create-inline">
+        ➕ Crear nuevo evento
+      </button>
+    </div>
+
+    <div *ngIf="displayEvents.length > 0" class="events-list">
+      <div *ngFor="let event of displayEvents" class="event-card">
+        <div class="event-time">
+          <span class="time">{{ getEventTime(event) }}</span>
+          <span class="date">{{ getEventDate(event) }}</span>
+        </div>
+        <div class="event-details">
+          <div class="event-urgency" [style.background-color]="getEventColor(event)"></div>
+          <h3 class="event-title">{{ event.summary }}</h3>
+          <p *ngIf="event.description" class="event-description">
+            {{ event.description }}
+          </p>
+          <p *ngIf="event.location" class="event-location">
+            📍 {{ event.location }}
+          </p>
+          <div class="event-actions">
+            <button (click)="openEditModal(event)" class="btn-edit">✏️ Editar</button>
+            <a *ngIf="event.htmlLink" 
+               [href]="event.htmlLink" 
+               target="_blank" 
+               class="event-link">
+              Ver en Google Calendar →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de detalles del evento -->
+  <!-- Modal de detalles del evento -->
+  <div *ngIf="selectedEvent && !showEditModal" class="event-modal" (click)="closeEventDetail()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <button class="close-modal" (click)="closeEventDetail()">×</button>
+      <div class="modal-urgency" [style.background-color]="selectedEvent ? getEventColor(selectedEvent) : '#6b7280'"></div>
+      <h2>{{ selectedEvent?.summary }}</h2>
+      <div class="modal-info">
+        <p><strong>📅 Fecha:</strong> {{ selectedEvent ? getEventDate(selectedEvent) : '' }}</p>
+        <p><strong>🕐 Hora:</strong> {{ selectedEvent ? getEventTime(selectedEvent) : '' }}</p>
+        <p *ngIf="selectedEvent?.location"><strong>📍 Lugar:</strong> {{ selectedEvent.location }}</p>
+        <p *ngIf="selectedEvent?.description"><strong>📝 Descripción:</strong> {{ selectedEvent.description }}</p>
+      </div>
+      <div class="modal-actions">
+        <button *ngIf="selectedEvent" (click)="openEditModal(selectedEvent)" class="btn-edit-modal">
+          ✏️ Editar Evento
+        </button>
+        <a *ngIf="selectedEvent?.htmlLink" 
+           [href]="selectedEvent.htmlLink" 
+           target="_blank" 
+           class="btn-open-google">
+          Abrir en Google Calendar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de CREAR evento -->
+  <div *ngIf="showCreateModal" class="event-modal" (click)="closeModal()">
+    <div class="modal-content form-modal" (click)="$event.stopPropagation()">
+      <button class="close-modal" (click)="closeModal()">×</button>
+      <h2>➕ Crear Nuevo Evento</h2>
+      
+      <form class="event-form" (submit)="createEvent(); $event.preventDefault()">
+        <div class="form-group">
+          <label for="summary">Título del Evento *</label>
+          <input 
+            type="text" 
+            id="summary"
+            [(ngModel)]="eventForm.summary" 
+            name="summary"
+            placeholder="Ej: Reunión con el equipo"
+            required>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Descripción</label>
+          <textarea 
+            id="description"
+            [(ngModel)]="eventForm.description" 
+            name="description"
+            placeholder="Detalles del evento..."
+            rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="location">Ubicación</label>
+          <input 
+            type="text" 
+            id="location"
+            [(ngModel)]="eventForm.location" 
+            name="location"
+            placeholder="Ej: Oficina, Zoom, etc.">
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label>
+            <input 
+              type="checkbox" 
+              [(ngModel)]="eventForm.allDay" 
+              name="allDay">
+            <span>Todo el día</span>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="startDate">Fecha de Inicio *</label>
+            <input 
+              type="date" 
+              id="startDate"
+              [(ngModel)]="eventForm.startDate" 
+              name="startDate"
+              required>
+          </div>
+
+          <div class="form-group" *ngIf="!eventForm.allDay">
+            <label for="startTime">Hora de Inicio *</label>
+            <input 
+              type="time" 
+              id="startTime"
+              [(ngModel)]="eventForm.startTime" 
+              name="startTime"
+              required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="endDate">Fecha de Fin *</label>
+            <input 
+              type="date" 
+              id="endDate"
+              [(ngModel)]="eventForm.endDate" 
+              name="endDate"
+              required>
+          </div>
+
+          <div class="form-group" *ngIf="!eventForm.allDay">
+            <label for="endTime">Hora de Fin *</label>
+            <input 
+              type="time" 
+              id="endTime"
+              [(ngModel)]="eventForm.endTime" 
+              name="endTime"
+              required>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" (click)="closeModal()" class="btn-cancel">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-submit">
+            ✅ Crear Evento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de EDITAR evento -->
+  <div *ngIf="showEditModal" class="event-modal" (click)="closeModal()">
+    <div class="modal-content form-modal" (click)="$event.stopPropagation()">
+      <button class="close-modal" (click)="closeModal()">×</button>
+      <h2>✏️ Editar Evento</h2>
+      
+      <form class="event-form" (submit)="updateEvent(); $event.preventDefault()">
+        <div class="form-group">
+          <label for="edit-summary">Título del Evento *</label>
+          <input 
+            type="text" 
+            id="edit-summary"
+            [(ngModel)]="eventForm.summary" 
+            name="summary"
+            required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-description">Descripción</label>
+          <textarea 
+            id="edit-description"
+            [(ngModel)]="eventForm.description" 
+            name="description"
+            rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-location">Ubicación</label>
+          <input 
+            type="text" 
+            id="edit-location"
+            [(ngModel)]="eventForm.location" 
+            name="location">
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label>
+            <input 
+              type="checkbox" 
+              [(ngModel)]="eventForm.allDay" 
+              name="allDay">
+            <span>Todo el día</span>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-startDate">Fecha de Inicio *</label>
+            <input 
+              type="date" 
+              id="edit-startDate"
+              [(ngModel)]="eventForm.startDate" 
+              name="startDate"
+              required>
+          </div>
+
+          <div class="form-group" *ngIf="!eventForm.allDay">
+            <label for="edit-startTime">Hora de Inicio *</label>
+            <input 
+              type="time" 
+              id="edit-startTime"
+              [(ngModel)]="eventForm.startTime" 
+              name="startTime"
+              required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-endDate">Fecha de Fin *</label>
+            <input 
+              type="date" 
+              id="edit-endDate"
+              [(ngModel)]="eventForm.endDate" 
+              name="endDate"
+              required>
+          </div>
+
+          <div class="form-group" *ngIf="!eventForm.allDay">
+            <label for="edit-endTime">Hora de Fin *</label>
+            <input 
+              type="time" 
+              id="edit-endTime"
+              [(ngModel)]="eventForm.endTime" 
+              name="endTime"
+              required>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" (click)="deleteEvent()" class="btn-delete">
+            🗑️ Eliminar
+          </button>
+          <div class="form-actions-right">
+            <button type="button" (click)="closeModal()" class="btn-cancel">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-submit">
+              ✅ Guardar Cambios
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
