@@ -91,7 +91,7 @@ io.on('connection', (socket) => {
   // Enviar mensaje - EMITIR A TODOS INCLUYENDO AL EMISOR
   socket.on('send-message', (data: any) => {
     console.log('📤 Socket.IO emitiendo mensaje a canal:', data.channelId);
-    io.to(data.channelId).emit('new-message', data);
+    io.to(data.channelId).emit('newMessage', data);
   });
 
   // Usuario escribiendo

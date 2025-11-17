@@ -81,10 +81,12 @@ router.post('/sync-channels', async (req: Request, res: Response) => {
       data: syncedChannels
     });
   } catch (error: any) {
-    console.error('❌ Error sincronizando canales:', error.message);
-    res.status(500).json({
+    if (error.data?.error !== 'invalid_auth' && error.data?.error !== 'account_inactive') {
+      console.error('❌ Error sincronizando canales:', error.message);
+    }
+    res.status(400).json({
       success: false,
-      message: 'Error al sincronizar canales',
+      message: 'Error al sincronizar canales. Verifica tu token de Slack.',
       error: error.message
     });
   }
@@ -138,13 +140,10 @@ router.post('/send-message', async (req: Request, res: Response) => {
 // Endpoint para eventos de Slack (webhooks)
 router.post('/events', async (req: Request, res: Response) => {
   try {
-    console.log('📨 Recibido evento de Slack:', JSON.stringify(req.body, null, 2));
-    
     const { type, challenge, event } = req.body;
 
     // Responder al challenge de verificación de URL
     if (type === 'url_verification') {
-      console.log('✅ Verificación de URL - Challenge:', challenge);
       return res.status(200).json({ challenge });
     }
 
@@ -152,9 +151,8 @@ router.post('/events', async (req: Request, res: Response) => {
     if (type === 'event_callback' && event) {
       console.log('📬 Evento recibido:', event.type);
       
-      // Ignorar mensajes del bot para evitar loops
-      if (event.bot_id) {
-        console.log('⏭️  Ignorando mensaje del bot');
+      // Ignorar mensajes del bot y eventos de canal_join
+      if (event.bot_id || event.subtype === 'channel_join') {
         return res.status(200).send('OK');
       }
 
@@ -163,6 +161,11 @@ router.post('/events', async (req: Request, res: Response) => {
         console.log('💬 Procesando mensaje de Slack');
         
         const slackUser = await slackService.getUserInfo(event.user);
+        
+        // Si getUserInfo falla (token inválido), simplemente ignorar
+        if (!slackUser) {
+          return res.status(200).send('OK');
+        }
         
         let user = await User.findOne({ email: slackUser?.profile?.email });
         
@@ -198,21 +201,13 @@ router.post('/events', async (req: Request, res: Response) => {
 
           console.log('✅ Mensaje guardado en MongoDB');
 
-          // 🔥 EMITIR POR SOCKET.IO
-          console.log('✅ Mensaje guardado en MongoDB');
-
-          // 🔥 EMITIR POR SOCKET.IO
+          // EMITIR POR SOCKET.IO
           const io = req.app.get('io');
           if (io && populatedMessage) {
             console.log('📤 Emitiendo mensaje de Slack por Socket.IO');
             const channelIdStr = String(channel._id);
-            io.to(channelIdStr).emit('new-message', {
-              channelId: channelIdStr,
-              message: populatedMessage
-            });
+            io.to(channelIdStr).emit('newMessage', populatedMessage);
             console.log('✅ Mensaje de Slack emitido por Socket.IO');
-          } else {
-            console.warn('⚠️ Socket.IO no disponible');
           }
         }
       }
@@ -220,12 +215,12 @@ router.post('/events', async (req: Request, res: Response) => {
       return res.status(200).send('OK');
     }
 
-    console.log('ℹ️  Evento no manejado:', type);
     res.status(200).send('OK');
   } catch (error: any) {
-    console.error('❌ Error procesando evento de Slack:', error.message);
-    console.error(error.stack);
-    res.status(500).json({ error: error.message });
+    if (error.data?.error !== 'invalid_auth' && error.data?.error !== 'account_inactive') {
+      console.error('❌ Error procesando evento de Slack:', error.message);
+    }
+    res.status(200).send('OK');
   }
 });
 

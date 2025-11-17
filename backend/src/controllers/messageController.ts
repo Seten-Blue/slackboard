@@ -22,7 +22,7 @@ export const getMessagesByChannel = async (req: Request, res: Response) => {
       success: true,
       count: messages.length,
       total,
-      data: messages.reverse(), // Ordenar de más antiguo a más reciente
+      data: messages.reverse(),
     });
   } catch (error: any) {
     res.status(500).json({
@@ -40,7 +40,6 @@ export const createMessage = async (req: Request, res: Response) => {
 
     console.log('📥 Recibiendo mensaje:', { content, channel, sender, type });
 
-    // Verificar que el canal existe
     const channelExists = await Channel.findById(channel);
     if (!channelExists) {
       return res.status(404).json({
@@ -49,7 +48,6 @@ export const createMessage = async (req: Request, res: Response) => {
       });
     }
 
-    // Verificar que el usuario existe
     const userExists = await User.findById(sender);
     if (!userExists) {
       return res.status(404).json({
@@ -58,7 +56,6 @@ export const createMessage = async (req: Request, res: Response) => {
       });
     }
 
-    // Crear el mensaje
     const message = await Message.create({
       content,
       channel,
@@ -66,28 +63,31 @@ export const createMessage = async (req: Request, res: Response) => {
       type,
     });
 
-    // Obtener el mensaje con el sender poblado
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'username email avatar status');
 
     console.log('✅ Mensaje creado en MongoDB:', populatedMessage);
 
-    // 🔥 INTEGRACIÓN SLACK: Enviar mensaje a Slack
+    // EMITIR POR SOCKET.IO (ANTES de Slack)
+    const io = (req as any).app.get('io');
+    if (io && populatedMessage) {
+      console.log('📤 Socket.IO emitiendo mensaje a canal:', channel);
+      io.to(channel.toString()).emit('newMessage', populatedMessage);
+    }
+
+    // 🔥 INTEGRACIÓN SLACK (con manejo silencioso de errores)
     try {
       if (slackService.isConfigured()) {
-        console.log(`📤 Intentando enviar a Slack canal: ${channelExists.name}`);
         await slackService.sendMessage(
           channelExists.name,
           content,
           userExists.username
         );
-        console.log('✅ Mensaje sincronizado con Slack');
-      } else {
-        console.log('⚠️ Slack no configurado, mensaje solo en MongoDB');
       }
     } catch (slackError: any) {
-      console.error('⚠️ Error enviando a Slack:', slackError.message);
-      // No falla la petición si Slack falla
+      if (slackError.data?.error !== 'invalid_auth' && slackError.data?.error !== 'account_inactive') {
+        console.error('⚠️ Error con Slack:', slackError.message);
+      }
     }
 
     res.status(201).json({
@@ -178,25 +178,20 @@ export const addReaction = async (req: Request, res: Response) => {
       });
     }
 
-    // Buscar si ya existe esa reacción
     const existingReaction = message.reactions.find((r) => r.emoji === emoji);
 
     if (existingReaction) {
-      // Si el usuario ya reaccionó, quitar su reacción
       if (existingReaction.users.includes(userId)) {
         existingReaction.users = existingReaction.users.filter(
           (id) => id.toString() !== userId
         );
-        // Si no quedan usuarios, eliminar la reacción
         if (existingReaction.users.length === 0) {
           message.reactions = message.reactions.filter((r) => r.emoji !== emoji);
         }
       } else {
-        // Agregar usuario a la reacción existente
         existingReaction.users.push(userId);
       }
     } else {
-      // Crear nueva reacción
       message.reactions.push({ emoji, users: [userId] });
     }
 
@@ -217,4 +212,4 @@ export const addReaction = async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-};  
+};

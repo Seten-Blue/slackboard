@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
+import { io, Socket } from 'socket.io-client';
 
 export interface Channel {
   _id: string;
@@ -34,22 +35,61 @@ export interface Message {
 })
 export class ChatService {
   private apiUrl = 'http://localhost:3000/api';
+  private socketUrl = 'http://localhost:3000';
+  private socket: Socket;
+  
   private currentChannelSubject = new BehaviorSubject<Channel | null>(null);
   public currentChannel$ = this.currentChannelSubject.asObservable();
+  
+  // BehaviorSubject para mensajes en tiempo real
+  private messagesSubject = new BehaviorSubject<Message[]>([]);
+  public messages$ = this.messagesSubject.asObservable();
   
   private currentUser: any;
 
   constructor(private http: HttpClient) {
-    // Inicializar usuario actual
+    // Inicializar Socket.IO
+    this.socket = io(this.socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10
+    });
+
+    this.setupSocketListeners();
     this.initializeCurrentUser();
+  }
+
+  private setupSocketListeners() {
+    this.socket.on('connect', () => {
+      console.log('✅ Socket.IO conectado:', this.socket.id);
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('❌ Socket.IO desconectado');
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('❌ Error de conexión Socket.IO:', error);
+    });
+
+    // Escuchar nuevos mensajes
+    this.socket.on('newMessage', (message: Message) => {
+      console.log('📨 Nuevo mensaje recibido:', message);
+      const currentMessages = this.messagesSubject.value;
+      this.messagesSubject.next([...currentMessages, message]);
+    });
+
+    // Escuchar usuario escribiendo
+    this.socket.on('user-typing', (data: any) => {
+      console.log('✍️ Usuario escribiendo:', data);
+    });
   }
 
   private async initializeCurrentUser() {
     try {
-      // Intentar obtener el primer usuario de la base de datos
       const response: any = await this.http.get(`${this.apiUrl}/channels`).toPromise();
       
-      // Si hay canales, obtener un usuario de los miembros
       if (response.data && response.data.length > 0) {
         const firstChannel = response.data[0];
         if (firstChannel.members && firstChannel.members.length > 0) {
@@ -67,13 +107,13 @@ export class ChatService {
     } catch (error) {
       console.error('Error obteniendo usuario:', error);
     }
-
-    // Usuario por defecto si falla
+    
+    // Usuario por defecto
     this.currentUser = {
-      _id: '000000000000000000000000', // ID temporal
+      _id: '691a782cae6f4b98118e1ebd', // ID del admin que ya existe
       username: 'Admin',
       email: 'admin@slackboard.com',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'
     };
   }
 
@@ -83,6 +123,27 @@ export class ChatService {
 
   setCurrentChannel(channel: Channel | null) {
     this.currentChannelSubject.next(channel);
+    
+    if (channel) {
+      // Unirse al canal en Socket.IO
+      this.socket.emit('join-channel', channel._id);
+      console.log('🔗 Unido al canal:', channel._id);
+      
+      // Cargar mensajes del canal
+      this.loadChannelMessages(channel._id);
+    }
+  }
+
+  private loadChannelMessages(channelId: string) {
+    this.getMessagesByChannel(channelId).subscribe({
+      next: (response) => {
+        this.messagesSubject.next(response.data || []);
+      },
+      error: (error) => {
+        console.error('Error cargando mensajes:', error);
+        this.messagesSubject.next([]);
+      }
+    });
   }
 
   getChannels(): Observable<any> {
@@ -98,17 +159,23 @@ export class ChatService {
   }
 
   sendMessage(messageData: any): Observable<any> {
-    // Asegurarse de que el mensaje tenga el sender
     const fullMessageData = {
       content: messageData.content,
       channel: messageData.channel,
       type: messageData.type || 'text',
       sender: this.currentUser._id
     };
-
+    
     console.log('📤 Enviando mensaje:', fullMessageData);
     
     return this.http.post(`${this.apiUrl}/messages`, fullMessageData);
+  }
+
+  notifyTyping(channelId: string) {
+    this.socket.emit('typing', {
+      channelId: channelId,
+      username: this.currentUser.username
+    });
   }
 
   updateMessage(messageId: string, content: string): Observable<any> {
@@ -124,5 +191,12 @@ export class ChatService {
       emoji,
       userId: this.currentUser._id
     });
+  }
+
+  // Limpiar al destruir el servicio
+  ngOnDestroy() {
+    if (this.socket) {
+      this.socket.disconnect();
+    }
   }
 }
