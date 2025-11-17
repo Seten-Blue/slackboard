@@ -184,13 +184,36 @@ router.post('/events', async (req: Request, res: Response) => {
         const channel = await Channel.findOne({ name: channelName });
 
         if (channel && user) {
-          await Message.create({
+          // Crear el mensaje en MongoDB
+          const message = await Message.create({
             content: event.text,
             channel: channel._id,
             sender: user._id,
             type: 'text'
           });
+
+          // Obtener el mensaje con el sender poblado
+          const populatedMessage = await Message.findById(message._id)
+            .populate('sender', 'username email avatar status');
+
           console.log('✅ Mensaje guardado en MongoDB');
+
+          // 🔥 EMITIR POR SOCKET.IO
+          console.log('✅ Mensaje guardado en MongoDB');
+
+          // 🔥 EMITIR POR SOCKET.IO
+          const io = req.app.get('io');
+          if (io && populatedMessage) {
+            console.log('📤 Emitiendo mensaje de Slack por Socket.IO');
+            const channelIdStr = String(channel._id);
+            io.to(channelIdStr).emit('new-message', {
+              channelId: channelIdStr,
+              message: populatedMessage
+            });
+            console.log('✅ Mensaje de Slack emitido por Socket.IO');
+          } else {
+            console.warn('⚠️ Socket.IO no disponible');
+          }
         }
       }
 

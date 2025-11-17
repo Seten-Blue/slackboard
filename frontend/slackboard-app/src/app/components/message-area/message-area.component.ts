@@ -32,10 +32,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   ngOnInit() {
     this.setupSocketListeners();
     
-    // Esperar a que el usuario esté cargado
     setTimeout(() => {
       this.currentUser = this.chatService.getCurrentUser();
-      console.log('👤 Usuario actual en message-area:', this.currentUser);
     }, 1000);
   }
 
@@ -61,24 +59,23 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   setupSocketListeners() {
-    // Escuchar nuevos mensajes
     const newMessageSub = this.socketService.onNewMessage().subscribe((data: any) => {
+      console.log('🔔 Mensaje recibido por Socket.IO:', data);
+      
       if (data.channelId === this.channel?._id) {
-        // Verificar si el mensaje ya existe (evitar duplicados)
         const exists = this.messages.some(m => m._id === data.message._id);
         if (!exists) {
+          console.log('➕ Agregando mensaje');
           this.messages.push(data.message);
           this.shouldScrollToBottom = true;
         }
       }
     });
 
-    // Escuchar cuando alguien está escribiendo
     const typingSub = this.socketService.onUserTyping().subscribe((data: any) => {
       if (data.channelId === this.channel?._id && data.username !== this.currentUser?.username) {
         this.userTyping = data.username;
         
-        // Limpiar después de 3 segundos
         if (this.typingTimeout) {
           clearTimeout(this.typingTimeout);
         }
@@ -111,15 +108,10 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   sendMessage() {
-    if (!this.newMessage.trim() || !this.channel) {
-      console.warn('⚠️ Mensaje vacío o sin canal');
-      return;
-    }
+    if (!this.newMessage.trim() || !this.channel) return;
 
-    // Verificar que tenemos usuario
     if (!this.currentUser || !this.currentUser._id) {
-      console.error('❌ No hay usuario actual configurado');
-      alert('Error: No se pudo identificar el usuario. Por favor recarga la página.');
+      alert('Error: No se pudo identificar el usuario');
       return;
     }
 
@@ -129,41 +121,20 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       type: 'text'
     };
 
-    console.log('📨 Intentando enviar mensaje:', messageData);
-    console.log('👤 Usuario actual:', this.currentUser);
-
     this.chatService.sendMessage(messageData).subscribe({
       next: (response) => {
-        console.log('✅ Mensaje enviado exitosamente:', response);
+        console.log('✅ Mensaje enviado:', response);
         
-        // Agregar el mensaje a la lista local solo si no existe
-        const exists = this.messages.some(m => m._id === response.data._id);
-        if (!exists) {
-          this.messages.push(response.data);
-        }
-        
-        // Emitir a través de Socket.IO
         this.socketService.sendMessage({
           channelId: this.channel._id,
           message: response.data
         });
 
-        // Limpiar input y scroll
         this.newMessage = '';
-        this.shouldScrollToBottom = true;
       },
       error: (error) => {
-        console.error('❌ Error enviando mensaje:', error);
-        console.error('Detalles del error:', error.error);
-        
-        let errorMessage = 'Error al enviar el mensaje';
-        if (error.status === 404) {
-          errorMessage = 'Error: Canal o usuario no encontrado';
-        } else if (error.error && error.error.message) {
-          errorMessage = error.error.message;
-        }
-        
-        alert(errorMessage);
+        console.error('❌ Error:', error);
+        alert('Error al enviar el mensaje');
       }
     });
   }
@@ -178,7 +149,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   onTyping() {
     if (!this.channel || !this.currentUser) return;
 
-    // Notificar que el usuario está escribiendo
     this.socketService.sendTyping({
       channelId: this.channel._id,
       username: this.currentUser.username
@@ -188,7 +158,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   addReaction(messageId: string, emoji: string) {
     this.chatService.addReaction(messageId, emoji).subscribe({
       next: (response) => {
-        // Actualizar el mensaje en la lista
         const index = this.messages.findIndex(m => m._id === messageId);
         if (index !== -1) {
           this.messages[index] = response.data;
@@ -227,8 +196,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         const element = this.messageContainer.nativeElement;
         element.scrollTop = element.scrollHeight;
       }
-    } catch (err) {
-      console.error('Error scrolling:', err);
-    }
+    } catch (err) {}
   }
 }

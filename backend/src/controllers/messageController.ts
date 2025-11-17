@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
+import slackService from '../services/slackService';
 
 // Obtener mensajes de un canal
 export const getMessagesByChannel = async (req: Request, res: Response) => {
@@ -37,6 +38,8 @@ export const createMessage = async (req: Request, res: Response) => {
   try {
     const { content, channel, sender, type = 'text' } = req.body;
 
+    console.log('📥 Recibiendo mensaje:', { content, channel, sender, type });
+
     // Verificar que el canal existe
     const channelExists = await Channel.findById(channel);
     if (!channelExists) {
@@ -55,6 +58,7 @@ export const createMessage = async (req: Request, res: Response) => {
       });
     }
 
+    // Crear el mensaje
     const message = await Message.create({
       content,
       channel,
@@ -62,19 +66,24 @@ export const createMessage = async (req: Request, res: Response) => {
       type,
     });
 
+    // Obtener el mensaje con el sender poblado
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'username email avatar status');
 
+    console.log('✅ Mensaje creado en MongoDB:', populatedMessage);
+
     // 🔥 INTEGRACIÓN SLACK: Enviar mensaje a Slack
     try {
-      const slackService = require('../services/slackService').default;
       if (slackService.isConfigured()) {
+        console.log(`📤 Intentando enviar a Slack canal: ${channelExists.name}`);
         await slackService.sendMessage(
           channelExists.name,
           content,
           userExists.username
         );
         console.log('✅ Mensaje sincronizado con Slack');
+      } else {
+        console.log('⚠️ Slack no configurado, mensaje solo en MongoDB');
       }
     } catch (slackError: any) {
       console.error('⚠️ Error enviando a Slack:', slackError.message);
@@ -87,6 +96,7 @@ export const createMessage = async (req: Request, res: Response) => {
       data: populatedMessage,
     });
   } catch (error: any) {
+    console.error('❌ Error al crear mensaje:', error);
     res.status(500).json({
       success: false,
       message: 'Error al crear mensaje',
@@ -207,4 +217,4 @@ export const addReaction = async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-};
+};  

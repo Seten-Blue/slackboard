@@ -10,6 +10,7 @@ import channelsRouter from './routes/channels';
 import messagesRouter from './routes/messages';
 import analyticsRouter from './routes/analytics';
 import slackRouter from './routes/slack';
+import calendarRouter from './routes/calendar';
 
 // Configurar variables de entorno
 dotenv.config();
@@ -25,6 +26,9 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"]
   }
 });
+
+// Hacer Socket.IO disponible para las rutas
+app.set('io', io);
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -53,7 +57,8 @@ app.get('/', (req: Request, res: Response) => {
       channels: '/api/channels',
       messages: '/api/messages',
       analytics: '/api/analytics',
-      slack: '/api/slack'
+      slack: '/api/slack',
+      calendar: '/api/calendar'
     }
   });
 });
@@ -71,6 +76,7 @@ app.use('/api/channels', channelsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/slack', slackRouter);
+app.use('/api/calendar', calendarRouter);
 
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
@@ -82,8 +88,9 @@ io.on('connection', (socket) => {
     console.log(`Usuario ${socket.id} se unió al canal: ${channelId}`);
   });
 
-  // Enviar mensaje
+  // Enviar mensaje - EMITIR A TODOS INCLUYENDO AL EMISOR
   socket.on('send-message', (data: any) => {
+    console.log('📤 Socket.IO emitiendo mensaje a canal:', data.channelId);
     io.to(data.channelId).emit('new-message', data);
   });
 
