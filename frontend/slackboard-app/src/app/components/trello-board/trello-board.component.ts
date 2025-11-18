@@ -32,11 +32,16 @@ export class TrelloBoardComponent implements OnInit {
   getMemberProgress() {
     if (!this.boardCards || this.boardCards.length === 0) return [];
     interface Progress {
+      id: string;
       name: string;
+      username?: string;
+      avatarUrl?: string;
+      email?: string;
       done: number;
       doing: number;
       todo: number;
       total: number;
+      percent: number;
       [key: string]: any;
     }
     const progress: { [member: string]: Progress } = {};
@@ -46,14 +51,37 @@ export class TrelloBoardComponent implements OnInit {
       if (card.closed || card.dueComplete) estado = 'done';
       else if (card.due || card.start) estado = 'doing';
       members.forEach((m: any) => {
-        if (!progress[m.id]) progress[m.id] = { name: m.fullName || m.username || 'Sin asignar', done: 0, doing: 0, todo: 0, total: 0 };
+        if (!progress[m.id]) {
+          progress[m.id] = {
+            id: m.id,
+            name: m.fullName || m.username || 'Sin asignar',
+            username: m.username || '',
+            avatarUrl: m.avatarUrl || m.avatarHash ? `https://trello-members.s3.amazonaws.com/${m.id}/${m.avatarHash}/170.png` : '',
+            email: m.email || '',
+            done: 0, doing: 0, todo: 0, total: 0, percent: 0
+          };
+        }
         progress[m.id][estado]++;
         progress[m.id].total++;
       });
     });
-    return Object.values(progress).sort((a, b) => b.done - a.done);
+    // Calcular porcentaje y devolver ordenado
+    Object.values(progress).forEach((p: any) => {
+      p.percent = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+    });
+    return Object.values(progress).sort((a, b) => b.percent - a.percent);
+  }
+
+  // Devuelve la clase de color para la barra de avance
+  getProgressColor(percent: number): string {
+    if (percent >= 90) return 'progress-bar-green';
+    if (percent > 69) return 'progress-bar-orange';
+    if (percent < 30) return 'progress-bar-red';
+    if (percent < 51) return 'progress-bar-yellow';
+    return 'progress-bar-default';
   }
   boards: any[] = [];
+  allBoards: any[] = []; // Incluye todos los tableros, incluso los de pruebas
   isLoading = false;
   errorMsg = '';
 
@@ -78,7 +106,8 @@ export class TrelloBoardComponent implements OnInit {
     this.errorMsg = '';
     this.trelloService.getBoards().subscribe({
       next: (res: any) => {
-        this.boards = res.data || [];
+        this.allBoards = res.data || [];
+        this.boards = this.allBoards; // Mostrar todos los tableros
         this.isLoading = false;
       },
       error: (err: any) => {
@@ -86,6 +115,20 @@ export class TrelloBoardComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+
+  // Detecta si un board es de pruebas (por nombre o id)
+  isTestBoard(board: any): boolean {
+    // Mejor filtro: ignora espacios, mayúsculas y caracteres especiales
+    const testNames = ['prueba', 'test', 'tablero de pruebas', 'demo'];
+    const normalize = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nameNorm = normalize(board.name);
+    // Coincidencia exacta o parcial
+    if (testNames.some(t => nameNorm.includes(normalize(t)))) return true;
+    // Si tienes el id del tablero de pruebas, agrégalo aquí:
+    const testBoardIds = ['tablerodepruebasid', 'idprueba123']; // <-- pon aquí el id real si lo sabes
+    if (testBoardIds.includes((board.id || '').toLowerCase())) return true;
+    return false;
   }
 
   // Devuelve un color para la barra lateral de cada board (puedes personalizar la paleta)

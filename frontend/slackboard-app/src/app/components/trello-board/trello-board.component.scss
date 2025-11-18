@@ -73,6 +73,21 @@
 	border-radius: 0.7rem;
 	transition: width 0.3s;
 }
+.progress-bar-green {
+	background: linear-gradient(90deg, #22c55e 60%, #a3e635 100%);
+}
+.progress-bar-orange {
+	background: linear-gradient(90deg, #f59e42 60%, #fbbf24 100%);
+}
+.progress-bar-yellow {
+	background: linear-gradient(90deg, #fbbf24 60%, #fde047 100%);
+}
+.progress-bar-red {
+	background: linear-gradient(90deg, #ef4444 60%, #f87171 100%);
+}
+.progress-bar-default {
+	background: linear-gradient(90deg, #a3e635 60%, #7bb6ff 100%);
+}
 .progress-label {
 	color: #a3e635;
 	font-weight: 600;

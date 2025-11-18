@@ -60,7 +60,7 @@
       </div>
     </div>
 
-    <!-- Boards Grid -->
+    <!-- Boards Grid (sin tableros de pruebas) -->
     <div *ngIf="boards.length > 0 && !isLoading" class="boards-grid">
       <div *ngFor="let board of boards; let i = index" 
            class="board-card" 
@@ -212,8 +212,13 @@
               <tr *ngFor="let m of getMemberProgress()">
                 <td>
                   <div class="progress-member">
-                    <span class="progress-avatar">{{ m.name ? m.name.charAt(0).toUpperCase() : '?' }}</span>
-                    <span>{{ m.name }}</span>
+                    <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="progress-avatar" [alt]="m.name" />
+                    <span *ngIf="!m.avatarUrl" class="progress-avatar">{{ m.name ? m.name.charAt(0).toUpperCase() : '?' }}</span>
+                    <div style="display:inline-block; vertical-align:top; margin-left:8px;">
+                      <div><b>{{ m.name }}</b></div>
+                      <div *ngIf="m.username" style="font-size:11px; color:#888;">@{{ m.username }}</div>
+                      <div *ngIf="m.email" style="font-size:11px; color:#888;">{{ m.email }}</div>
+                    </div>
                   </div>
                 </td>
                 <td class="progress-status-done">{{ m.done }}</td>
@@ -222,9 +227,9 @@
                 <td>{{ m.total }}</td>
                 <td>
                   <div class="progress-bar-bg">
-                    <div class="progress-bar" [style.width]="((m.done/m.total)*100).toFixed(0) + '%'" [attr.title]="((m.done/m.total)*100).toFixed(1) + '%'" ></div>
+                    <div class="progress-bar" [ngClass]="getProgressColor(m.percent)" [style.width]="m.percent + '%'" [attr.title]="m.percent + '%'" ></div>
                   </div>
-                  <span class="progress-label">{{ ((m.done/m.total)*100) | number:'1.0-0' }}%</span>
+                  <span class="progress-label">{{ m.percent }}%</span>
                 </td>
               </tr>
             </tbody>
@@ -236,10 +241,10 @@
       </div>
     </div>
 
-    <!-- Botón para cargar actividad de cada board -->
-    <div *ngIf="boards.length > 0 && !isLoading" class="activity-board-buttons">
+    <!-- Botón para cargar actividad de cada board (incluye tableros de pruebas) -->
+    <div *ngIf="allBoards.length > 0 && !isLoading" class="activity-board-buttons">
       <span>Ver actividad de:</span>
-      <button *ngFor="let board of boards" (click)="loadBoardActions(board.id)" [class.active]="selectedBoardId === board.id">
+      <button *ngFor="let board of allBoards" (click)="loadBoardActions(board.id)" [class.active]="selectedBoardId === board.id">
         {{ board.name }}
       </button>
     </div>
