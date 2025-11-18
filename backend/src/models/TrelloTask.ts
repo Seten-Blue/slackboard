@@ -76,8 +76,5 @@ const TrelloTaskSchema: Schema = new Schema(
 );
 
 // Índices para búsquedas
-TrelloTaskSchema.index({ trelloId: 1 });
-TrelloTaskSchema.index({ channel: 1 });
-TrelloTaskSchema.index({ boardId: 1 });
 
 export default mongoose.model<ITrelloTask>('TrelloTask', TrelloTaskSchema);

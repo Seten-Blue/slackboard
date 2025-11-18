@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import geminiService from '../services/geminiService';
+import geminiService, { GEMINI_MODELS } from '../services/geminiService';
 import Message from '../models/Message';
 
 const router = express.Router();
@@ -10,16 +10,54 @@ router.get('/status', (req: Request, res: Response) => {
   res.json({
     success: true,
     configured: configured,
+    currentModel: geminiService.getCurrentModel(),
+    availableModels: geminiService.getAvailableModels(),
     message: configured
       ? 'Gemini AI está configurado y funcionando'
       : 'Gemini AI no está configurado. Verifica GEMINI_API_KEY en .env',
   });
 });
 
+// Obtener modelos disponibles
+router.get('/models', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    currentModel: geminiService.getCurrentModel(),
+    models: GEMINI_MODELS
+  });
+});
+
+// Cambiar modelo actual
+router.post('/models/select', (req: Request, res: Response) => {
+  const { model } = req.body;
+
+  if (!model) {
+    return res.status(400).json({
+      success: false,
+      message: 'Se requiere el nombre del modelo'
+    });
+  }
+
+  const changed = geminiService.setCurrentModel(model);
+
+  if (changed) {
+    res.json({
+      success: true,
+      message: `Modelo cambiado a ${model}`,
+      currentModel: geminiService.getCurrentModel()
+    });
+  } else {
+    res.status(400).json({
+      success: false,
+      message: 'Modelo no disponible'
+    });
+  }
+});
+
 // Chat con Gemini
 router.post('/chat', async (req: Request, res: Response) => {
   try {
-    const { userId, message, channelId } = req.body;
+    const { userId, message, channelId, model } = req.body;
 
     if (!message) {
       return res.status(400).json({
@@ -38,13 +76,20 @@ router.post('/chat', async (req: Request, res: Response) => {
     // Obtener historial de conversación
     const history = await geminiService.getConversationHistory(userId);
 
-    // Generar respuesta
-    const response = await geminiService.chat(userId, message, channelId, history);
+    // Generar respuesta con el modelo especificado (o el actual)
+    const result = await geminiService.chat(
+      userId, 
+      message, 
+      channelId, 
+      history,
+      model
+    );
 
     res.json({
       success: true,
       data: {
-        message: response,
+        message: result.response,
+        model: result.model
       },
     });
   } catch (error: any) {
@@ -60,7 +105,7 @@ router.post('/chat', async (req: Request, res: Response) => {
 // Resumir texto
 router.post('/summarize', async (req: Request, res: Response) => {
   try {
-    const { text } = req.body;
+    const { text, model } = req.body;
 
     if (!text) {
       return res.status(400).json({
@@ -69,7 +114,7 @@ router.post('/summarize', async (req: Request, res: Response) => {
       });
     }
 
-    const summary = await geminiService.summarizeText(text);
+    const summary = await geminiService.summarizeText(text, model);
 
     res.json({
       success: true,
@@ -88,7 +133,7 @@ router.post('/summarize', async (req: Request, res: Response) => {
 // Analizar mensaje
 router.post('/analyze', async (req: Request, res: Response) => {
   try {
-    const { message } = req.body;
+    const { message, model } = req.body;
 
     if (!message) {
       return res.status(400).json({
@@ -97,7 +142,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
       });
     }
 
-    const analysis = await geminiService.analyzeMessage(message);
+    const analysis = await geminiService.analyzeMessage(message, model);
 
     res.json({
       success: true,
@@ -116,7 +161,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
 // Generar resumen de canal
 router.post('/channel-summary', async (req: Request, res: Response) => {
   try {
-    const { channelId, limit = 50 } = req.body;
+    const { channelId, limit = 50, model } = req.body;
 
     if (!channelId) {
       return res.status(400).json({
@@ -142,7 +187,8 @@ router.post('/channel-summary', async (req: Request, res: Response) => {
 
     const summary = await geminiService.generateChannelSummary(
       channelId,
-      messages.reverse()
+      messages.reverse(),
+      model
     );
 
     res.json({

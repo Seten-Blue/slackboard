@@ -160,3 +160,4 @@ const deleteChannel = async (req, res) => {
     }
 };
 exports.deleteChannel = deleteChannel;
+//# sourceMappingURL=channelController.js.map

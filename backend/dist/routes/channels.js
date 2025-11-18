@@ -17,3 +17,4 @@ router.post('/add-member', channelController_1.addMemberToChannel);
 // DELETE /api/channels/:id - Eliminar un canal
 router.delete('/:id', channelController_1.deleteChannel);
 exports.default = router;
+//# sourceMappingURL=channels.js.map

@@ -17,3 +17,4 @@ router.delete('/:id', messageController_1.deleteMessage);
 // POST /api/messages/:messageId/reaction - Agregar/quitar reacción
 router.post('/:messageId/reaction', messageController_1.addReaction);
 exports.default = router;
+//# sourceMappingURL=messages.js.map

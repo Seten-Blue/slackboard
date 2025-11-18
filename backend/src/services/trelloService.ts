@@ -212,6 +212,27 @@ class TrelloService {
       return [];
     }
   }
+
+  // Obtener acciones recientes de un board (modificaciones, creaciones, comentarios, etc)
+  async getBoardActions(boardId: string, limit: number = 20): Promise<any[]> {
+    if (!this.isConfigured()) {
+      throw new Error('Trello no está configurado');
+    }
+    try {
+      const response = await axios.get(`${this.baseUrl}/boards/${boardId}/actions`, {
+        params: {
+          ...this.getAuthParams(),
+          limit,
+          filter: 'updateCard,createCard,commentCard,moveCardToBoard,moveCardFromBoard',
+          fields: 'id,type,date,data,memberCreator',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error obteniendo acciones del board:', error.message);
+      throw new Error(`Error obteniendo acciones: ${error.message}`);
+    }
+  }
 }
 
 export default new TrelloService();

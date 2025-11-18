@@ -7,6 +7,7 @@ exports.addReaction = exports.deleteMessage = exports.updateMessage = exports.cr
 const Message_1 = __importDefault(require("../models/Message"));
 const Channel_1 = __importDefault(require("../models/Channel"));
 const User_1 = __importDefault(require("../models/User"));
+const slackService_1 = __importDefault(require("../services/slackService"));
 // Obtener mensajes de un canal
 const getMessagesByChannel = async (req, res) => {
     try {
@@ -22,7 +23,7 @@ const getMessagesByChannel = async (req, res) => {
             success: true,
             count: messages.length,
             total,
-            data: messages.reverse(), // Ordenar de más antiguo a más reciente
+            data: messages.reverse(),
         });
     }
     catch (error) {
@@ -38,7 +39,7 @@ exports.getMessagesByChannel = getMessagesByChannel;
 const createMessage = async (req, res) => {
     try {
         const { content, channel, sender, type = 'text' } = req.body;
-        // Verificar que el canal existe
+        console.log('📥 Recibiendo mensaje:', { content, channel, sender, type });
         const channelExists = await Channel_1.default.findById(channel);
         if (!channelExists) {
             return res.status(404).json({
@@ -46,7 +47,6 @@ const createMessage = async (req, res) => {
                 message: 'Canal no encontrado',
             });
         }
-        // Verificar que el usuario existe
         const userExists = await User_1.default.findById(sender);
         if (!userExists) {
             return res.status(404).json({
@@ -62,6 +62,24 @@ const createMessage = async (req, res) => {
         });
         const populatedMessage = await Message_1.default.findById(message._id)
             .populate('sender', 'username email avatar status');
+        console.log('✅ Mensaje creado en MongoDB:', populatedMessage);
+        // EMITIR POR SOCKET.IO (ANTES de Slack)
+        const io = req.app.get('io');
+        if (io && populatedMessage) {
+            console.log('📤 Socket.IO emitiendo mensaje a canal:', channel);
+            io.to(channel.toString()).emit('newMessage', populatedMessage);
+        }
+        // 🔥 INTEGRACIÓN SLACK (con manejo silencioso de errores)
+        try {
+            if (slackService_1.default.isConfigured()) {
+                await slackService_1.default.sendMessage(channelExists.name, content, userExists.username);
+            }
+        }
+        catch (slackError) {
+            if (slackError.data?.error !== 'invalid_auth' && slackError.data?.error !== 'account_inactive') {
+                console.error('⚠️ Error con Slack:', slackError.message);
+            }
+        }
         res.status(201).json({
             success: true,
             message: 'Mensaje enviado',
@@ -69,6 +87,7 @@ const createMessage = async (req, res) => {
         });
     }
     catch (error) {
+        console.error('❌ Error al crear mensaje:', error);
         res.status(500).json({
             success: false,
             message: 'Error al crear mensaje',
@@ -140,24 +159,19 @@ const addReaction = async (req, res) => {
                 message: 'Mensaje no encontrado',
             });
         }
-        // Buscar si ya existe esa reacción
         const existingReaction = message.reactions.find((r) => r.emoji === emoji);
         if (existingReaction) {
-            // Si el usuario ya reaccionó, quitar su reacción
             if (existingReaction.users.includes(userId)) {
                 existingReaction.users = existingReaction.users.filter((id) => id.toString() !== userId);
-                // Si no quedan usuarios, eliminar la reacción
                 if (existingReaction.users.length === 0) {
                     message.reactions = message.reactions.filter((r) => r.emoji !== emoji);
                 }
             }
             else {
-                // Agregar usuario a la reacción existente
                 existingReaction.users.push(userId);
             }
         }
         else {
-            // Crear nueva reacción
             message.reactions.push({ emoji, users: [userId] });
         }
         await message.save();
@@ -178,3 +192,4 @@ const addReaction = async (req, res) => {
     }
 };
 exports.addReaction = addReaction;
+//# sourceMappingURL=messageController.js.map

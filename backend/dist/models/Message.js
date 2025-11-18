@@ -75,3 +75,4 @@ const MessageSchema = new mongoose_1.Schema({
 // Índice para búsquedas más rápidas
 MessageSchema.index({ channel: 1, createdAt: -1 });
 exports.default = mongoose_1.default.model('Message', MessageSchema);
+//# sourceMappingURL=Message.js.map

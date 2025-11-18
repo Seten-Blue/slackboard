@@ -1,0 +1,22 @@
+<div class="git-activity-dashboard bg-neutral-800 border border-neutral-700 rounded-xl p-6 shadow mt-8">
+  <h2 class="text-xl font-bold mb-4 text-neutral-200 flex items-center">
+    <span class="text-2xl mr-2">📁</span>Actividad reciente por carpeta/archivo
+  </h2>
+  <table class="w-full text-sm text-neutral-300">
+    <thead>
+      <tr>
+        <th class="py-2 text-left">Carpeta/Archivo</th>
+        <th class="py-2 text-left">Último autor</th>
+        <th class="py-2 text-left">Fecha de modificación</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let act of activities">
+        <td class="py-2">{{ act.folder }}</td>
+        <td class="py-2">{{ act.lastAuthor }}</td>
+        <td class="py-2">{{ act.lastDate }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="text-xs text-neutral-500 mt-2">* Datos de ejemplo. Para datos reales, se debe extraer el historial de Git automáticamente.</div>
+</div>

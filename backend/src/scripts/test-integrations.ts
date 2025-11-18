@@ -50,7 +50,7 @@ const testIntegrations = async () => {
         '¿Cuál es la capital de Colombia? Responde en máximo 10 palabras.'
       );
       console.log('✅ Respuesta de Gemini AI:');
-      console.log(`   "${response.substring(0, 150)}${response.length > 150 ? '...' : ''}"`);
+      console.log(`   "${response.response.substring(0, 150)}${response.response.length > 150 ? '...' : ''}"`);
     } catch (error: any) {
       console.error('❌ Error al conectar con Gemini AI:', error.message);
       allPassed = false;

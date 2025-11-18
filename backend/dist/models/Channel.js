@@ -64,3 +64,4 @@ const ChannelSchema = new mongoose_1.Schema({
     timestamps: true,
 });
 exports.default = mongoose_1.default.model('Channel', ChannelSchema);
+//# sourceMappingURL=Channel.js.map

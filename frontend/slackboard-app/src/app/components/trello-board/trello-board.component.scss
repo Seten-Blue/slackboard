@@ -1,0 +1,710 @@
+.progress-table-container {
+	margin-top: 2.2rem;
+	background: #22304a;
+	border-radius: 0.8rem;
+	box-shadow: 0 1.5px 7px 0 #7bb6ff22;
+	padding: 1.2rem 1rem 1.2rem 1rem;
+	overflow-x: auto;
+}
+.progress-title {
+	color: #a3e635;
+	font-size: 1.08rem;
+	font-weight: 700;
+	margin-bottom: 1.1rem;
+}
+.progress-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0 0.4rem;
+	font-size: 0.93rem;
+}
+.progress-table th, .progress-table td {
+	padding: 0.5rem 0.7rem;
+	color: #e0e7ef;
+	text-align: left;
+	background: #1e293b;
+}
+.progress-table th {
+	color: #a3e635;
+	font-weight: 700;
+	border-bottom: 2px solid #334155;
+}
+.progress-table tr {
+	border-radius: 0.7rem;
+	box-shadow: 0 1px 4px 0 #7bb6ff11;
+	transition: background 0.18s;
+}
+.progress-table tr:hover td {
+	background: #334155;
+}
+.progress-table tr:last-child td {
+	border-bottom: none;
+}
+.progress-member {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+}
+.progress-avatar {
+	width: 2rem;
+	height: 2rem;
+	border-radius: 50%;
+	background: #334155;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #a3e635;
+	font-weight: 700;
+	font-size: 1.1rem;
+	text-transform: uppercase;
+}
+.progress-bar-bg {
+	background: #334155;
+	border-radius: 0.7rem;
+	width: 120px;
+	height: 1rem;
+	margin: 0.1rem 0.5rem 0.1rem 0;
+	display: inline-block;
+	vertical-align: middle;
+}
+.progress-bar {
+	background: linear-gradient(90deg, #a3e635 60%, #7bb6ff 100%);
+	height: 100%;
+	border-radius: 0.7rem;
+	transition: width 0.3s;
+}
+.progress-label {
+	color: #a3e635;
+	font-weight: 600;
+	margin-left: 0.5rem;
+	font-size: 0.93rem;
+}
+.progress-status-done {
+	color: #a3e635;
+	font-weight: 700;
+}
+.progress-status-doing {
+	color: #60a5fa;
+	font-weight: 700;
+}
+.progress-status-todo {
+	color: #fbbf24;
+	font-weight: 700;
+}
+// --- Tabla de avance por miembro ---
+.progress-table-container {
+	margin-top: 2.2rem;
+	background: #22304a;
+	border-radius: 0.8rem;
+	box-shadow: 0 1.5px 7px 0 #7bb6ff22;
+	padding: 1.2rem 1rem 1.2rem 1rem;
+}
+.progress-title {
+	color: #a3e635;
+	font-size: 1.08rem;
+	font-weight: 700;
+	margin-bottom: 1.1rem;
+}
+.progress-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.93rem;
+}
+.progress-table th, .progress-table td {
+	padding: 0.5rem 0.7rem;
+	border-bottom: 1px solid #334155;
+	color: #e0e7ef;
+	text-align: left;
+}
+.progress-table th {
+	background: #1e293b;
+	color: #a3e635;
+	font-weight: 700;
+}
+.progress-table tr:last-child td {
+	border-bottom: none;
+}
+.progress-bar-bg {
+	background: #334155;
+	border-radius: 0.7rem;
+	width: 90px;
+	height: 0.7rem;
+	margin: 0.1rem 0.5rem 0.1rem 0;
+	display: inline-block;
+	vertical-align: middle;
+}
+.progress-bar {
+	background: linear-gradient(90deg, #a3e635 60%, #7bb6ff 100%);
+	height: 100%;
+	border-radius: 0.7rem;
+	transition: width 0.3s;
+}
+.progress-label {
+	color: #a3e635;
+	font-weight: 600;
+	margin-left: 0.5rem;
+	font-size: 0.93rem;
+}
+.activity-table-container {
+	margin: 2rem auto 1.5rem auto;
+	max-width: 700px;
+	min-width: 320px;
+	width: 100%;
+	background: #1e293b;
+	border-radius: 1rem;
+	box-shadow: 0 2px 12px 0 #22304a44;
+	padding: 2rem 1.5rem;
+	overflow-x: auto;
+	position: relative;
+}
+.activity-header-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1.2rem;
+	position: sticky;
+	top: 0;
+	background: #1e293b;
+	z-index: 2;
+	padding-bottom: 0.5rem;
+}
+.close-activity-btn {
+	background: #22304a;
+	color: #7bb6ff;
+	border: none;
+	border-radius: 50%;
+	width: 2.2rem;
+	height: 2.2rem;
+	font-size: 1.3rem;
+	font-weight: 700;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.18s, color 0.18s;
+}
+.close-activity-btn:hover {
+	background: #7bb6ff;
+	color: #22304a;
+}
+// --- Tabla de actividad Trello ---
+.activity-table {
+	min-width: 600px;
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 1rem;
+	max-height: 340px;
+	overflow-y: auto;
+	display: block;
+}
+.activity-table thead, .activity-table tbody {
+	display: table;
+	width: 100%;
+	table-layout: fixed;
+}
+.activity-table tbody {
+	display: block;
+	max-height: 260px;
+	overflow-y: auto;
+}
+.activity-table tr {
+	width: 100%;
+	display: table;
+	table-layout: fixed;
+}
+@media (max-width: 800px) {
+	.activity-table-container {
+		max-width: 98vw;
+		min-width: 0;
+		padding: 1rem 0.2rem;
+	}
+	.activity-table {
+		min-width: 400px;
+		font-size: 0.95rem;
+		max-height: 220px;
+	}
+	.activity-table tbody {
+		max-height: 120px;
+	}
+}
+.activity-title {
+	color: #7bb6ff;
+	font-size: 1.3rem;
+	font-weight: 700;
+	margin-bottom: 1.2rem;
+}
+.activity-table th, .activity-table td {
+	padding: 0.7rem 1rem;
+	border-bottom: 1px solid #334155;
+	color: #e0e7ef;
+	text-align: left;
+	font-size: 1rem;
+}
+.activity-table th {
+	background: #22304a;
+	color: #7bb6ff;
+	font-weight: 700;
+}
+.activity-table tr:last-child td {
+	border-bottom: none;
+}
+.activity-board-buttons {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	margin: 1.5rem 0 2rem 0;
+	flex-wrap: wrap;
+}
+.activity-board-buttons button {
+	background: #22304a;
+	color: #7bb6ff;
+	border: 1px solid #7bb6ff44;
+	border-radius: 1.2rem;
+	padding: 0.4rem 1.2rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.18s, color 0.18s, border 0.18s;
+}
+.activity-board-buttons button.active, .activity-board-buttons button:hover {
+	background: #7bb6ff;
+	color: #22304a;
+	border: 1px solid #7bb6ff;
+}
+
+// --- MODERNO Y PROFESIONAL: TRELLO BOARD ---
+
+:host, :host ::ng-deep .main-content, :host ::ng-deep .app-container, :host ::ng-deep body {
+	background: #0a1733 !important;
+	min-height: 100vh;
+	width: 100vw;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+}
+
+.trello-container {
+	width: 100vw;
+	min-height: 100vh;
+	background: #0a1733;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.trello-header {
+	width: 100%;
+	background: linear-gradient(90deg, #22304a 0%, #334155 100%);
+	padding: 1.1rem 0 0.5rem 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	box-shadow: 0 1px 8px 0 rgba(30,41,59,0.10);
+}
+
+.header-content {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 0.7rem;
+}
+
+
+.boards-grid {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	justify-content: flex-start;
+	align-items: flex-start;
+	gap: 1.1rem;
+	margin-top: 1.1rem;
+	width: 100vw;
+	padding-bottom: 1rem;
+	margin-left: 0;
+	margin-right: 0;
+}
+.board-card {
+	flex: 0 0 auto;
+}
+
+.board-card {
+	background: linear-gradient(120deg, #1e293b 60%, #334155 100%);
+	border-radius: 0.7rem;
+	box-shadow: 0 1.5px 7px 0 rgba(30,41,59,0.13), 0 1px 3px 0 rgba(123,182,255,0.08);
+	border: 1.2px solid #7bb6ff22;
+	padding: 1.2rem 1rem 1.1rem 1rem;
+	display: flex;
+	flex-direction: column;
+	min-width: 180px;
+	max-width: 260px;
+	width: 100%;
+	margin: 0.3rem;
+	align-items: center;
+	animation: fadeInUp 0.5s cubic-bezier(.23,1.01,.32,1) both;
+	transition: box-shadow 0.18s, border 0.18s, background 0.18s, transform 0.18s;
+}
+.board-card:hover {
+	box-shadow: 0 4px 16px 0 #7bb6ff33, 0 1.5px 6px 0 #7bb6ff22;
+	border: 1.2px solid #7bb6ff77;
+	background: linear-gradient(120deg, #22304a 60%, #42506a 100%);
+	transform: translateY(-1px) scale(1.01);
+}
+
+@keyframes fadeInUp {
+	from { opacity: 0; transform: translateY(30px); }
+	to { opacity: 1; transform: none; }
+}
+
+.board-header {
+	display: flex;
+	align-items: flex-start;
+	margin-bottom: 0.7rem;
+	width: 100%;
+}
+.board-color-bar {
+	width: 8px;
+	height: 2.5rem;
+	border-radius: 8px;
+	margin-right: 1.1rem;
+	background: #7bb6ff;
+	flex-shrink: 0;
+}
+.board-header-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+.board-name {
+	color: #fff;
+	font-size: 1.18rem;
+	font-weight: 700;
+	margin-bottom: 0.1rem;
+	letter-spacing: -0.5px;
+}
+.board-badges {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.1rem;
+}
+.badge {
+	background: #334155;
+	color: #7bb6ff;
+	font-size: 0.85rem;
+	font-weight: 600;
+	border-radius: 1rem;
+	padding: 0.18rem 0.8rem;
+	box-shadow: 0 1px 4px 0 #7bb6ff11;
+	border: 1px solid #7bb6ff22;
+	display: flex;
+	align-items: center;
+}
+.badge-members {
+	background: #1e293b;
+	color: #a3e635;
+	border: 1px solid #a3e63544;
+}
+.board-body {
+	margin-top: 0.7rem;
+	margin-bottom: 0.7rem;
+	width: 100%;
+}
+.board-stats {
+	display: flex;
+	gap: 1.5rem;
+	flex-wrap: wrap;
+}
+.stat-item {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	color: #b6c2d6;
+	font-size: 0.97rem;
+}
+.stat-icon {
+	width: 1.1rem;
+	height: 1.1rem;
+	color: #7bb6ff;
+	flex-shrink: 0;
+}
+.stat-label {
+	margin-left: 0.2rem;
+	font-weight: 500;
+}
+.stat-value {
+	color: #fff;
+	font-weight: 700;
+	margin-left: 0.3rem;
+}
+.board-details {
+	margin-top: 0.5rem;
+	color: #b6c2d6;
+	font-size: 0.93rem;
+}
+.details-trigger {
+	cursor: pointer;
+	color: #7bb6ff;
+	font-weight: 600;
+	outline: none;
+	border: none;
+	background: none;
+	padding: 0.1rem 0;
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+.details-content {
+	margin-top: 0.3rem;
+	color: #e0e7ef;
+	word-break: break-all;
+}
+.board-footer {
+	margin-top: 1.1rem;
+	display: flex;
+	justify-content: flex-end;
+	width: 100%;
+}
+.board-link {
+	color: #7bb6ff;
+	text-decoration: underline;
+	font-size: 0.98rem;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	transition: color 0.18s;
+}
+.board-link:hover {
+	color: #fff;
+}
+
+// Estados: loading, error, empty
+.state-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 220px;
+	color: #b6c2d6;
+}
+.loading-spinner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+.spinner {
+	width: 2.2rem;
+	height: 2.2rem;
+	border: 3px solid #7bb6ff44;
+	border-top: 3px solid #7bb6ff;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	margin-bottom: 0.7rem;
+}
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+.loading-text {
+	color: #7bb6ff;
+	font-weight: 600;
+}
+.error-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	color: #f87171;
+}
+.error-icon {
+	width: 2.2rem;
+	height: 2.2rem;
+	color: #f87171;
+	margin-bottom: 0.5rem;
+}
+.error-text {
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+.retry-button {
+	background: #7bb6ff;
+	color: #fff;
+	border: none;
+	border-radius: 1rem;
+	padding: 0.4rem 1.2rem;
+	font-weight: 600;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin-top: 0.3rem;
+	transition: background 0.18s;
+}
+.retry-button:hover {
+	background: #60a5fa;
+}
+.empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	color: #b6c2d6;
+}
+.empty-icon-wrapper {
+	background: #22304a;
+	border-radius: 50%;
+	padding: 1.1rem;
+	margin-bottom: 0.7rem;
+}
+.empty-icon {
+	width: 2.2rem;
+	height: 2.2rem;
+	color: #7bb6ff;
+}
+.empty-text {
+	font-weight: 700;
+	color: #fff;
+	margin-bottom: 0.2rem;
+}
+.empty-subtext {
+	font-size: 0.98rem;
+	margin-bottom: 0.5rem;
+}
+.create-button {
+	background: #7bb6ff;
+	color: #fff;
+	border: none;
+	border-radius: 1rem;
+	padding: 0.4rem 1.2rem;
+	font-weight: 600;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	text-decoration: none;
+	transition: background 0.18s;
+}
+.create-button:hover {
+	background: #60a5fa;
+}
+
+// Responsive
+@media (max-width: 700px) {
+	.boards-grid {
+		flex-direction: column;
+		gap: 1.2rem;
+		align-items: center;
+	}
+	.trello-header {
+		padding: 1.2rem 0 0.7rem 0;
+	}
+	.board-card {
+		min-width: 90vw;
+		max-width: 98vw;
+	}
+}
+
+// Títulos y listas
+.trello-board-title {
+	font-size: 2rem;
+	font-weight: 700;
+	color: #e0e7ef;
+	text-align: center;
+	margin-bottom: 2rem;
+	letter-spacing: -0.5px;
+}
+.trello-board-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2.5rem;
+}
+
+// Eliminar estilos viejos de tarjetas heredadas
+.trello-board-card, .trello-board-card-header, .trello-board-card-footer, .trello-board-card-title, .trello-board-card-link, .trello-board-card-meta {
+	background: none !important;
+	border: none !important;
+	box-shadow: none !important;
+	border-radius: 0 !important;
+	color: #e0e7ef !important;
+	padding: 0 !important;
+	margin: 0;
+}
+
+.trello-board-list > * + * {
+	margin-top: 2.5rem;
+}
+
+a, .trello-board-card-link {
+	color: #7bb6ff !important;
+	text-decoration: underline;
+	font-size: 1rem;
+}
+a:hover, .trello-board-card-link:hover {
+	color: #fff !important;
+}
+
+.trello-board-card-meta, .trello-board-card-footer span {
+	color: #b6c2d6 !important;
+}
+
+// --- MODAL DE ACTIVIDAD TRELLO ---
+.activity-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 23, 51, 0.72);
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+  transition: opacity 0.2s;
+}
+.activity-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1e293b;
+  border-radius: 1.2rem;
+  box-shadow: 0 8px 32px 0 #22304a99, 0 1.5px 7px 0 #7bb6ff22;
+  padding: 0.7rem 0.3rem 0.7rem 0.3rem;
+  z-index: 1001;
+  min-width: 320px;
+  max-width: 1200px;
+  width: 900px;
+  max-height: 99vh;
+  overflow-y: auto;
+  animation: modalIn 0.22s cubic-bezier(.23,1.01,.32,1);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.91rem;
+}
+.activity-modal .activity-title {
+  font-size: 1.01rem;
+}
+.activity-modal .activity-table th, .activity-modal .activity-table td {
+  font-size: 0.87rem;
+  padding: 0.32rem 0.4rem;
+}
+.activity-modal .activity-table {
+  min-width: 340px;
+  font-size: 0.87rem;
+  max-height: 600px;
+}
+@media (max-width: 1200px) {
+  .activity-modal {
+    width: 99vw;
+    min-width: 0;
+    max-width: 99vw;
+    padding: 0.3rem 0.05rem 0.3rem 0.05rem;
+    max-height: 99vh;
+    font-size: 0.87rem;
+  }
+  .activity-modal .activity-table {
+    min-width: 220px;
+    font-size: 0.85rem;
+    max-height: 300px;
+  }
+  .activity-modal .activity-table th, .activity-modal .activity-table td {
+    font-size: 0.85rem;
+    padding: 0.22rem 0.2rem;
+  }
+}

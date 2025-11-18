@@ -1,7 +1,35 @@
+
 import express, { Request, Response } from 'express';
 import trelloService from '../services/trelloService';
 
 const router = express.Router();
+
+// Obtener acciones recientes de un board (modificaciones, creaciones, comentarios, etc)
+router.get('/boards/:boardId/actions', async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    const limit = req.query.limit ? parseInt(String(req.query.limit)) : 20;
+    if (!trelloService.isConfigured()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Trello no está configurado',
+      });
+    }
+    const actions = await trelloService.getBoardActions(boardId, limit);
+    res.json({
+      success: true,
+      data: actions,
+      count: actions.length,
+    });
+  } catch (error: any) {
+    console.error('❌ Error obteniendo acciones del board:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo acciones del board',
+      error: error.message,
+    });
+  }
+});
 
 // Estado de la integración
 router.get('/status', (req: Request, res: Response) => {

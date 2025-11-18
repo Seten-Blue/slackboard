@@ -82,3 +82,4 @@ const AnalyticsSchema = new mongoose_1.Schema({
     timestamps: true,
 });
 exports.default = mongoose_1.default.model('Analytics', AnalyticsSchema);
+//# sourceMappingURL=Analytics.js.map

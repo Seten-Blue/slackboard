@@ -328,3 +328,4 @@ const generateDailyReport = async (req, res) => {
     }
 };
 exports.generateDailyReport = generateDailyReport;
+//# sourceMappingURL=analyticsController.js.map

@@ -15,3 +15,4 @@ router.get('/trends', analyticsController_1.getMessageTrends);
 // POST /api/analytics/generate-report - Generar reporte diario
 router.post('/generate-report', analyticsController_1.generateDailyReport);
 exports.default = router;
+//# sourceMappingURL=analytics.js.map
