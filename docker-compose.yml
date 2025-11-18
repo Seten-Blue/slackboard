@@ -31,7 +31,6 @@ services:
       - NODE_ENV=development
       - MONGODB_URI=mongodb://mongodb:27017/slackboard
       - PORT=3000
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
       - ./backend/.env
     depends_on:
