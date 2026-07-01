@@ -14,8 +14,8 @@ router.get('/status', (req: Request, res: Response) => {
     configured: configured,
     message: configured 
       ? 'Slack está configurado y funcionando' 
-      : 'Slack no está configurado. Verifica SLACK_BOT_TOKEN en .env',
-    token: configured ? 'Token presente' : 'Token no encontrado'
+      : 'Slack no está configurado. Usa un Bot User OAuth Token (xoxb-...) y, para recibir mensajes, configura SLACK_SIGNING_SECRET y un endpoint público.',
+    token: configured ? 'Bot token válido' : 'Token no válido o no encontrado'
   });
 });
 
@@ -158,9 +158,14 @@ router.post('/events', async (req: Request, res: Response) => {
         return res.status(200).send('OK');
       }
 
-      // Manejar mensaje de canal
-      if (event.type === 'message' && event.channel_type === 'channel') {
+      // Manejar mensaje de canal o DM
+      if (event.type === 'message' && (event.channel_type === 'channel' || event.channel_type === 'im')) {
         console.log('💬 Procesando mensaje de Slack');
+
+        if (event.subtype) {
+          console.log(`⏭️  Ignorando mensaje con subtype: ${event.subtype}`);
+          return res.status(200).send('OK');
+        }
         
         const slackUser = await slackService.getUserInfo(event.user);
         
@@ -176,21 +181,25 @@ router.post('/events', async (req: Request, res: Response) => {
           });
         }
 
-        const channelInfo = await slackService.getClient().conversations.info({
-          channel: event.channel
-        });
-
-        const channelName = channelInfo.channel?.name;
-        const channel = await Channel.findOne({ name: channelName });
-
-        if (channel && user) {
-          await Message.create({
-            content: event.text,
-            channel: channel._id,
-            sender: user._id,
-            type: 'text'
+        try {
+          const channelInfo = await slackService.getClient().conversations.info({
+            channel: event.channel
           });
-          console.log('✅ Mensaje guardado en MongoDB');
+
+          const channelName = channelInfo.channel?.name;
+          const channel = await Channel.findOne({ name: channelName });
+
+          if (channel && user) {
+            await Message.create({
+              content: event.text,
+              channel: channel._id,
+              sender: user._id,
+              type: 'text'
+            });
+            console.log('✅ Mensaje guardado en MongoDB');
+          }
+        } catch (channelError: any) {
+          console.warn('⚠️  No se pudo procesar el canal del evento:', channelError.message);
         }
       }
 

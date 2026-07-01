@@ -6,18 +6,26 @@ dotenv.config();
 class SlackService {
   private client: WebClient;
   private channelMap: Map<string, string> = new Map();
+  private readonly token: string;
 
   constructor() {
-    const token = process.env.SLACK_BOT_TOKEN;
-    
-    if (!token) {
+    this.token = (process.env.SLACK_BOT_TOKEN || '').trim();
+
+    if (!this.token) {
       console.warn('⚠️  SLACK_BOT_TOKEN no configurado. La integración con Slack no funcionará.');
       this.client = new WebClient();
-    } else {
-      this.client = new WebClient(token);
-      console.log('✅ Slack SDK inicializado');
-      this.initializeChannelMap();
+      return;
     }
+
+    this.client = new WebClient(this.token);
+
+    if (!this.token.startsWith('xoxb-') || this.token === 'xoxb-your-bot-token-here') {
+      console.error('⚠️  Se detectó un token de Slack inválido o de ejemplo. Debe usar un Bot User OAuth Token real (xoxb-...) para enviar y recibir mensajes.');
+      return;
+    }
+
+    console.log('✅ Slack SDK inicializado');
+    this.initializeChannelMap();
   }
 
   private async initializeChannelMap() {
@@ -41,7 +49,7 @@ class SlackService {
 
   async sendMessage(channelName: string, text: string, username?: string): Promise<any> {
     try {
-      if (!process.env.SLACK_BOT_TOKEN) {
+      if (!this.isConfigured()) {
         console.log('Slack no configurado, mensaje solo local:', { channelName, text });
         return null;
       }
@@ -61,16 +69,47 @@ class SlackService {
         throw new Error(`Canal "${channelName}" no encontrado en Slack. Créalo primero o invita al bot.`);
       }
 
-      // Enviar el mensaje
-      const result = await this.client.chat.postMessage({
-        channel: slackChannelId,
-        text: text,
-        username: username || 'SlackBoard Bot',
-        icon_emoji: ':robot_face:'
-      });
+      try {
+        // Enviar el mensaje
+        const result = await this.client.chat.postMessage({
+          channel: slackChannelId,
+          text: text,
+          username: username || 'SlackBoard Bot',
+          icon_emoji: ':robot_face:'
+        });
 
-      console.log('✅ Mensaje enviado a Slack:', result.ts);
-      return result;
+        console.log('✅ Mensaje enviado a Slack:', result.ts);
+        return result;
+      } catch (error: any) {
+        if (error?.data?.error === 'not_in_channel') {
+          console.log(`🔄 Bot no estaba en el canal ${channelName}. Intentando entrar...`);
+          try {
+            await this.client.conversations.join({ channel: slackChannelId });
+
+            const retryResult = await this.client.chat.postMessage({
+              channel: slackChannelId,
+              text: text,
+              username: username || 'SlackBoard Bot',
+              icon_emoji: ':robot_face:'
+            });
+
+            console.log('✅ Mensaje enviado a Slack tras unirse al canal:', retryResult.ts);
+            return retryResult;
+          } catch (joinError: any) {
+            if (joinError?.data?.error === 'missing_scope') {
+              throw new Error('El token de Slack no tiene el scope channels:join. Añádelo en OAuth & Permissions y vuelve a instalar la app.');
+            }
+
+            throw new Error(`El bot no pudo entrar al canal ${channelName}. Invítalo manualmente desde Slack o verifica los permisos de la app.`);
+          }
+        }
+
+        if (error?.data?.error === 'missing_scope') {
+          throw new Error('El token de Slack no tiene los scopes necesarios. Revisa channels:read, channels:join, chat:write y users:read en OAuth & Permissions.');
+        }
+
+        throw error;
+      }
     } catch (error: any) {
       console.error('❌ Error enviando mensaje a Slack:', error.message);
       throw error;
@@ -79,7 +118,7 @@ class SlackService {
 
   async getChannelHistory(channelName: string, limit = 50): Promise<any[]> {
     try {
-      if (!process.env.SLACK_BOT_TOKEN) {
+      if (!this.isConfigured()) {
         return [];
       }
 
@@ -104,7 +143,7 @@ class SlackService {
 
   async getUserInfo(userId: string): Promise<any> {
     try {
-      if (!process.env.SLACK_BOT_TOKEN) {
+      if (!this.isConfigured()) {
         return null;
       }
 
@@ -121,7 +160,7 @@ class SlackService {
 
   async syncChannels(): Promise<any[]> {
     try {
-      if (!process.env.SLACK_BOT_TOKEN) {
+      if (!this.isConfigured()) {
         return [];
       }
 
@@ -139,7 +178,7 @@ class SlackService {
   }
 
   isConfigured(): boolean {
-    return !!process.env.SLACK_BOT_TOKEN;
+    return !!this.token && this.token.startsWith('xoxb-') && this.token !== 'xoxb-your-bot-token-here';
   }
 
   getClient(): WebClient {

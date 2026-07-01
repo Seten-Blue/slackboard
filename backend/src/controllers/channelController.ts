@@ -56,8 +56,20 @@ export const createChannel = async (req: Request, res: Response) => {
   try {
     const { name, description, isPrivate, createdBy } = req.body;
 
+    let creatorId = createdBy;
+    if (!creatorId) {
+      const defaultUser = await User.findOne({ email: 'admin@slackboard.com' }) || await User.findOne();
+      if (!defaultUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado',
+        });
+      }
+      creatorId = defaultUser._id;
+    }
+
     // Verificar si el usuario existe
-    const user = await User.findById(createdBy);
+    const user = await User.findById(creatorId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -69,8 +81,8 @@ export const createChannel = async (req: Request, res: Response) => {
       name,
       description,
       isPrivate: isPrivate || false,
-      createdBy,
-      members: [createdBy], // El creador es miembro automáticamente
+      createdBy: creatorId,
+      members: [creatorId], // El creador es miembro automáticamente
     });
 
     const populatedChannel = await Channel.findById(channel._id)

@@ -12,7 +12,7 @@ export class ChatService {
   public currentChannel$ = this.currentChannelSubject.asObservable();
 
   private currentUser = {
-    _id: '69196dd00a60b097f35f3587',
+    _id: '6a44842732d43596a6033b58',
     username: 'Admin',
     email: 'admin@slackboard.com',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
