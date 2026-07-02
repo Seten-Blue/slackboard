@@ -13,6 +13,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const channels_1 = __importDefault(require("./routes/channels"));
 const messages_1 = __importDefault(require("./routes/messages"));
 const analytics_1 = __importDefault(require("./routes/analytics"));
+const slack_1 = __importDefault(require("./routes/slack"));
 // Configurar variables de entorno
 dotenv_1.default.config();
 // Inicializar Express
@@ -27,9 +28,14 @@ const io = new socket_io_1.Server(httpServer, {
 });
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || '';
+app.set('io', io);
 // Middlewares
 app.use((0, cors_1.default)());
-app.use(express_1.default.json());
+app.use(express_1.default.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf.toString();
+    }
+}));
 app.use(express_1.default.urlencoded({ extended: true }));
 // Conectar a MongoDB
 mongoose_1.default.connect(MONGODB_URI)
@@ -49,6 +55,7 @@ app.get('/', (req, res) => {
             channels: '/api/channels',
             messages: '/api/messages',
             analytics: '/api/analytics',
+            slack: '/api/slack'
         }
     });
 });
@@ -63,6 +70,7 @@ app.get('/health', (req, res) => {
 app.use('/api/channels', channels_1.default);
 app.use('/api/messages', messages_1.default);
 app.use('/api/analytics', analytics_1.default);
+app.use('/api/slack', slack_1.default);
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
     console.log('👤 Usuario conectado:', socket.id);
@@ -96,3 +104,11 @@ httpServer.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
     console.log(`📡 Socket.IO listo para conexiones en tiempo real`);
 });
+// Middlewares
+app.use((0, cors_1.default)());
+app.use(express_1.default.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf.toString(); // ← NUEVO: guardamos el raw body para slackController
+    }
+}));
+app.use(express_1.default.urlencoded({ extended: true }));

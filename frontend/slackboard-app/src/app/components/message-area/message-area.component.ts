@@ -55,10 +55,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   setupSocketListeners() {
-    // Escuchar nuevos mensajes
     const newMessageSub = this.socketService.onNewMessage().subscribe((data: any) => {
       if (data.channelId === this.channel?._id) {
-        // Verificar si el mensaje ya existe (evitar duplicados)
         const exists = this.messages.some(m => m._id === data.message._id);
         if (!exists) {
           this.messages.push(data.message);
@@ -67,12 +65,10 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    // Escuchar cuando alguien está escribiendo
     const typingSub = this.socketService.onUserTyping().subscribe((data: any) => {
       if (data.channelId === this.channel?._id && data.username !== this.currentUser.username) {
         this.userTyping = data.username;
-        
-        // Limpiar después de 3 segundos
+
         if (this.typingTimeout) {
           clearTimeout(this.typingTimeout);
         }
@@ -115,16 +111,13 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
     this.chatService.sendMessage(messageData).subscribe({
       next: (response) => {
-        // Agregar el mensaje a la lista local
         this.messages.push(response.data);
-        
-        // Emitir a través de Socket.IO
+
         this.socketService.sendMessage({
           channelId: this.channel._id,
           message: response.data
         });
 
-        // Limpiar input y scroll
         this.newMessage = '';
         this.shouldScrollToBottom = true;
       },
@@ -145,7 +138,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   onTyping() {
     if (!this.channel) return;
 
-    // Notificar que el usuario está escribiendo
     this.socketService.sendTyping({
       channelId: this.channel._id,
       username: this.currentUser.username
@@ -155,7 +147,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   addReaction(messageId: string, emoji: string) {
     this.chatService.addReaction(messageId, emoji).subscribe({
       next: (response) => {
-        // Actualizar el mensaje en la lista
         const index = this.messages.findIndex(m => m._id === messageId);
         if (index !== -1) {
           this.messages[index] = response.data;
@@ -165,6 +156,19 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         console.error('Error agregando reacción:', error);
       }
     });
+  }
+
+  // ← NUEVO: agrupa mensajes consecutivos del mismo usuario (misma lógica que Discord/Linear)
+  shouldGroupWithPrevious(index: number): boolean {
+    if (index === 0) return false;
+    const current = this.messages[index];
+    const previous = this.messages[index - 1];
+    if (!current || !previous) return false;
+    if (current.sender?._id !== previous.sender?._id) return false;
+
+    const currentTime = new Date(current.createdAt).getTime();
+    const previousTime = new Date(previous.createdAt).getTime();
+    return (currentTime - previousTime) < 5 * 60 * 1000; // 5 minutos
   }
 
   formatTime(timestamp: string): string {
@@ -179,9 +183,9 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     if (minutes < 60) return `hace ${minutes}m`;
     if (hours < 24) return `hace ${hours}h`;
     if (days < 7) return `hace ${days}d`;
-    
-    return date.toLocaleDateString('es-ES', { 
-      day: 'numeric', 
+
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
       month: 'short',
       hour: '2-digit',
       minute: '2-digit'

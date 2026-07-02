@@ -60,6 +60,11 @@ const ChannelSchema = new mongoose_1.Schema({
         ref: 'User',
         required: true,
     },
+    slackChannelId: {
+        type: String,
+        default: null,
+        index: true, // ← para buscar rápido cuando llega un evento
+    },
 }, {
     timestamps: true,
 });

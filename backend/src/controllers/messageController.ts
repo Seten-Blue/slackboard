@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
@@ -46,8 +47,22 @@ export const createMessage = async (req: Request, res: Response) => {
       });
     }
 
+    let senderId = sender;
+    const isValidSenderId = senderId && mongoose.Types.ObjectId.isValid(senderId.toString());
+
+    if (!isValidSenderId) {
+      const defaultUser = await User.findOne({ email: 'admin@slackboard.com' }) || await User.findOne();
+      if (!defaultUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado',
+        });
+      }
+      senderId = defaultUser._id;
+    }
+
     // Verificar que el usuario existe
-    const userExists = await User.findById(sender);
+    const userExists = await User.findById(senderId);
     if (!userExists) {
       return res.status(404).json({
         success: false,
@@ -58,7 +73,7 @@ export const createMessage = async (req: Request, res: Response) => {
     const message = await Message.create({
       content,
       channel,
-      sender,
+      sender: senderId,
       type,
     });
 

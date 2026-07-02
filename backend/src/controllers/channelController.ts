@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Channel from '../models/Channel';
 import User from '../models/User';
 
@@ -57,7 +58,9 @@ export const createChannel = async (req: Request, res: Response) => {
     const { name, description, isPrivate, createdBy } = req.body;
 
     let creatorId = createdBy;
-    if (!creatorId) {
+    const isValidCreatorId = creatorId && mongoose.Types.ObjectId.isValid(creatorId.toString());
+
+    if (!isValidCreatorId) {
       const defaultUser = await User.findOne({ email: 'admin@slackboard.com' }) || await User.findOne();
       if (!defaultUser) {
         return res.status(404).json({

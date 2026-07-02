@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteChannel = exports.addMemberToChannel = exports.createChannel = exports.getChannelById = exports.getAllChannels = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const Channel_1 = __importDefault(require("../models/Channel"));
 const User_1 = __importDefault(require("../models/User"));
 // Obtener todos los canales
@@ -58,8 +59,20 @@ exports.getChannelById = getChannelById;
 const createChannel = async (req, res) => {
     try {
         const { name, description, isPrivate, createdBy } = req.body;
+        let creatorId = createdBy;
+        const isValidCreatorId = creatorId && mongoose_1.default.Types.ObjectId.isValid(creatorId.toString());
+        if (!isValidCreatorId) {
+            const defaultUser = await User_1.default.findOne({ email: 'admin@slackboard.com' }) || await User_1.default.findOne();
+            if (!defaultUser) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Usuario no encontrado',
+                });
+            }
+            creatorId = defaultUser._id;
+        }
         // Verificar si el usuario existe
-        const user = await User_1.default.findById(createdBy);
+        const user = await User_1.default.findById(creatorId);
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -70,8 +83,8 @@ const createChannel = async (req, res) => {
             name,
             description,
             isPrivate: isPrivate || false,
-            createdBy,
-            members: [createdBy], // El creador es miembro automáticamente
+            createdBy: creatorId,
+            members: [creatorId], // El creador es miembro automáticamente
         });
         const populatedChannel = await Channel_1.default.findById(channel._id)
             .populate('createdBy', 'username email avatar')

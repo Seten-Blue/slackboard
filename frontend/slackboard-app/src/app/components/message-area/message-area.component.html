@@ -1,94 +1,91 @@
-<div class="flex flex-col h-full bg-gray-50">
+<div class="flex flex-col h-full min-h-0 bg-paper">
   <!-- Área de mensajes con scroll -->
-  <div #messageContainer class="flex-1 overflow-y-auto p-6 space-y-4">
+  <div #messageContainer class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-1">
     <!-- Estado de carga -->
     <div *ngIf="loading" class="flex justify-center items-center h-full">
-      <div class="animate-pulse text-gray-500">Cargando mensajes...</div>
+      <div class="flex items-center gap-2 text-ink-950/40 text-sm">
+        <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+        Cargando mensajes…
+      </div>
     </div>
 
     <!-- Sin canal seleccionado -->
-    <div *ngIf="!channel && !loading" class="flex flex-col items-center justify-center h-full text-gray-500">
-      <div class="text-6xl mb-4">💬</div>
-      <p class="text-xl font-semibold">Selecciona un canal</p>
-      <p class="text-sm">Elige un canal de la lista para comenzar a chatear</p>
+    <div *ngIf="!channel && !loading" class="flex flex-col items-center justify-center h-full text-center px-6">
+      <div class="w-14 h-14 rounded-2xl bg-ink-950/5 flex items-center justify-center mb-4">
+        <svg class="w-6 h-6 text-ink-950/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+      </div>
+      <p class="font-display font-semibold text-ink-950 mb-1">Selecciona un canal</p>
+      <p class="text-sm text-ink-950/50">Elige un canal de la lista para empezar a chatear</p>
     </div>
 
     <!-- Sin mensajes -->
-    <div *ngIf="channel && messages.length === 0 && !loading" class="flex flex-col items-center justify-center h-full text-gray-500">
-      <div class="text-6xl mb-4">✨</div>
-      <p class="text-xl font-semibold">Sin mensajes aún</p>
-      <p class="text-sm">Sé el primero en escribir en #{{ channel.name }}</p>
+    <div *ngIf="channel && messages.length === 0 && !loading" class="flex flex-col items-center justify-center h-full text-center px-6">
+      <div class="w-14 h-14 rounded-2xl bg-signal/10 flex items-center justify-center mb-4">
+        <span class="text-2xl">✨</span>
+      </div>
+      <p class="font-display font-semibold text-ink-950 mb-1">Sin mensajes aún</p>
+      <p class="text-sm text-ink-950/50">Sé el primero en escribir en #{{ channel.name }}</p>
     </div>
 
     <!-- Lista de mensajes -->
-    <div *ngFor="let message of messages" class="flex items-start space-x-3 hover:bg-gray-100 p-2 rounded transition">
-      <!-- Avatar -->
-      <img 
-        [src]="message.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" 
-        [alt]="message.sender?.username"
-        class="w-10 h-10 rounded-full flex-shrink-0">
+    <div *ngFor="let message of messages; let i = index"
+         class="group flex items-start gap-3 px-2 py-1 rounded-lg hover:bg-ink-950/[0.03] transition-colors"
+         [class.mt-3]="!shouldGroupWithPrevious(i)">
 
-      <!-- Contenido del mensaje -->
+      <div class="w-9 flex-shrink-0">
+        <img
+          *ngIf="!shouldGroupWithPrevious(i)"
+          [src]="message.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
+          [alt]="message.sender?.username"
+          class="w-9 h-9 rounded-lg">
+        <span
+          *ngIf="shouldGroupWithPrevious(i)"
+          class="hidden group-hover:block text-[10px] font-mono text-ink-950/30 text-center leading-9">
+          {{ formatTime(message.createdAt) }}
+        </span>
+      </div>
+
       <div class="flex-1 min-w-0">
-        <div class="flex items-baseline space-x-2">
-          <span class="font-semibold text-gray-900">{{ message.sender?.username || 'Usuario' }}</span>
-          <span class="text-xs text-gray-500">{{ formatTime(message.createdAt) }}</span>
-          <span *ngIf="message.isEdited" class="text-xs text-gray-400">(editado)</span>
+        <div *ngIf="!shouldGroupWithPrevious(i)" class="flex items-baseline gap-2 mb-0.5">
+          <span class="font-semibold text-sm text-ink-950">{{ message.sender?.username || 'Usuario' }}</span>
+          <span class="text-[11px] font-mono text-ink-950/35">{{ formatTime(message.createdAt) }}</span>
+          <span *ngIf="message.isEdited" class="text-[11px] text-ink-950/30">(editado)</span>
         </div>
 
-        <!-- Texto del mensaje -->
-        <p class="text-gray-800 mt-1 break-words">{{ message.content }}</p>
+        <p class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
 
-        <!-- Reacciones -->
-        <div *ngIf="message.reactions && message.reactions.length > 0" class="flex flex-wrap gap-1 mt-2">
-          <button 
+        <div *ngIf="message.reactions && message.reactions.length > 0" class="flex flex-wrap gap-1 mt-1.5">
+          <button
             *ngFor="let reaction of message.reactions"
             (click)="addReaction(message._id, reaction.emoji)"
-            class="inline-flex items-center px-2 py-1 bg-white border border-gray-300 rounded-full text-sm hover:bg-gray-100 transition">
+            class="inline-flex items-center gap-1 px-2 py-0.5 bg-signal/10 border border-signal/20 rounded-full text-xs hover:bg-signal/20 transition-colors">
             <span>{{ reaction.emoji }}</span>
-            <span class="ml-1 text-xs text-gray-600">{{ reaction.users?.length || 0 }}</span>
+            <span class="font-mono text-ink-950/50">{{ reaction.users?.length || 0 }}</span>
           </button>
         </div>
 
-        <!-- Acciones del mensaje (al hacer hover) -->
-        <div class="flex items-center space-x-2 mt-1 opacity-0 hover:opacity-100 transition">
-          <button 
-            (click)="addReaction(message._id, '👍')"
-            class="text-xs text-gray-500 hover:text-blue-600"
-            title="Reaccionar">
-            👍
-          </button>
-          <button 
-            (click)="addReaction(message._id, '❤️')"
-            class="text-xs text-gray-500 hover:text-red-600"
-            title="Reaccionar">
-            ❤️
-          </button>
-          <button 
-            (click)="addReaction(message._id, '😂')"
-            class="text-xs text-gray-500 hover:text-yellow-600"
-            title="Reaccionar">
-            😂
-          </button>
+        <div class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button (click)="addReaction(message._id, '👍')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">👍</button>
+          <button (click)="addReaction(message._id, '❤️')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">❤️</button>
+          <button (click)="addReaction(message._id, '😂')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">😂</button>
         </div>
       </div>
     </div>
 
     <!-- Usuario escribiendo -->
-    <div *ngIf="userTyping" class="flex items-center space-x-2 text-gray-500 text-sm italic">
-      <div class="flex space-x-1">
-        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
-        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+    <div *ngIf="userTyping" class="flex items-center gap-2 px-2 py-2 text-ink-950/40 text-sm italic">
+      <div class="flex gap-1">
+        <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+        <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0.15s"></div>
+        <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
       </div>
-      <span>{{ userTyping }} está escribiendo...</span>
+      <span>{{ userTyping }} está escribiendo…</span>
     </div>
   </div>
 
-  <!-- Input para enviar mensajes -->
-  <div *ngIf="channel" class="border-t border-gray-300 bg-white p-4">
-    <div class="flex items-end space-x-3">
-      <!-- Campo de texto -->
+  <!-- Composer -->
+  <div *ngIf="channel" class="flex-shrink-0 border-t border-ink-950/10 bg-white px-5 py-4">
+    <div class="flex items-end gap-3">
       <div class="flex-1 relative">
         <textarea
           [(ngModel)]="newMessage"
@@ -96,30 +93,24 @@
           (input)="onTyping()"
           placeholder="Escribe un mensaje en #{{ channel.name }}"
           rows="1"
-          class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          class="w-full px-4 py-3 pr-11 bg-ink-950/[0.04] border border-transparent rounded-xl focus:outline-none focus:border-signal/50 focus:bg-white resize-none text-[15px] placeholder:text-ink-950/35 transition-colors"
           style="max-height: 120px; overflow-y: auto;"></textarea>
-        
-        <!-- Botón emoji (decorativo por ahora) -->
-        <button 
-          class="absolute right-3 bottom-3 text-gray-400 hover:text-gray-600"
-          title="Agregar emoji">
+        <button class="absolute right-3 bottom-3 text-ink-950/30 hover:text-ink-950/60 transition-colors" title="Agregar emoji">
           😊
         </button>
       </div>
 
-      <!-- Botón enviar -->
       <button
         (click)="sendMessage()"
         [disabled]="!newMessage.trim()"
-        class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium">
-        Enviar
+        class="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-signal text-white rounded-xl hover:bg-signal/90 disabled:bg-ink-950/10 disabled:text-ink-950/30 disabled:cursor-not-allowed transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
       </button>
     </div>
 
-    <!-- Información adicional -->
-    <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
-      <span>Presiona Enter para enviar, Shift+Enter para nueva línea</span>
-      <span *ngIf="channel.members">{{ channel.members.length }} miembros</span>
+    <div class="flex items-center justify-between mt-2 text-xs text-ink-950/35">
+      <span>Enter para enviar · Shift+Enter para nueva línea</span>
+      <span *ngIf="channel.members" class="font-mono">{{ channel.members.length }} miembros</span>
     </div>
   </div>
 </div>

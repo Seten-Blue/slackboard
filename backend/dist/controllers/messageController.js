@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addReaction = exports.deleteMessage = exports.updateMessage = exports.createMessage = exports.getMessagesByChannel = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const Message_1 = __importDefault(require("../models/Message"));
 const Channel_1 = __importDefault(require("../models/Channel"));
 const User_1 = __importDefault(require("../models/User"));
@@ -46,8 +47,20 @@ const createMessage = async (req, res) => {
                 message: 'Canal no encontrado',
             });
         }
+        let senderId = sender;
+        const isValidSenderId = senderId && mongoose_1.default.Types.ObjectId.isValid(senderId.toString());
+        if (!isValidSenderId) {
+            const defaultUser = await User_1.default.findOne({ email: 'admin@slackboard.com' }) || await User_1.default.findOne();
+            if (!defaultUser) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Usuario no encontrado',
+                });
+            }
+            senderId = defaultUser._id;
+        }
         // Verificar que el usuario existe
-        const userExists = await User_1.default.findById(sender);
+        const userExists = await User_1.default.findById(senderId);
         if (!userExists) {
             return res.status(404).json({
                 success: false,
@@ -57,11 +70,23 @@ const createMessage = async (req, res) => {
         const message = await Message_1.default.create({
             content,
             channel,
-            sender,
+            sender: senderId,
             type,
         });
         const populatedMessage = await Message_1.default.findById(message._id)
             .populate('sender', 'username email avatar status');
+        // 🔥 INTEGRACIÓN SLACK: Enviar mensaje a Slack
+        try {
+            const slackService = require('../services/slackService').default;
+            if (slackService.isConfigured()) {
+                await slackService.sendMessage(channelExists.name, content, userExists.username);
+                console.log('✅ Mensaje sincronizado con Slack');
+            }
+        }
+        catch (slackError) {
+            console.error('⚠️ Error enviando a Slack:', slackError.message);
+            // No falla la petición si Slack falla
+        }
         res.status(201).json({
             success: true,
             message: 'Mensaje enviado',

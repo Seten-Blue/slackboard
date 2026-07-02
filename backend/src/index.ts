@@ -29,9 +29,15 @@ const io = new Server(httpServer, {
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || '';
 
+app.set('io', io);
+
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Conectar a MongoDB
@@ -111,3 +117,14 @@ httpServer.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📡 Socket.IO listo para conexiones en tiempo real`);
 });
+
+// Middlewares
+app.use(cors());
+
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf.toString(); // ← NUEVO: guardamos el raw body para slackController
+  }
+}));
+
+app.use(express.urlencoded({ extended: true }));

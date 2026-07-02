@@ -1,5 +1,6 @@
 import { WebClient } from '@slack/web-api';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -7,9 +8,22 @@ class SlackService {
   private client: WebClient;
   private channelMap: Map<string, string> = new Map();
   private readonly token: string;
+  private readonly signingSecret: string;
+
+  private normalizeChannelName(name: string): string {
+    return (name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-');
+  }
 
   constructor() {
     this.token = (process.env.SLACK_BOT_TOKEN || '').trim();
+    this.signingSecret = (process.env.SLACK_SIGNING_SECRET || '').trim();
+
+    if (!this.signingSecret) {
+      console.warn('⚠️  SLACK_SIGNING_SECRET no configurado. Los eventos entrantes no se verificarán (inseguro para producción).');
+    }
 
     if (!this.token) {
       console.warn('⚠️  SLACK_BOT_TOKEN no configurado. La integración con Slack no funcionará.');
@@ -31,13 +45,15 @@ class SlackService {
   private async initializeChannelMap() {
     try {
       const result = await this.client.conversations.list({
-        types: 'public_channel,private_channel',  // ← CAMBIO: agregado private_channel
+        types: 'public_channel,private_channel',
         exclude_archived: true,
         limit: 200
       });
 
       if (result.channels) {
         result.channels.forEach((channel: any) => {
+          const normalizedName = this.normalizeChannelName(channel.name);
+          this.channelMap.set(normalizedName, channel.id);
           this.channelMap.set(channel.name.toLowerCase(), channel.id);
           console.log(`📌 Canal mapeado: ${channel.name} -> ${channel.id}`);
         });
@@ -54,23 +70,20 @@ class SlackService {
         return null;
       }
 
-      // Buscar el ID del canal
-      let slackChannelId = this.channelMap.get(channelName.toLowerCase());
+      const normalizedChannelName = this.normalizeChannelName(channelName);
+      let slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
 
-      // Si no existe, refrescar el mapa
       if (!slackChannelId) {
         console.log(`🔄 Canal ${channelName} no encontrado, refrescando mapa...`);
         await this.initializeChannelMap();
-        slackChannelId = this.channelMap.get(channelName.toLowerCase());
+        slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
       }
 
-      // Si aún no existe, NO crear el canal, solo reportar error
       if (!slackChannelId) {
         throw new Error(`Canal "${channelName}" no encontrado en Slack. Créalo primero o invita al bot.`);
       }
 
       try {
-        // Enviar el mensaje
         const result = await this.client.chat.postMessage({
           channel: slackChannelId,
           text: text,
@@ -123,7 +136,7 @@ class SlackService {
       }
 
       const slackChannelId = this.channelMap.get(channelName.toLowerCase());
-      
+
       if (!slackChannelId) {
         console.log(`Canal ${channelName} no encontrado en Slack`);
         return [];
@@ -165,7 +178,7 @@ class SlackService {
       }
 
       const result = await this.client.conversations.list({
-        types: 'public_channel,private_channel',  // ← CAMBIO
+        types: 'public_channel,private_channel',
         exclude_archived: true,
         limit: 200
       });
@@ -181,12 +194,49 @@ class SlackService {
     return !!this.token && this.token.startsWith('xoxb-') && this.token !== 'xoxb-your-bot-token-here';
   }
 
+  isSignatureVerificationEnabled(): boolean {
+    return !!this.signingSecret;
+  }
+
   getClient(): WebClient {
     return this.client;
   }
 
   async refreshChannelMap(): Promise<void> {
     await this.initializeChannelMap();
+  }
+
+  // ← NUEVO: verifica que la petición realmente venga de Slack usando el Signing Secret
+  verifySignature(rawBody: string, timestamp: string, signature: string): boolean {
+    if (!this.signingSecret) {
+      console.warn('⚠️  SLACK_SIGNING_SECRET no configurado, se omite verificación de firma (inseguro, configúralo pronto).');
+      return true; // no bloqueamos mientras no tengas el secret puesto
+    }
+
+    if (!timestamp || !signature || !rawBody) {
+      return false;
+    }
+
+    // Evitar replay attacks: rechazar timestamps de más de 5 minutos
+    const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 60 * 5;
+    if (Number(timestamp) < fiveMinutesAgo) {
+      return false;
+    }
+
+    const baseString = `v0:${timestamp}:${rawBody}`;
+    const mySignature = 'v0=' + crypto
+      .createHmac('sha256', this.signingSecret)
+      .update(baseString, 'utf8')
+      .digest('hex');
+
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(mySignature, 'utf8'),
+        Buffer.from(signature, 'utf8')
+      );
+    } catch {
+      return false;
+    }
   }
 }
 

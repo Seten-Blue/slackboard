@@ -3,8 +3,65 @@ import Channel from '../models/Channel';
 import Message from '../models/Message';
 import User from '../models/User';
 import slackService from '../services/slackService';
+import { Server } from 'socket.io';
 
 const router = express.Router();
+
+// ← NUEVO: normaliza nombres para comparar "Los nuevos" con "los-nuevos" como el mismo canal
+const normalizeChannelName = (name: string): string =>
+  (name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+
+// ← CORREGIDO: matching por nombre normalizado en vez de comparación exacta
+const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?: string) => {
+  const fallbackName = channelName || `slack-${slackChannelId}`;
+  const normalizedIncoming = normalizeChannelName(fallbackName);
+
+  // 1. Buscar primero por slackChannelId (la forma más confiable una vez vinculado)
+  let channel: any = await Channel.findOne({ slackChannelId });
+
+  // 2. Si no hay vínculo aún, buscar por nombre normalizado entre todos los canales
+  if (!channel) {
+    const allChannels = await Channel.find({});
+    const match = allChannels.find(
+      (c: any) => normalizeChannelName(c.name) === normalizedIncoming
+    );
+    if (match) {
+      channel = match;
+    }
+  }
+
+  // 3. Si lo encontramos por nombre, vincularlo con su slackChannelId para la próxima vez
+  if (channel) {
+    if (!channel.slackChannelId) {
+      channel.slackChannelId = slackChannelId;
+      await channel.save();
+      console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannelId})`);
+    }
+    return channel;
+  }
+
+  // 4. Si de verdad no existe en ningún lado, ahí sí se crea uno nuevo
+  let adminUser = await User.findOne({ email: 'admin@slackboard.com' }) || await User.findOne();
+  if (!adminUser) {
+    throw new Error('No existe un usuario admin para crear el canal sincronizado desde Slack');
+  }
+
+  channel = await Channel.create({
+    name: fallbackName,
+    description: `Canal sincronizado desde Slack (${fallbackName})`,
+    isPrivate: false,
+    members: [adminUser._id],
+    createdBy: adminUser._id,
+    slackChannelId
+  });
+
+  console.log(`➕ Canal nuevo creado desde Slack: ${fallbackName} (${slackChannelId})`);
+
+  return channel;
+};
 
 // Estado de la integración
 router.get('/status', (req: Request, res: Response) => {
@@ -55,7 +112,7 @@ router.post('/sync-channels', async (req: Request, res: Response) => {
     const syncedChannels = [];
 
     for (const slackChannel of slackChannels) {
-      let channel = await Channel.findOne({ name: slackChannel.name });
+      let channel: any = await Channel.findOne({ name: slackChannel.name });
       
       if (!channel) {
         console.log(`➕ Creando canal: ${slackChannel.name}`);
@@ -64,10 +121,17 @@ router.post('/sync-channels', async (req: Request, res: Response) => {
           description: slackChannel.purpose?.value || '',
           isPrivate: slackChannel.is_private || false,
           members: [adminUser._id],
-          createdBy: adminUser._id
+          createdBy: adminUser._id,
+          slackChannelId: slackChannel.id // ← NUEVO: guarda el vínculo desde la sincronización
         });
       } else {
         console.log(`✅ Canal ya existe: ${slackChannel.name}`);
+        // ← NUEVO: si ya existía pero sin vínculo, lo vinculamos ahora
+        if (!channel.slackChannelId) {
+          channel.slackChannelId = slackChannel.id;
+          await channel.save();
+          console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannel.id})`);
+        }
       }
 
       syncedChannels.push(channel);
@@ -139,8 +203,23 @@ router.post('/send-message', async (req: Request, res: Response) => {
 router.post('/events', async (req: Request, res: Response) => {
   try {
     console.log('📨 Recibido evento de Slack:', JSON.stringify(req.body, null, 2));
-    
+
     const { type, challenge, event } = req.body;
+
+    // Verificar que la petición realmente venga de Slack
+    const signature = req.headers['x-slack-signature'] as string;
+    const timestamp = req.headers['x-slack-request-timestamp'] as string;
+    const rawBody = (req as any).rawBody || '';
+
+    if (slackService.isSignatureVerificationEnabled()) {
+      const isValid = slackService.verifySignature(rawBody, timestamp, signature);
+      if (!isValid) {
+        console.warn('⚠️  Firma de Slack inválida, petición rechazada');
+        return res.status(401).send('Firma inválida');
+      }
+    } else if (!signature || !timestamp) {
+      console.warn('⚠️  No se recibió firma de Slack; se procesará el evento aunque la verificación esté deshabilitada');
+    }
 
     // Responder al challenge de verificación de URL
     if (type === 'url_verification') {
@@ -158,19 +237,26 @@ router.post('/events', async (req: Request, res: Response) => {
         return res.status(200).send('OK');
       }
 
-      // Manejar mensaje de canal o DM
-      if (event.type === 'message' && (event.channel_type === 'channel' || event.channel_type === 'im')) {
+      const channelType = (event.channel_type || 'channel').toString();
+
+      // Manejar mensaje de canal público, privado o DM sin depender de un payload exacto
+      if (event.type === 'message' && ['channel', 'group', 'im'].includes(channelType)) {
         console.log('💬 Procesando mensaje de Slack');
 
         if (event.subtype) {
           console.log(`⏭️  Ignorando mensaje con subtype: ${event.subtype}`);
           return res.status(200).send('OK');
         }
-        
+
+        if (!event.text || !event.channel) {
+          console.warn('⚠️  Evento de Slack sin texto o canal, se ignora');
+          return res.status(200).send('OK');
+        }
+
         const slackUser = await slackService.getUserInfo(event.user);
-        
+
         let user = await User.findOne({ email: slackUser?.profile?.email });
-        
+
         if (!user && slackUser) {
           user = await User.create({
             email: slackUser.profile?.email || `slack_${event.user}@slack.com`,
@@ -182,21 +268,41 @@ router.post('/events', async (req: Request, res: Response) => {
         }
 
         try {
-          const channelInfo = await slackService.getClient().conversations.info({
-            channel: event.channel
-          });
+          let channelName = undefined as string | undefined;
+          try {
+            const channelInfo = await slackService.getClient().conversations.info({
+              channel: event.channel
+            });
+            channelName = channelInfo.channel?.name;
+          } catch (channelInfoError: any) {
+            console.warn('⚠️  No se pudo obtener información del canal de Slack:', channelInfoError.message);
+          }
 
-          const channelName = channelInfo.channel?.name;
-          const channel = await Channel.findOne({ name: channelName });
+          const channel: any = await resolveOrCreateSlackChannel(event.channel, channelName);
 
           if (channel && user) {
-            await Message.create({
+            const createdMessage = await Message.create({
               content: event.text,
               channel: channel._id,
               sender: user._id,
               type: 'text'
             });
-            console.log('✅ Mensaje guardado en MongoDB');
+
+            const populatedMessage = await Message.findById(createdMessage._id)
+              .populate('sender', 'username email avatar status');
+
+            const io = req.app.get('io') as Server;
+            if (io && populatedMessage) {
+              io.to(channel._id.toString()).emit('new-message', {
+                channelId: channel._id.toString(),
+                message: populatedMessage
+              });
+            }
+
+            console.log('✅ Mensaje guardado en MongoDB y emitido al frontend');
+          } else {
+            // ← NUEVO: ya no se pierde ningún mensaje en silencio
+            console.warn(`⚠️  Mensaje de Slack no guardado — channel encontrado: ${!!channel}, user encontrado: ${!!user}`);
           }
         } catch (channelError: any) {
           console.warn('⚠️  No se pudo procesar el canal del evento:', channelError.message);

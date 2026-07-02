@@ -1,4 +1,4 @@
-backend/.env
 .env
+.env.*
 node_modules/
-backend/.env.example
+!*.env.example
