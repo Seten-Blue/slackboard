@@ -80,11 +80,57 @@
             *ngIf="currentChannel?._id === channel._id"
             class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-signal"></span>
           <span class="text-white/40 text-sm font-mono w-3.5 text-center flex-shrink-0">{{ channel.isPrivate ? '🔒' : '#' }}</span>
-          <span class="text-sm truncate flex-1">{{ channel.name }}</span>
-          <span *ngIf="channel.members?.length" class="text-[10px] font-mono text-white/30 flex-shrink-0">
-            {{ channel.members.length }}
-          </span>
+          
+          <div class="flex-1">
+
+
+  <input
+    *ngIf="editingChannel?._id === channel._id"
+    [(ngModel)]="editedChannelName"
+    (keyup.enter)="updateChannel()"
+    (blur)="updateChannel()"
+    class="w-full bg-transparent border-b border-signal outline-none text-sm text-white">
+
+  <span
+    *ngIf="editingChannel?._id !== channel._id"
+    class="text-sm truncate block">
+
+    {{ channel.name }}
+
+  </span>
+
+</div>
+          <span *ngIf="channel.members?.length"
+      class="text-[10px] font-mono text-white/30 flex-shrink-0">
+  {{ channel.members.length }}
+</span>
+
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+  <button
+    (click)="startEditing(channel); $event.stopPropagation()"
+    class="text-white/40 hover:text-white p-1 rounded"
+    title="Renombrar canal">
+
+    ✏️
+
+  </button>
+
+  <button
+    (click)="deleteChannel(channel); $event.stopPropagation()"
+    class="text-white/40 hover:text-red-400 p-1 rounded"
+    title="Abandonar canal">
+
+    🚪
+
+  </button>
+
+</div>
+
+
         </li>
+        
+
       </ul>
 
       <div *ngIf="loading" class="px-3 py-4 text-sm text-white/40">Cargando canales…</div>

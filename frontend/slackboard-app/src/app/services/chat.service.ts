@@ -35,6 +35,20 @@ export class ChatService {
     });
   }
 
+
+updateChannel(channelId: string, channelData: any): Observable<any> {
+  return this.http.put(`${this.apiUrl}/channels/${channelId}`, channelData);
+}
+
+leaveChannel(channelId: string): Observable<any> {
+  return this.http.post(`${this.apiUrl}/channels/${channelId}/leave`, {});
+}
+
+deleteChannel(channelId: string): Observable<any> {
+  return this.http.delete(`${this.apiUrl}/channels/${channelId}`);
+}
+
+
   getMessagesByChannel(channelId: string, limit = 50, skip = 0): Observable<any> {
     return this.http.get(`${this.apiUrl}/messages/channel/${channelId}?limit=${limit}&skip=${skip}`);
   }

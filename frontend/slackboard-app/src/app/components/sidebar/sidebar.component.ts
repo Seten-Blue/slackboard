@@ -14,6 +14,11 @@ export class SidebarComponent implements OnInit {
   showCreateChannel = false;
   newChannelName = '';
 
+  editingChannel: any = null;
+  editedChannelName = '';
+  savingChannel = false;
+
+
   constructor(
     private chatService: ChatService,
     private router: Router
@@ -75,4 +80,67 @@ export class SidebarComponent implements OnInit {
       }
     });
   }
+
+  startEditing(channel: any) {
+  this.editingChannel = channel;
+  this.editedChannelName = channel.name;
+}
+
+updateChannel() {
+  if (!this.editingChannel || this.savingChannel) return;
+
+  const trimmedName = this.editedChannelName.trim();
+  if (!trimmedName) {
+    this.editingChannel = null;
+    this.editedChannelName = '';
+    return;
+  }
+
+  this.savingChannel = true;
+
+  this.chatService.updateChannel(
+    this.editingChannel._id,
+    { name: trimmedName }
+  ).subscribe({
+    next: (response) => {
+      this.editingChannel.name = response.data.name;
+      this.editingChannel = null;
+      this.editedChannelName = '';
+      this.savingChannel = false;
+    },
+    error: (error) => {
+      console.error('Error actualizando canal:', error);
+      const message = error?.error?.message || 'No fue posible actualizar el canal.';
+      alert(message);
+      this.savingChannel = false;
+    }
+  });
+}
+
+deleteChannel(channel: any) {
+
+  if (!confirm(`¿Abandonar el canal "${channel.name}"?`)) {
+    return;
+  }
+
+  this.chatService.deleteChannel(channel._id).subscribe({
+    next: () => {
+
+      this.channels = this.channels.filter(c => c._id !== channel._id);
+
+      if (this.currentChannel?._id === channel._id) {
+        this.currentChannel = null;
+      }
+
+    },
+
+    error: (error) => {
+      console.error('Error eliminando canal:', error);
+      const message = error?.error?.message || 'No fue posible abandonar el canal.';
+      alert(message);
+    }
+
+  });
+
+}
 }
