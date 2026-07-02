@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Channel from '../models/Channel';
 import User from '../models/User';
+import slackService from '../services/slackService';
 
 // Obtener todos los canales
 export const getAllChannels = async (req: Request, res: Response) => {
@@ -52,6 +53,7 @@ export const getChannelById = async (req: Request, res: Response) => {
   }
 };
 
+
 // Crear un nuevo canal
 export const createChannel = async (req: Request, res: Response) => {
   try {
@@ -97,7 +99,14 @@ export const createChannel = async (req: Request, res: Response) => {
       message: 'Canal creado exitosamente',
       data: populatedChannel,
     });
+
   } catch (error: any) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe un canal con ese nombre. Elige otro.',
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Error al crear el canal',
@@ -105,6 +114,55 @@ export const createChannel = async (req: Request, res: Response) => {
     });
   }
 };
+
+// Editar nombre de un canal
+export const updateChannel = async (req: Request, res: Response) => {
+  try {
+    const { name, description } = req.body;
+
+    const channel = await Channel.findById(req.params.id);
+
+    if (!channel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Canal no encontrado',
+      });
+    }
+
+    channel.name = name ?? channel.name;
+    channel.description = description ?? channel.description;
+
+    await channel.save();
+
+    let slackWarning: string | null = null;
+
+    if (channel.slackChannelId) {
+      try {
+        await slackService.renameChannel(channel.slackChannelId, channel.name);
+      } catch (error: any) {
+        console.error('❌ Error renombrando canal en Slack:', error.message);
+        slackWarning = 'El canal se actualizó, pero no se pudo renombrar en Slack (revisa permisos del bot).';
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Canal actualizado exitosamente',
+      data: channel,
+      ...(slackWarning && { warning: slackWarning }),
+    });
+
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar el canal',
+      error: error.message,
+    });
+  }
+};
+
+
+
 
 // Agregar miembro a un canal
 export const addMemberToChannel = async (req: Request, res: Response) => {
@@ -156,10 +214,11 @@ export const addMemberToChannel = async (req: Request, res: Response) => {
   }
 };
 
-// Eliminar canal
-export const deleteChannel = async (req: Request, res: Response) => {
+// Hacer que el bot abandone un canal de Slack
+export const leaveChannel = async (req: Request, res: Response) => {
   try {
-    const channel = await Channel.findByIdAndDelete(req.params.id);
+
+    const channel = await Channel.findById(req.params.id);
 
     if (!channel) {
       return res.status(404).json({
@@ -168,10 +227,65 @@ export const deleteChannel = async (req: Request, res: Response) => {
       });
     }
 
+    if (!channel.slackChannelId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Este canal no está vinculado con Slack.',
+      });
+    }
+
+    try {
+      await slackService.leaveChannel(channel.slackChannelId);
+    } catch (slackError: any) {
+      console.error('Error abandonando el canal en Slack:', slackError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'El bot abandonó el canal en la app (Slack pudo fallar, revisa logs).',
+    });
+
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error abandonando el canal.',
+      error: error.message,
+    });
+  }
+};
+
+// Eliminar canal
+export const deleteChannel = async (req: Request, res: Response) => {
+  try {
+    const channel = await Channel.findById(req.params.id);
+
+    if (!channel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Canal no encontrado',
+      });
+    }
+
+    
+    if (channel.slackChannelId) {
+      try {
+        await slackService.leaveChannel(channel.slackChannelId);
+      } catch (slackError: any) {
+        console.error('❌ No se pudo abandonar el canal en Slack:', slackError.message);
+        return res.status(502).json({
+          success: false,
+          message: `No se pudo abandonar el canal en Slack: ${slackError.message}`,
+        });
+      }
+    }
+
+    await Channel.findByIdAndDelete(req.params.id);
+
     res.json({
       success: true,
       message: 'Canal eliminado exitosamente',
     });
+
   } catch (error: any) {
     res.status(500).json({
       success: false,

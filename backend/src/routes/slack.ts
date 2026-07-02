@@ -237,6 +237,41 @@ router.post('/events', async (req: Request, res: Response) => {
         return res.status(200).send('OK');
       }
 
+      // Manejar renombrado de canal hecho directamente en Slack
+      if (event.type === 'channel_rename' && event.channel) {
+        console.log('✏️  Canal renombrado en Slack:', event.channel);
+
+        const slackChannelId = event.channel.id;
+        const newName = event.channel.name;
+
+        if (slackChannelId && newName) {
+          const channel: any = await Channel.findOne({ slackChannelId });
+if (channel) {
+  if (channel.name !== newName) {
+    channel.name = newName;
+    await channel.save();
+    console.log(`✅ Canal renombrado en SlackBoard: ${slackChannelId} -> ${newName}`);
+  } else {
+    console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard');
+  }
+
+  await slackService.refreshChannelMap(); // ← sacar esto del if, siempre refrescar
+
+  const io = req.app.get('io') as Server;
+  if (io) {
+    io.emit('channel-renamed', { channelId: channel._id.toString(), name: channel.name });
+  }
+} else {
+              console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard, no se hace nada');
+            }
+          } else {
+            console.warn(`⚠️  Se recibió channel_rename para un canal no vinculado: ${slackChannelId}`);
+          }
+        }
+
+        return res.status(200).send('OK');
+      }
+      
       const channelType = (event.channel_type || 'channel').toString();
 
       // Manejar mensaje de canal público, privado o DM sin depender de un payload exacto

@@ -4,24 +4,32 @@ import {
   getChannelById,
   createChannel,
   addMemberToChannel,
+  updateChannel,
+  leaveChannel,
   deleteChannel,
 } from '../controllers/channelController';
 
 const router = express.Router();
 
-// GET /api/channels - Obtener todos los canales
+// GET /api/channels
 router.get('/', getAllChannels);
 
-// GET /api/channels/:id - Obtener un canal por ID
+// GET /api/channels/:id
 router.get('/:id', getChannelById);
 
-// POST /api/channels - Crear un nuevo canal
+// POST /api/channels
 router.post('/', createChannel);
 
-// POST /api/channels/add-member - Agregar miembro a un canal
+// PUT /api/channels/:id
+router.put('/:id', updateChannel);
+
+// POST /api/channels/:id/leave
+router.post('/:id/leave', leaveChannel);
+
+// POST /api/channels/add-member
 router.post('/add-member', addMemberToChannel);
 
-// DELETE /api/channels/:id - Eliminar un canal
+// DELETE /api/channels/:id
 router.delete('/:id', deleteChannel);
 
 export default router;
