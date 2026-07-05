@@ -1,0 +1,164 @@
+<div class="flex flex-col h-full min-h-0 overflow-hidden bg-paper">
+  <!-- Header: selector de tablero -->
+  <header class="flex-shrink-0 bg-white/80 backdrop-blur border-b border-ink-950/10 px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div class="relative">
+        <button
+          (click)="showBoardPicker = !showBoardPicker"
+          class="flex items-center gap-2 font-display font-semibold text-lg text-ink-950 hover:text-signal transition-colors">
+          <span class="text-ink-950/30 font-mono text-base">▤</span>
+          {{ selectedBoard?.name || 'Selecciona un tablero' }}
+          <svg class="w-4 h-4 text-ink-950/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+
+        <div *ngIf="showBoardPicker" class="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg border border-ink-950/10 py-2 z-20">
+          <button
+            *ngFor="let board of boards"
+            (click)="selectBoard(board)"
+            class="w-full text-left px-4 py-2.5 text-sm hover:bg-ink-950/5 transition-colors flex items-center justify-between"
+            [class.text-signal]="selectedBoard?.id === board.id"
+            [class.font-medium]="selectedBoard?.id === board.id">
+            {{ board.name }}
+            <span *ngIf="selectedBoard?.id === board.id" class="text-signal">✓</span>
+          </button>
+          <div *ngIf="boards.length === 0" class="px-4 py-3 text-sm text-ink-950/40">
+            No tienes tableros en Trello
+          </div>
+        </div>
+      </div>
+
+      <a *ngIf="selectedBoard" [href]="selectedBoard.url" target="_blank"
+         class="text-xs font-mono text-ink-950/40 hover:text-signal transition-colors">
+        Abrir en Trello ↗
+      </a>
+    </div>
+  </header>
+
+  <!-- Tablero kanban -->
+  <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 py-5">
+    <div *ngIf="loadingBoards || loadingBoard" class="flex items-center gap-2 text-ink-950/40 text-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+      Cargando…
+    </div>
+
+    <div *ngIf="!loadingBoards && boards.length === 0" class="flex flex-col items-center justify-center h-full text-center">
+      <p class="font-display font-semibold text-ink-950 mb-1">No hay tableros conectados</p>
+      <p class="text-sm text-ink-950/50">Crea un tablero en Trello para empezar</p>
+    </div>
+
+    <div *ngIf="!loadingBoard && selectedBoard" class="flex gap-4 h-full items-start">
+      <div *ngFor="let list of lists"
+           class="w-72 flex-shrink-0 flex flex-col bg-ink-950/[0.03] rounded-xl max-h-full"
+           (dragover)="onDragOver($event)"
+           (drop)="onDrop($event, list.id)">
+
+        <div class="flex items-center justify-between px-3 py-2.5 flex-shrink-0">
+          <h3 class="font-display font-semibold text-sm text-ink-950">{{ list.name }}</h3>
+          <span class="text-[11px] font-mono text-ink-950/40">{{ cardsInList(list.id).length }}</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-2 space-y-2 min-h-[20px]">
+          <div *ngFor="let card of cardsInList(list.id)"
+               draggable="true"
+               (dragstart)="onDragStart($event, card)"
+               (click)="openCard(card)"
+               class="bg-white rounded-lg shadow-sm border border-ink-950/5 px-3 py-2.5 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <p class="text-sm text-ink-950/85 leading-snug">{{ card.name }}</p>
+            <div *ngIf="card.due" class="flex items-center gap-1 mt-1.5 text-[11px] font-mono"
+                 [class.text-signal]="!card.dueComplete"
+                 [class.text-pulse]="card.dueComplete">
+              📅 {{ card.due | date:'d MMM' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="p-2 flex-shrink-0">
+          <div *ngIf="addingCardToList === list.id" class="bg-white rounded-lg border border-signal/30 p-2">
+            <textarea
+              [(ngModel)]="newCardName"
+              (keydown.enter)="$event.preventDefault(); confirmAddCard()"
+              placeholder="Nombre de la tarjeta…"
+              rows="2"
+              class="w-full text-sm outline-none resize-none placeholder:text-ink-950/30"></textarea>
+            <div class="flex items-center gap-2 mt-1">
+              <button (click)="confirmAddCard()" class="px-3 py-1 bg-signal text-white text-xs font-medium rounded-md hover:bg-signal/90 transition-colors">
+                Agregar
+              </button>
+              <button (click)="cancelAddingCard()" class="text-ink-950/40 hover:text-ink-950/70 text-xs">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <button
+            *ngIf="addingCardToList !== list.id"
+            (click)="startAddingCard(list.id)"
+            class="w-full text-left px-2 py-1.5 text-sm text-ink-950/40 hover:text-ink-950/70 hover:bg-white/60 rounded-lg transition-colors">
+            + Agregar tarjeta
+          </button>
+        </div>
+      </div>
+
+      <div class="w-72 flex-shrink-0">
+        <div *ngIf="showAddList" class="bg-white rounded-xl border border-signal/30 p-3">
+          <input
+            [(ngModel)]="newListName"
+            (keyup.enter)="confirmAddList()"
+            placeholder="Nombre de la lista…"
+            class="w-full text-sm outline-none placeholder:text-ink-950/30 mb-2">
+          <div class="flex items-center gap-2">
+            <button (click)="confirmAddList()" class="px-3 py-1 bg-signal text-white text-xs font-medium rounded-md hover:bg-signal/90 transition-colors">
+              Crear lista
+            </button>
+            <button (click)="showAddList = false" class="text-ink-950/40 hover:text-ink-950/70 text-xs">
+              Cancelar
+            </button>
+          </div>
+        </div>
+
+        <button
+          *ngIf="!showAddList"
+          (click)="startAddingList()"
+          class="w-full text-left px-3 py-2.5 text-sm text-ink-950/40 hover:text-ink-950/70 hover:bg-ink-950/[0.03] rounded-xl transition-colors">
+          + Agregar otra lista
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel lateral de edición de tarjeta -->
+  <div *ngIf="selectedCard" class="fixed inset-0 z-30 flex justify-end" (click)="closeCardPanel()">
+    <div class="absolute inset-0 bg-ink-950/20"></div>
+    <div class="relative w-full max-w-md h-full bg-white shadow-2xl p-6 overflow-y-auto" (click)="$event.stopPropagation()">
+      <button (click)="closeCardPanel()" class="absolute top-4 right-4 text-ink-950/40 hover:text-ink-950/70 text-xl leading-none">
+        ×
+      </button>
+
+      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Nombre</label>
+      <input
+        [(ngModel)]="editedCardName"
+        class="w-full text-lg font-display font-semibold text-ink-950 outline-none border-b border-transparent focus:border-signal/50 pb-1 mt-1 mb-5">
+
+      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Descripción</label>
+      <textarea
+        [(ngModel)]="editedCardDesc"
+        rows="6"
+        placeholder="Agrega una descripción más detallada…"
+        class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg p-3 mt-1 mb-5 resize-none focus:border-signal/50 transition-colors"></textarea>
+
+      <div class="flex items-center gap-2">
+        <button
+          (click)="saveCard()"
+          [disabled]="savingCard"
+          class="px-4 py-2 bg-signal text-white text-sm font-medium rounded-lg hover:bg-signal/90 disabled:opacity-50 transition-colors">
+          {{ savingCard ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+        <button
+          (click)="archiveCard(selectedCard)"
+          class="px-4 py-2 text-ink-950/50 hover:text-red-500 text-sm font-medium transition-colors">
+          Archivar tarjeta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

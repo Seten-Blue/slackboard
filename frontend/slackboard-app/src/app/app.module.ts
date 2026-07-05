@@ -11,6 +11,7 @@ import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { ChatComponent } from './components/chat/chat.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { MessageAreaComponent } from './components/message-area/message-area.component';
+import { TrelloComponent } from './components/trello/trello.component';
 
 @NgModule({
   declarations: [
@@ -18,7 +19,8 @@ import { MessageAreaComponent } from './components/message-area/message-area.com
     SidebarComponent,
     ChatComponent,
     DashboardComponent,
-    MessageAreaComponent
+    MessageAreaComponent,
+    TrelloComponent
   ],
   imports: [
     BrowserModule,

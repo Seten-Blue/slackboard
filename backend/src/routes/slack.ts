@@ -246,22 +246,23 @@ router.post('/events', async (req: Request, res: Response) => {
 
         if (slackChannelId && newName) {
           const channel: any = await Channel.findOne({ slackChannelId });
-if (channel) {
-  if (channel.name !== newName) {
-    channel.name = newName;
-    await channel.save();
-    console.log(`✅ Canal renombrado en SlackBoard: ${slackChannelId} -> ${newName}`);
-  } else {
-    console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard');
-  }
 
-  await slackService.refreshChannelMap(); // ← sacar esto del if, siempre refrescar
+          if (channel) {
+            if (channel.name !== newName) {
+              channel.name = newName;
+              await channel.save();
+              console.log(`✅ Canal renombrado en SlackBoard: ${slackChannelId} -> ${newName}`);
 
-  const io = req.app.get('io') as Server;
-  if (io) {
-    io.emit('channel-renamed', { channelId: channel._id.toString(), name: channel.name });
-  }
-} else {
+              await slackService.refreshChannelMap();
+
+              const io = req.app.get('io') as Server;
+              if (io) {
+                io.emit('channel-renamed', {
+                  channelId: channel._id.toString(),
+                  name: channel.name
+                });
+              }
+            } else {
               console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard, no se hace nada');
             }
           } else {

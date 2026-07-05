@@ -10,6 +10,7 @@ import channelsRouter from './routes/channels';
 import messagesRouter from './routes/messages';
 import analyticsRouter from './routes/analytics';
 import slackRouter from './routes/slack';
+import trelloRouter from './routes/trello';
 
 // Configurar variables de entorno
 dotenv.config();
@@ -77,7 +78,7 @@ app.use('/api/channels', channelsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/slack', slackRouter);
-
+app.use('/api/trello', trelloRouter);
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
   console.log('👤 Usuario conectado:', socket.id);
