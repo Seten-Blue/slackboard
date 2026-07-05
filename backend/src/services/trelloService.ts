@@ -9,7 +9,7 @@ class TrelloService {
     this.token = (process.env.TRELLO_TOKEN || '').trim();
 
     if (!this.key || !this.token) {
-      console.warn('⚠️  TRELLO_API_KEY o TRELLO_API_TOKEN no configurados. La integración con Trello no funcionará.');
+      console.warn('⚠️  TRELLO_API_KEY o TRELLO_TOKEN no configurados. La integración con Trello no funcionará.');
     } else {
       console.log('✅ Trello configurado');
     }
@@ -40,27 +40,39 @@ class TrelloService {
       throw new Error(`Trello API error (${response.status}): ${errorText}`);
     }
 
-    // Algunas respuestas de Trello (como archivar) vienen sin body útil
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   }
 
-  // Obtener todos los tableros del usuario
+  // ---------- Tableros ----------
+
   async getBoards(): Promise<any[]> {
     return this.request('/members/me/boards?fields=id,name,desc,url,closed');
   }
 
-  // Obtener las listas de un tablero
+  // ---------- Listas ----------
+
   async getLists(boardId: string): Promise<any[]> {
     return this.request(`/boards/${boardId}/lists?fields=id,name,pos`);
   }
 
-  // Obtener las tarjetas de un tablero (se agrupan por lista en el frontend)
-  async getCardsByBoard(boardId: string): Promise<any[]> {
-    return this.request(`/boards/${boardId}/cards?fields=id,name,desc,idList,pos,due,dueComplete,labels,closed`);
+  async createList(boardId: string, name: string): Promise<any> {
+    const params = new URLSearchParams({ idBoard: boardId, name });
+    return this.request(`/lists?${params.toString()}`, { method: 'POST' });
   }
 
-  // Crear una tarjeta nueva en una lista
+  // ← NUEVO: archivar una lista (equivalente a "quitarla" sin destruir sus tarjetas)
+  async archiveList(listId: string): Promise<any> {
+    return this.request(`/lists/${listId}?closed=true`, { method: 'PUT' });
+  }
+
+  // ---------- Tarjetas ----------
+
+  async getCardsByBoard(boardId: string): Promise<any[]> {
+    // ← CAMBIO: se agregó 'badges' para traer contador de adjuntos/comentarios/checklist sin llamadas extra
+    return this.request(`/boards/${boardId}/cards?fields=id,name,desc,idList,pos,due,dueComplete,labels,closed,badges`);
+  }
+
   async createCard(listId: string, name: string, desc?: string): Promise<any> {
     const params = new URLSearchParams({
       idList: listId,
@@ -70,30 +82,61 @@ class TrelloService {
     return this.request(`/cards?${params.toString()}`, { method: 'POST' });
   }
 
-  // Actualizar nombre/descripción de una tarjeta
-  async updateCard(cardId: string, data: { name?: string; desc?: string }): Promise<any> {
+  // ← CAMBIO: ahora acepta también due y dueComplete
+  async updateCard(cardId: string, data: { name?: string; desc?: string; due?: string | null; dueComplete?: boolean }): Promise<any> {
     const params = new URLSearchParams();
     if (data.name !== undefined) params.set('name', data.name);
     if (data.desc !== undefined) params.set('desc', data.desc);
+    if (data.due !== undefined) params.set('due', data.due === null ? 'null' : data.due);
+    if (data.dueComplete !== undefined) params.set('dueComplete', String(data.dueComplete));
     return this.request(`/cards/${cardId}?${params.toString()}`, { method: 'PUT' });
   }
 
-  // Mover una tarjeta a otra lista (o reordenar)
   async moveCard(cardId: string, listId: string, pos?: string | number): Promise<any> {
     const params = new URLSearchParams({ idList: listId });
     if (pos !== undefined) params.set('pos', pos.toString());
     return this.request(`/cards/${cardId}?${params.toString()}`, { method: 'PUT' });
   }
 
-  // Archivar tarjeta — el equivalente Trello de "abandonar" en vez de destruir
   async archiveCard(cardId: string): Promise<any> {
     return this.request(`/cards/${cardId}?closed=true`, { method: 'PUT' });
   }
 
-  // Crear una lista nueva en un tablero
-  async createList(boardId: string, name: string): Promise<any> {
-    const params = new URLSearchParams({ idBoard: boardId, name });
-    return this.request(`/lists?${params.toString()}`, { method: 'POST' });
+  // ---------- Etiquetas (NUEVO) ----------
+
+  async getLabels(boardId: string): Promise<any[]> {
+    return this.request(`/boards/${boardId}/labels?fields=id,name,color`);
+  }
+
+  async addLabelToCard(cardId: string, labelId: string): Promise<any> {
+    const params = new URLSearchParams({ value: labelId });
+    return this.request(`/cards/${cardId}/idLabels?${params.toString()}`, { method: 'POST' });
+  }
+
+  async removeLabelFromCard(cardId: string, labelId: string): Promise<any> {
+    return this.request(`/cards/${cardId}/idLabels/${labelId}`, { method: 'DELETE' });
+  }
+
+  // ---------- Adjuntos (NUEVO) ----------
+
+  async getAttachments(cardId: string): Promise<any[]> {
+    return this.request(`/cards/${cardId}/attachments`);
+  }
+
+  async addAttachmentByUrl(cardId: string, url: string, name?: string): Promise<any> {
+    const params = new URLSearchParams({ url, ...(name ? { name } : {}) });
+    return this.request(`/cards/${cardId}/attachments?${params.toString()}`, { method: 'POST' });
+  }
+
+  // Sube el archivo directo a Trello, sin guardar nada en Mongo ni en disco propio
+  async addAttachmentByFile(cardId: string, buffer: Buffer, filename: string, mimetype: string): Promise<any> {
+    const formData = new FormData();
+    const blob = new Blob([buffer], { type: mimetype });
+    formData.append('file', blob, filename);
+    return this.request(`/cards/${cardId}/attachments`, {
+      method: 'POST',
+      body: formData,
+    });
   }
 }
 

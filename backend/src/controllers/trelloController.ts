@@ -6,7 +6,7 @@ export const getBoards = async (req: Request, res: Response) => {
     if (!trelloService.isConfigured()) {
       return res.status(400).json({
         success: false,
-        message: 'Trello no está configurado. Verifica TRELLO_API_KEY y TRELLO_API_TOKEN en .env',
+        message: 'Trello no está configurado. Verifica TRELLO_API_KEY y TRELLO_TOKEN en .env',
       });
     }
     const boards = await trelloService.getBoards();
@@ -31,6 +31,33 @@ export const getBoardContents = async (req: Request, res: Response) => {
   }
 };
 
+export const createList = async (req: Request, res: Response) => {
+  try {
+    const { boardId } = req.params;
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Se requiere name' });
+    }
+    const list = await trelloService.createList(boardId, name);
+    res.status(201).json({ success: true, data: list });
+  } catch (error: any) {
+    console.error('❌ Error creando lista:', error.message);
+    res.status(500).json({ success: false, message: 'Error al crear la lista', error: error.message });
+  }
+};
+
+// ← NUEVO
+export const archiveList = async (req: Request, res: Response) => {
+  try {
+    const { listId } = req.params;
+    const list = await trelloService.archiveList(listId);
+    res.json({ success: true, data: list });
+  } catch (error: any) {
+    console.error('❌ Error archivando lista:', error.message);
+    res.status(500).json({ success: false, message: 'Error al archivar la lista', error: error.message });
+  }
+};
+
 export const createCard = async (req: Request, res: Response) => {
   try {
     const { listId, name, desc } = req.body;
@@ -48,8 +75,8 @@ export const createCard = async (req: Request, res: Response) => {
 export const updateCard = async (req: Request, res: Response) => {
   try {
     const { cardId } = req.params;
-    const { name, desc } = req.body;
-    const card = await trelloService.updateCard(cardId, { name, desc });
+    const { name, desc, due, dueComplete } = req.body;
+    const card = await trelloService.updateCard(cardId, { name, desc, due, dueComplete });
     res.json({ success: true, data: card });
   } catch (error: any) {
     console.error('❌ Error actualizando tarjeta:', error.message);
@@ -83,17 +110,72 @@ export const archiveCard = async (req: Request, res: Response) => {
   }
 };
 
-export const createList = async (req: Request, res: Response) => {
+// ← NUEVO: etiquetas
+export const getBoardLabels = async (req: Request, res: Response) => {
   try {
     const { boardId } = req.params;
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ success: false, message: 'Se requiere name' });
-    }
-    const list = await trelloService.createList(boardId, name);
-    res.status(201).json({ success: true, data: list });
+    const labels = await trelloService.getLabels(boardId);
+    res.json({ success: true, data: labels });
   } catch (error: any) {
-    console.error('❌ Error creando lista:', error.message);
-    res.status(500).json({ success: false, message: 'Error al crear la lista', error: error.message });
+    console.error('❌ Error obteniendo etiquetas:', error.message);
+    res.status(500).json({ success: false, message: 'Error al obtener etiquetas', error: error.message });
+  }
+};
+
+export const toggleCardLabel = async (req: Request, res: Response) => {
+  try {
+    const { cardId, labelId } = req.params;
+    const { action } = req.body; // 'add' | 'remove'
+    if (action === 'remove') {
+      await trelloService.removeLabelFromCard(cardId, labelId);
+    } else {
+      await trelloService.addLabelToCard(cardId, labelId);
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error actualizando etiqueta:', error.message);
+    res.status(500).json({ success: false, message: 'Error al actualizar la etiqueta', error: error.message });
+  }
+};
+
+// ← NUEVO: adjuntos
+export const getCardAttachments = async (req: Request, res: Response) => {
+  try {
+    const { cardId } = req.params;
+    const attachments = await trelloService.getAttachments(cardId);
+    res.json({ success: true, data: attachments });
+  } catch (error: any) {
+    console.error('❌ Error obteniendo adjuntos:', error.message);
+    res.status(500).json({ success: false, message: 'Error al obtener adjuntos', error: error.message });
+  }
+};
+
+export const addCardAttachmentUrl = async (req: Request, res: Response) => {
+  try {
+    const { cardId } = req.params;
+    const { url, name } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, message: 'Se requiere una URL' });
+    }
+    const attachment = await trelloService.addAttachmentByUrl(cardId, url, name);
+    res.status(201).json({ success: true, data: attachment });
+  } catch (error: any) {
+    console.error('❌ Error adjuntando enlace:', error.message);
+    res.status(500).json({ success: false, message: 'Error al adjuntar el enlace', error: error.message });
+  }
+};
+
+export const uploadCardAttachment = async (req: Request, res: Response) => {
+  try {
+    const { cardId } = req.params;
+    const file = (req as any).file;
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'No se recibió ningún archivo' });
+    }
+    const attachment = await trelloService.addAttachmentByFile(cardId, file.buffer, file.originalname, file.mimetype);
+    res.status(201).json({ success: true, data: attachment });
+  } catch (error: any) {
+    console.error('❌ Error subiendo archivo a Trello:', error.message);
+    res.status(500).json({ success: false, message: 'Error al subir el archivo', error: error.message });
   }
 };
