@@ -78,7 +78,35 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    this.subscriptions.push(newMessageSub, typingSub);
+    // ← NUEVO: alguien editó un mensaje desde una plataforma externa (Discord por ahora)
+    const updatedSub = this.socketService.onMessageUpdated().subscribe((data: any) => {
+      const index = this.messages.findIndex(m => m._id === data.messageId);
+      if (index !== -1) {
+        this.messages[index] = {
+          ...this.messages[index],
+          content: data.content,
+          isEdited: true
+        };
+      }
+    });
+
+    // ← NUEVO: alguien borró un mensaje desde una plataforma externa
+    const deletedSub = this.socketService.onMessageDeleted().subscribe((data: any) => {
+      this.messages = this.messages.filter(m => m._id !== data.messageId);
+    });
+
+    // ← NUEVO: se agregó/quitó una reacción desde una plataforma externa
+    const reactionSub = this.socketService.onMessageReaction().subscribe((data: any) => {
+      const index = this.messages.findIndex(m => m._id === data.messageId);
+      if (index !== -1) {
+        this.messages[index] = {
+          ...this.messages[index],
+          reactions: data.reactions
+        };
+      }
+    });
+
+    this.subscriptions.push(newMessageSub, typingSub, updatedSub, deletedSub, reactionSub);
   }
 
   loadMessages() {

@@ -1,24 +1,25 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject } from 'rxjs';
+import { Observable, BehaviorSubject, Subject } from 'rxjs';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ChatService {
   private apiUrl = 'http://localhost:3000/api';
-  
+
   private currentChannelSubject = new BehaviorSubject<any>(null);
   public currentChannel$ = this.currentChannelSubject.asObservable();
 
-  private currentUser = {
-    _id: '6a44842732d43596a6033b58',
-    username: 'Admin',
-    email: 'admin@slackboard.com',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-  };
+  private refreshChannelsSubject = new Subject<void>();
+  public refreshChannels$ = this.refreshChannelsSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  triggerChannelsRefresh(): void {
+    this.refreshChannelsSubject.next();
+  }
+
+  constructor(private http: HttpClient, private authService: AuthService) {}
 
   getChannels(): Observable<any> {
     return this.http.get(`${this.apiUrl}/channels`);
@@ -31,23 +32,41 @@ export class ChatService {
   createChannel(channelData: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/channels`, {
       ...channelData,
-      createdBy: this.currentUser._id
+      createdBy: this.authService.currentUser?._id
     });
   }
 
+  getOrCreateAIChannel(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/ai/channel`, {});
+  }
 
-updateChannel(channelId: string, channelData: any): Observable<any> {
-  return this.http.put(`${this.apiUrl}/channels/${channelId}`, channelData);
-}
+  updateChannel(channelId: string, channelData: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/channels/${channelId}`, channelData);
+  }
 
-leaveChannel(channelId: string): Observable<any> {
-  return this.http.post(`${this.apiUrl}/channels/${channelId}/leave`, {});
-}
+  leaveChannel(channelId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/channels/${channelId}/leave`, {});
+  }
 
-deleteChannel(channelId: string): Observable<any> {
-  return this.http.delete(`${this.apiUrl}/channels/${channelId}`);
-}
+  deleteChannel(channelId: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/channels/${channelId}`);
+  }
 
+  syncPlatformChannels(platform: string): Observable<any> {
+    const supported: Record<string, string> = {
+      slack: `${this.apiUrl}/slack/sync-channels`,
+      discord: `${this.apiUrl}/discord/sync-channels`,
+    };
+
+    const url = supported[platform];
+    if (!url) {
+      return new Observable(observer => {
+        observer.error({ error: { message: `Sincronización aún no disponible para "${platform}".` } });
+      });
+    }
+
+    return this.http.post(url, {});
+  }
 
   getMessagesByChannel(channelId: string, limit = 50, skip = 0): Observable<any> {
     return this.http.get(`${this.apiUrl}/messages/channel/${channelId}?limit=${limit}&skip=${skip}`);
@@ -56,7 +75,7 @@ deleteChannel(channelId: string): Observable<any> {
   sendMessage(messageData: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/messages`, {
       ...messageData,
-      sender: this.currentUser._id
+      sender: this.authService.currentUser?._id
     });
   }
 
@@ -71,7 +90,7 @@ deleteChannel(channelId: string): Observable<any> {
   addReaction(messageId: string, emoji: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/messages/${messageId}/reaction`, {
       emoji,
-      userId: this.currentUser._id
+      userId: this.authService.currentUser?._id
     });
   }
 
@@ -80,6 +99,6 @@ deleteChannel(channelId: string): Observable<any> {
   }
 
   getCurrentUser(): any {
-    return this.currentUser;
+    return this.authService.currentUser;
   }
 }

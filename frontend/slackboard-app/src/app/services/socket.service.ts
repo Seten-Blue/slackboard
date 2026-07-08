@@ -49,6 +49,39 @@ export class SocketService {
     });
   }
 
+  // ← NUEVO: una plataforma (Discord por ahora) edita un mensaje ya guardado
+  onMessageUpdated(): Observable<any> {
+    return new Observable(observer => {
+      if (this.socket) {
+        this.socket.on('message-updated', (data: any) => {
+          observer.next(data);
+        });
+      }
+    });
+  }
+
+  // ← NUEVO: una plataforma borra un mensaje ya guardado
+  onMessageDeleted(): Observable<any> {
+    return new Observable(observer => {
+      if (this.socket) {
+        this.socket.on('message-deleted', (data: any) => {
+          observer.next(data);
+        });
+      }
+    });
+  }
+
+  // ← NUEVO: se agrega/quita una reacción desde la plataforma externa
+  onMessageReaction(): Observable<any> {
+    return new Observable(observer => {
+      if (this.socket) {
+        this.socket.on('message-reaction', (data: any) => {
+          observer.next(data);
+        });
+      }
+    });
+  }
+
   sendTyping(data: any) {
     if (this.socket) {
       this.socket.emit('typing', data);

@@ -1,0 +1,85 @@
+<div class="flex flex-col h-full min-h-0 overflow-hidden bg-paper">
+  <!-- Header -->
+  <header class="flex-shrink-0 bg-white/80 backdrop-blur border-b border-ink-950/10 px-6 py-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-signal/10 flex items-center justify-center flex-shrink-0">
+        <span class="font-display font-bold text-signal text-sm">Z</span>
+      </div>
+      <div>
+        <h2 class="font-display font-semibold text-lg text-ink-950">Zork</h2>
+        <p class="text-sm text-ink-950/50">
+          Escribí <code class="font-mono text-xs bg-ink-950/5 px-1.5 py-0.5 rounded">@zork</code> en cualquier canal, o hablá directo acá
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Error -->
+  <div *ngIf="errorMsg" class="flex-shrink-0 px-6 py-2 bg-red-50 border-b border-red-100 text-red-600 text-sm">
+    {{ errorMsg }}
+  </div>
+
+  <!-- Mensajes -->
+  <div #scrollContainer class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-3">
+    <div *ngIf="loading" class="flex justify-center items-center h-full">
+      <div class="flex items-center gap-2 text-ink-950/40 text-sm">
+        <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+        Cargando conversación…
+      </div>
+    </div>
+
+    <div *ngIf="!loading && messages.length === 0" class="flex flex-col items-center justify-center h-full text-center px-6">
+      <div class="w-14 h-14 rounded-2xl bg-signal/10 flex items-center justify-center mb-4">
+        <span class="font-display font-bold text-signal text-xl">Z</span>
+      </div>
+      <p class="font-display font-semibold text-ink-950 mb-1">Escribí algo para empezar</p>
+      <p class="text-sm text-ink-950/50">Zork está para ayudarte</p>
+    </div>
+
+    <div *ngFor="let msg of messages" class="flex items-end gap-2" [class.justify-end]="!isAIMessage(msg)">
+      <div *ngIf="isAIMessage(msg)" class="w-7 h-7 rounded-lg bg-signal/10 flex items-center justify-center flex-shrink-0">
+        <span class="font-display font-bold text-signal text-xs">Z</span>
+      </div>
+
+      <div class="max-w-[70%] px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed break-words"
+           [ngClass]="isAIMessage(msg)
+             ? 'bg-ink-950/5 text-ink-950/85 rounded-bl-md'
+             : 'bg-signal text-white rounded-br-md'">
+        {{ msg.content }}
+      </div>
+    </div>
+
+    <div *ngIf="thinking" class="flex items-end gap-2">
+      <div class="w-7 h-7 rounded-lg bg-signal/10 flex items-center justify-center flex-shrink-0">
+        <span class="font-display font-bold text-signal text-xs">Z</span>
+      </div>
+      <div class="px-4 py-3 rounded-2xl rounded-bl-md bg-ink-950/5 flex gap-1">
+        <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+        <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0.15s"></div>
+        <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Composer -->
+  <div class="flex-shrink-0 border-t border-ink-950/10 bg-white px-5 py-4">
+    <div class="flex items-end gap-3">
+      <textarea
+        [(ngModel)]="newMessage"
+        (keydown)="onKeyDown($event)"
+        placeholder="Escribile algo a Zork…"
+        rows="1"
+        [disabled]="sending || loading"
+        class="flex-1 px-4 py-3 bg-ink-950/[0.04] border border-transparent rounded-xl focus:outline-none focus:border-signal/50 focus:bg-white resize-none text-[15px] placeholder:text-ink-950/35 transition-colors"
+        style="max-height: 120px; overflow-y: auto;"></textarea>
+
+      <button
+        (click)="sendMessage()"
+        [disabled]="sending || loading || !newMessage.trim()"
+        class="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-signal text-white rounded-xl hover:bg-signal/90 disabled:bg-ink-950/10 disabled:text-ink-950/30 disabled:cursor-not-allowed transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+      </button>
+    </div>
+    <div class="mt-2 text-xs text-ink-950/35">Enter para enviar · Shift+Enter para nueva línea</div>
+  </div>
+</div>

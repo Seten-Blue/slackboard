@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BrowserModule } from '@angular/platform-browser';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { NgChartsModule } from 'ng2-charts';
 
@@ -12,6 +12,12 @@ import { ChatComponent } from './components/chat/chat.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { MessageAreaComponent } from './components/message-area/message-area.component';
 import { TrelloComponent } from './components/trello/trello.component';
+import { AiChatComponent } from './components/ai-chat/ai-chat.component';
+import { PlatformIconComponent } from './components/platform-icon/platform-icon.component';
+import { AuthComponent } from './components/auth/auth.component';
+import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
+import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
+import { AuthInterceptor } from './interceptors/auth.interceptor';
 
 @NgModule({
   declarations: [
@@ -20,7 +26,12 @@ import { TrelloComponent } from './components/trello/trello.component';
     ChatComponent,
     DashboardComponent,
     MessageAreaComponent,
-    TrelloComponent
+    TrelloComponent,
+    AiChatComponent,
+    PlatformIconComponent,
+    AuthComponent,
+    ForgotPasswordComponent,
+    ResetPasswordComponent
   ],
   imports: [
     BrowserModule,
@@ -30,7 +41,9 @@ import { TrelloComponent } from './components/trello/trello.component';
     FormsModule,
     NgChartsModule
   ],
-  providers: [],
+  providers: [
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

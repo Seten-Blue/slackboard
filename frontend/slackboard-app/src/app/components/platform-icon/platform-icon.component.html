@@ -1,0 +1,48 @@
+<span
+  class="p-icon"
+  [class.p-icon--badge]="withBadge"
+  [style.--p-color]="color"
+  [style.width.px]="withBadge ? size + 16 : size"
+  [style.height.px]="withBadge ? size + 16 : size"
+  [ngSwitch]="platform">
+
+  <!-- WhatsApp -->
+  <svg *ngSwitchCase="'whatsapp'" [attr.width]="size" [attr.height]="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4 8.3 8.3 0 0 1-4-1L3 20l1.1-5.5a8.3 8.3 0 0 1-1-4A8.4 8.4 0 0 1 11.5 2c4.7 0 8.5 3.8 8.5 8.5Z"/>
+    <path d="M8.3 8.5c.2-.4.4-.4.6-.4h.4c.2 0 .3 0 .5.4l.6 1.4c.1.2.1.3 0 .5l-.5.6c-.1.2-.1.3 0 .5.4.7 1.5 1.9 2.5 2.3.2.1.3.1.5-.1l.6-.6c.1-.2.3-.2.5-.1l1.4.7c.2.1.2.2.2.3 0 .3-.1.7-.4 1-.3.3-1 .6-1.6.6-.5 0-1.6-.1-3-1.3-1.7-1.4-2.8-3.2-2.9-3.4-.1-.2-.7-1.1-.7-2.1 0-1 .5-1.5.7-1.7Z"/>
+  </svg>
+
+  <!-- Slack -->
+  <svg *ngSwitchCase="'slack'" [attr.width]="size" [attr.height]="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 3.5v6M15 14.5v6M3.5 9h6M14.5 15h6"/>
+    <rect x="7" y="9" width="4" height="4" rx="1.3"/>
+    <rect x="13" y="11" width="4" height="4" rx="1.3"/>
+  </svg>
+
+  <!-- Discord -->
+  <svg *ngSwitchCase="'discord'" [attr.width]="size" [attr.height]="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="6" width="17" height="11" rx="4.5"/>
+    <circle cx="9" cy="11.5" r="1" fill="currentColor" stroke="none"/>
+    <circle cx="15" cy="11.5" r="1" fill="currentColor" stroke="none"/>
+    <path d="M8.5 19 10 17M15.5 19 14 17"/>
+  </svg>
+
+  <!-- Teams -->
+  <svg *ngSwitchCase="'teams'" [attr.width]="size" [attr.height]="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="6.5" width="13" height="10" rx="2"/>
+    <path d="M16 9.5 21 7v10l-5-2.5"/>
+    <circle cx="8.5" cy="10" r="1" fill="currentColor" stroke="none"/>
+  </svg>
+
+  <!-- Skype -->
+  <svg *ngSwitchCase="'skype'" [attr.width]="size" [attr.height]="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M9 10.2c0-1 1-1.7 2.4-1.7 1.5 0 2.6.8 2.6 1.8 0 2.4-6 1.4-6 4.3 0 1.2 1.3 2.1 3 2.1 1.5 0 2.7-.7 2.9-1.8"/>
+  </svg>
+
+  <!-- Otro / genérico -->
+  <svg *ngSwitchDefault [attr.width]="size" [attr.height]="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M3.5 12h17M12 3.5c2.5 2.3 3.8 5.3 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.3-3.8-8.5S9.5 5.8 12 3.5Z"/>
+  </svg>
+</span>
