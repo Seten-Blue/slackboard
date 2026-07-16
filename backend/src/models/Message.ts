@@ -10,6 +10,8 @@ export interface IMessage extends Document {
     emoji: string;
     users: mongoose.Types.ObjectId[];
   }[];
+  attachments?: string[];
+  discordMessageId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +52,19 @@ const MessageSchema: Schema = new Schema(
         ],
       },
     ],
+    // ← NUEVO: URLs de adjuntos/imágenes (usado por Discord, pero sirve
+    // igual para cualquier plataforma que mande archivos).
+    attachments: {
+      type: [String],
+      default: [],
+    },
+    // ← NUEVO: id del mensaje original en Discord. Permite encontrar este
+    // mensaje cuando llega su edición, borrado o una reacción desde Discord.
+    discordMessageId: {
+      type: String,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,

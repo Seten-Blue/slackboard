@@ -17,6 +17,7 @@ import { PlatformIconComponent } from './components/platform-icon/platform-icon.
 import { AuthComponent } from './components/auth/auth.component';
 import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
+import { DiscordLinkModalComponent } from './components/discord-link-modal/discord-link-modal.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 
 @NgModule({
@@ -31,7 +32,8 @@ import { AuthInterceptor } from './interceptors/auth.interceptor';
     PlatformIconComponent,
     AuthComponent,
     ForgotPasswordComponent,
-    ResetPasswordComponent
+    ResetPasswordComponent,
+    DiscordLinkModalComponent
   ],
   imports: [
     BrowserModule,

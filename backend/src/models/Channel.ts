@@ -1,12 +1,18 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export type ChannelPlatform = 'slack' | 'whatsapp' | 'discord' | 'skype' | 'teams' | 'other';
+
 export interface IChannel extends Document {
   name: string;
   description?: string;
   isPrivate: boolean;
   members: mongoose.Types.ObjectId[];
   createdBy: mongoose.Types.ObjectId;
-  slackChannelId?: string; // ← NUEVO: ID del canal en Slack (ej: C0123456)
+  slackChannelId?: string;
+  discordChannelId?: string;
+  platform: ChannelPlatform;
+  aiEnabled?: boolean;
+  isAIChannel?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,7 +47,30 @@ const ChannelSchema: Schema = new Schema(
     slackChannelId: {
       type: String,
       default: null,
-      index: true, // ← para buscar rápido cuando llega un evento
+      index: true,
+    },
+    // ← NUEVO: equivalente a slackChannelId pero para Discord.
+    // Permite: (1) reconocer un canal que ya vinculamos antes,
+    // (2) mandar mensajes de vuelta al canal correcto de Discord.
+    discordChannelId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    platform: {
+      type: String,
+      enum: ['slack', 'whatsapp', 'discord', 'skype', 'teams', 'other'],
+      default: 'slack',
+      index: true,
+    },
+    aiEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    isAIChannel: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {

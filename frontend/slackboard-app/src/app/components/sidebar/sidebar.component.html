@@ -30,6 +30,8 @@
         <svg class="menu__chevron" [class.menu__chevron--open]="menuOpened.dashboard" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
       </button>
 
+
+
       <div class="menu__collapsible" [class.menu__collapsible--open]="menuOpened.dashboard">
         <div class="menu__collapsible-inner">
           <ul class="submenu submenu--tree">
@@ -56,6 +58,7 @@
         Trello
       </span>
     </a>
+
 
     <!-- ============ CONVERSACIONES + SWITCHER DE PLATAFORMA ============ -->
     <div class="menu">
@@ -110,6 +113,7 @@
             </button>
 
             <!-- Dropdown de plataformas -->
+            <!-- Dropdown de plataformas -->
             <div class="switcher__dropdown" *ngIf="showPlatformDropdown" (click)="$event.stopPropagation()">
               <button
                 *ngFor="let platform of platforms"
@@ -123,6 +127,11 @@
                 <span class="switcher__option-count">{{ countByPlatform(platform.id) }}</span>
               </button>
             </div>
+          </div>
+
+          <div *ngIf="selectedPlatform.id === 'discord'" style="padding: 2px 8px 8px; font-size: 11px; text-align: center;"
+             [style.color]="discordLinked ? '#22c55e' : '#9CA3AF'">
+            {{ discordLinked === null ? 'Consultando…' : (discordLinked ? '● Vinculado' : '○ No vinculado') }}
           </div>
 
           <!-- Lista de canales de la plataforma activa -->
@@ -282,5 +291,10 @@
       <p class="footer__state">En línea</p>
     </div>
   </div>
+
+<app-discord-link-modal
+    *ngIf="showLinkModal"
+    (close)="closeLinkModal()">
+  </app-discord-link-modal>
 
 </aside>

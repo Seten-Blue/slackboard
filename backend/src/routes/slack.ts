@@ -4,6 +4,8 @@ import Message from '../models/Message';
 import User from '../models/User';
 import slackService from '../services/slackService';
 import { Server } from 'socket.io';
+import aiService from '../services/aiService';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -77,8 +79,7 @@ router.get('/status', (req: Request, res: Response) => {
 });
 
 // Sincronizar canales de Slack con la base de datos
-router.post('/sync-channels', async (req: Request, res: Response) => {
-  try {
+router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Response) => {  try {
     if (!slackService.isConfigured()) {
       return res.status(400).json({
         success: false,
@@ -120,18 +121,22 @@ router.post('/sync-channels', async (req: Request, res: Response) => {
           name: slackChannel.name,
           description: slackChannel.purpose?.value || '',
           isPrivate: slackChannel.is_private || false,
-          members: [adminUser._id],
+          members: [adminUser._id, req.userId],
           createdBy: adminUser._id,
-          slackChannelId: slackChannel.id // ← NUEVO: guarda el vínculo desde la sincronización
+          slackChannelId: slackChannel.id
         });
       } else {
         console.log(`✅ Canal ya existe: ${slackChannel.name}`);
-        // ← NUEVO: si ya existía pero sin vínculo, lo vinculamos ahora
         if (!channel.slackChannelId) {
           channel.slackChannelId = slackChannel.id;
-          await channel.save();
           console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannel.id})`);
         }
+        // ← NUEVO: agrega como miembro a quien hizo el sync, si todavía no lo era
+        const alreadyMember = channel.members.some((m: any) => m.toString() === req.userId);
+        if (!alreadyMember && req.userId) {
+          channel.members.push(req.userId);
+        }
+        await channel.save();
       }
 
       syncedChannels.push(channel);
@@ -336,6 +341,17 @@ router.post('/events', async (req: Request, res: Response) => {
             }
 
             console.log('✅ Mensaje guardado en MongoDB y emitido al frontend');
+
+            try {
+              const io = req.app.get('io') as Server;
+              await aiService.checkAndRespond({
+                text: event.text,
+                channel,
+                io,
+              });
+            } catch (aiError: any) {
+              console.error('⚠️ Error disparando integración de IA desde Slack:', aiError.message);
+            }
           } else {
             // ← NUEVO: ya no se pierde ningún mensaje en silencio
             console.warn(`⚠️  Mensaje de Slack no guardado — channel encontrado: ${!!channel}, user encontrado: ${!!user}`);

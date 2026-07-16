@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
+import aiService from '../services/aiService';
 
 // Obtener mensajes de un canal
 export const getMessagesByChannel = async (req: Request, res: Response) => {
@@ -38,7 +39,6 @@ export const createMessage = async (req: Request, res: Response) => {
   try {
     const { content, channel, sender, type = 'text' } = req.body;
 
-    // Verificar que el canal existe
     const channelExists = await Channel.findById(channel);
     if (!channelExists) {
       return res.status(404).json({
@@ -61,7 +61,6 @@ export const createMessage = async (req: Request, res: Response) => {
       senderId = defaultUser._id;
     }
 
-    // Verificar que el usuario existe
     const userExists = await User.findById(senderId);
     if (!userExists) {
       return res.status(404).json({
@@ -80,27 +79,57 @@ export const createMessage = async (req: Request, res: Response) => {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'username email avatar status');
 
-    // 🔥 INTEGRACIÓN SLACK: Enviar mensaje a Slack
-    try {
-      const slackService = require('../services/slackService').default;
-      if (slackService.isConfigured()) {
-        await slackService.sendMessage(
-          channelExists.name,
-          content,
-          userExists.username
-        );
-        console.log('✅ Mensaje sincronizado con Slack');
-      }
-    } catch (slackError: any) {
-      console.error('⚠️ Error enviando a Slack:', slackError.message);
-      // No falla la petición si Slack falla
-    }
-
+    // ← FIX: respondemos YA, antes de tocar Slack, Discord o la IA — esto elimina la condición de carrera
     res.status(201).json({
       success: true,
       message: 'Mensaje enviado',
       data: populatedMessage,
     });
+
+    // Todo lo que sigue corre en segundo plano, sin bloquear la respuesta
+    (async () => {
+      // 🔥 INTEGRACIÓN SLACK
+      try {
+        if (channelExists.slackChannelId) {
+          const slackService = require('../services/slackService').default;
+          if (slackService.isConfigured()) {
+            await slackService.sendMessage(channelExists.name, content, userExists.username);
+            console.log('✅ Mensaje sincronizado con Slack');
+          }
+        }
+      } catch (slackError: any) {
+        console.error('⚠️ Error enviando a Slack:', slackError.message);
+      }
+
+      // 🎮 INTEGRACIÓN DISCORD
+      try {
+        if (channelExists.discordChannelId) {
+          const discordservice = require('../services/discordservice').default;
+          if (discordservice.isConfigured()) {
+            // se manda con el nombre del usuario delante, ya que Discord no
+            // deja "impersonar" el remitente como sí hace el webhook de Slack
+              await discordservice.sendMessage(String(channelExists._id), `**${userExists.username}:** ${content}`);
+            console.log('✅ Mensaje sincronizado con Discord');
+          }
+        }
+      } catch (discordError: any) {
+        console.error('⚠️ Error enviando a Discord:', discordError.message);
+      }
+
+      // 🤖 INTEGRACIÓN IA
+      try {
+        const io = req.app.get('io');
+        await aiService.checkAndRespond({
+          text: content,
+          channel: channelExists,
+          io,
+          senderId: senderId?.toString(),
+        });
+      } catch (aiError: any) {
+        console.error('⚠️ Error disparando integración de IA:', aiError.message);
+      }
+    })();
+
   } catch (error: any) {
     res.status(500).json({
       success: false,

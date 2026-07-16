@@ -131,8 +131,7 @@ class TrelloService {
   // Sube el archivo directo a Trello, sin guardar nada en Mongo ni en disco propio
   async addAttachmentByFile(cardId: string, buffer: Buffer, filename: string, mimetype: string): Promise<any> {
     const formData = new FormData();
-    const blob = new Blob([buffer], { type: mimetype });
-    formData.append('file', blob, filename);
+    const blob = new Blob([new Uint8Array(buffer)], { type: mimetype });    formData.append('file', blob, filename);
     return this.request(`/cards/${cardId}/attachments`, {
       method: 'POST',
       body: formData,

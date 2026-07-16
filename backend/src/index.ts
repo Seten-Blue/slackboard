@@ -11,7 +11,11 @@ import messagesRouter from './routes/messages';
 import analyticsRouter from './routes/analytics';
 import slackRouter from './routes/slack';
 import trelloRouter from './routes/trello';
-
+import aiRouter from './routes/ai';
+import discordRouter from './routes/discord';
+import { ensureAIChannel } from './services/aiService';
+import discordservice from './services/discordservice';
+import authRouter from './routes/auth';
 // Configurar variables de entorno
 dotenv.config();
 
@@ -36,15 +40,29 @@ app.set('io', io);
 app.use(cors());
 app.use(express.json({
   verify: (req: any, res, buf) => {
-    req.rawBody = buf.toString();
+    req.rawBody = buf.toString(); // guardamos el raw body para slackController
   }
 }));
 app.use(express.urlencoded({ extended: true }));
 
 // Conectar a MongoDB
 mongoose.connect(MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log('✅ Conectado a MongoDB exitosamente');
+
+    try {
+      await ensureAIChannel();
+    } catch (err: any) {
+      console.error('⚠️  No se pudo crear el canal de IA:', err.message);
+    }
+
+    // ← separado en su propio try/catch: si Discord falla (token malo,
+    // intent no activado, etc.) no debe reportarse como error de MongoDB
+    try {
+      await discordservice.connect(io);
+    } catch (err: any) {
+      console.error('⚠️  No se pudo conectar el bot de Discord:', err.message);
+    }
   })
   .catch((error) => {
     console.error('❌ Error conectando a MongoDB:', error);
@@ -52,7 +70,7 @@ mongoose.connect(MONGODB_URI)
 
 // Rutas básicas
 app.get('/', (req: Request, res: Response) => {
-  res.json({ 
+  res.json({
     message: '🚀 SlackBoard API está funcionando',
     version: '1.0.0',
     endpoints: {
@@ -60,14 +78,15 @@ app.get('/', (req: Request, res: Response) => {
       channels: '/api/channels',
       messages: '/api/messages',
       analytics: '/api/analytics',
-      slack: '/api/slack'
+      slack: '/api/slack',
+      discord: '/api/discord'
     }
   });
 });
 
 app.get('/health', (req: Request, res: Response) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
   });
@@ -79,6 +98,10 @@ app.use('/api/messages', messagesRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/slack', slackRouter);
 app.use('/api/trello', trelloRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/discord', discordRouter);
+app.use('/api/auth', authRouter);
+
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
   console.log('👤 Usuario conectado:', socket.id);
@@ -107,9 +130,9 @@ io.on('connection', (socket) => {
 // Manejo de errores
 app.use((err: any, req: Request, res: Response, next: any) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Algo salió mal!',
-    message: err.message 
+    message: err.message
   });
 });
 
@@ -118,14 +141,3 @@ httpServer.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📡 Socket.IO listo para conexiones en tiempo real`);
 });
-
-// Middlewares
-app.use(cors());
-
-app.use(express.json({
-  verify: (req: any, res, buf) => {
-    req.rawBody = buf.toString(); // ← NUEVO: guardamos el raw body para slackController
-  }
-}));
-
-app.use(express.urlencoded({ extended: true }));

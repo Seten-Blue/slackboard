@@ -1,6 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { Router } from '@angular/router';
+import { DiscordService } from '../../services/discord.service';
+
+
+
 
 interface Platform {
   id: string;
@@ -75,6 +79,9 @@ export class SidebarComponent implements OnInit {
   showPlatformDropdown = false;
   isSwitching = false;
   syncingPlatform = false;
+  showLinkModal = false;
+  discordLinked: boolean | null = null; // null = todavía no se consultó
+  
 
   get selectedPlatform(): Platform {
     return this.platforms[this.platformIndex];
@@ -82,7 +89,9 @@ export class SidebarComponent implements OnInit {
 
   constructor(
     private chatService: ChatService,
-    private router: Router
+    private router: Router,
+    private discordService: DiscordService
+
   ) {}
 
   ngOnInit(): void {
@@ -95,7 +104,35 @@ export class SidebarComponent implements OnInit {
     this.chatService.refreshChannels$.subscribe(() => {
       this.loadChannels();
     });
+
+    this.checkDiscordStatus();
+
+    // Si venimos de un redirect de OAuth (Discord nos mandó de vuelta a /chat),
+    // reabrimos el modal para que el usuario vea sus servidores ya vinculados.
+    const params = new URLSearchParams(window.location.search);
+    const discordLinkedParam = params.get('discordLinked');
+    if (discordLinkedParam) {
+      if (discordLinkedParam === 'success') {
+        this.showLinkModal = true;
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }
+
+
+  private checkDiscordStatus(): void {
+    this.discordService.getStatus().subscribe({
+      next: (response: any) => (this.discordLinked = response.linked),
+      error: () => (this.discordLinked = null)
+    });
+  }
+
+  closeLinkModal(): void {
+    this.showLinkModal = false;
+    this.checkDiscordStatus();
+    this.loadChannels();
+  }
+
 
   // ============ MENÚ ============
   toggleMenu(menu: MenuKey): void {
@@ -139,6 +176,15 @@ export class SidebarComponent implements OnInit {
 
   // ← NUEVO: trae los canales reales desde Slack/Discord y refresca la lista
   syncCurrentPlatform(): void {
+    // Discord ya tiene vinculación real por usuario — abrimos la card en vez
+    // del sync directo, que a su vez decide "conectar" o "listar servidores"
+    if (this.selectedPlatform.id === 'discord') {
+      this.showLinkModal = true;
+      return;
+    }
+
+    // Las demás plataformas siguen con el sync directo del bot compartido
+    // hasta que armemos su OAuth también
     if (this.syncingPlatform) return;
     this.syncingPlatform = true;
 
