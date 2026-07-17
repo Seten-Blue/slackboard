@@ -12,6 +12,7 @@ export interface IMessage extends Document {
   }[];
   attachments?: string[];
   discordMessageId?: string;
+  whatsappMessageId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +62,12 @@ const MessageSchema: Schema = new Schema(
     // ← NUEVO: id del mensaje original en Discord. Permite encontrar este
     // mensaje cuando llega su edición, borrado o una reacción desde Discord.
     discordMessageId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    whatsappMessageId: {
       type: String,
       default: null,
       index: true,

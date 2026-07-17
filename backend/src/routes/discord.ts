@@ -8,6 +8,7 @@ import {
   oauthCallback,
   getMyGuilds,
   syncMyGuild,
+  unlinkDiscord,
 } from '../controllers/discordOAuthController';
 
 const router = express.Router();
@@ -81,5 +82,6 @@ router.get('/oauth/start', requireAuth, startOAuth);
 router.get('/oauth/callback', oauthCallback); // público: Discord redirige acá sin nuestro header Authorization
 router.get('/oauth/my-guilds', requireAuth, getMyGuilds);
 router.post('/oauth/sync-guild', requireAuth, syncMyGuild);
+router.post('/oauth/unlink', requireAuth, unlinkDiscord);
 
 export default router;

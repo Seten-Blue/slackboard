@@ -60,6 +60,11 @@
       <p *ngIf="!loadingGuilds && guilds.length === 0" class="text-sm text-ink-950/40 text-center py-6">
         No encontramos servidores en tu cuenta de Discord.
       </p>
+
+      <button (click)="unlink()"
+              class="w-full mt-4 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 transition-colors">
+        Desvincular cuenta de Discord
+      </button>
     </div>
 
   </div>

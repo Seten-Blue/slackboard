@@ -2,7 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { Router } from '@angular/router';
 import { DiscordService } from '../../services/discord.service';
-
+import { SlackService } from '../../services/slack.service';
+import { WhatsappService } from '../../services/whatsapp.service';
+import { AuthService } from '../../services/auth.service';
 
 
 
@@ -81,6 +83,9 @@ export class SidebarComponent implements OnInit {
   syncingPlatform = false;
   showLinkModal = false;
   discordLinked: boolean | null = null; // null = todavía no se consultó
+
+  showSlackModal = false;
+  slackLinked: boolean | null = null; // null = todavía no se consultó
   
 
   get selectedPlatform(): Platform {
@@ -90,8 +95,10 @@ export class SidebarComponent implements OnInit {
   constructor(
     private chatService: ChatService,
     private router: Router,
-    private discordService: DiscordService
-
+    private discordService: DiscordService,
+    private slackService: SlackService,
+    private whatsappService: WhatsappService,
+    public authService: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -106,15 +113,23 @@ export class SidebarComponent implements OnInit {
     });
 
     this.checkDiscordStatus();
+    this.checkSlackStatus();
 
-    // Si venimos de un redirect de OAuth (Discord nos mandó de vuelta a /chat),
-    // reabrimos el modal para que el usuario vea sus servidores ya vinculados.
+    // Si venimos de un redirect de OAuth (Discord/Slack nos mandaron de
+    // vuelta a /chat), reabrimos el modal correspondiente.
     const params = new URLSearchParams(window.location.search);
     const discordLinkedParam = params.get('discordLinked');
-    if (discordLinkedParam) {
-      if (discordLinkedParam === 'success') {
-        this.showLinkModal = true;
-      }
+    const slackLinkedParam = params.get('slackLinked');
+
+    if (discordLinkedParam && discordLinkedParam === 'success') {
+      this.showLinkModal = true;
+    }
+
+    if (slackLinkedParam && slackLinkedParam === 'success') {
+      this.showSlackModal = true;
+    }
+
+    if (discordLinkedParam || slackLinkedParam) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }
@@ -130,6 +145,19 @@ export class SidebarComponent implements OnInit {
   closeLinkModal(): void {
     this.showLinkModal = false;
     this.checkDiscordStatus();
+    this.loadChannels();
+  }
+
+  private checkSlackStatus(): void {
+    this.slackService.getStatus().subscribe({
+      next: (response: any) => (this.slackLinked = (response.workspaces || []).length > 0),
+      error: () => (this.slackLinked = null)
+    });
+  }
+
+  closeSlackModal(): void {
+    this.showSlackModal = false;
+    this.checkSlackStatus();
     this.loadChannels();
   }
 
@@ -180,6 +208,19 @@ export class SidebarComponent implements OnInit {
     // del sync directo, que a su vez decide "conectar" o "listar servidores"
     if (this.selectedPlatform.id === 'discord') {
       this.showLinkModal = true;
+      return;
+    }
+
+    if (this.selectedPlatform.id === 'slack') {
+      this.showSlackModal = true;
+      return;
+    }
+
+    if (this.selectedPlatform.id === 'whatsapp') {
+      this.whatsappService.joinInbox().subscribe({
+        next: () => this.loadChannels(),
+        error: (error: any) => alert(error?.error?.message || 'No se pudo conectar el inbox de WhatsApp.')
+      });
       return;
     }
 

@@ -6,6 +6,7 @@ import slackService from '../services/slackService';
 import { Server } from 'socket.io';
 import aiService from '../services/aiService';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getOAuthStatus as getSlackOAuthStatus, startOAuth as startSlackOAuth, oauthCallback as slackOAuthCallback, syncMyWorkspace as syncMySlackWorkspace, unlinkWorkspace as unlinkSlackWorkspace } from '../controllers/slackOAuthController';
 
 const router = express.Router();
 
@@ -372,5 +373,14 @@ router.post('/events', async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+
+// ===== OAuth por usuario (vinculación real de cuenta) — mismo patrón que Discord =====
+router.get('/oauth/status', requireAuth, getSlackOAuthStatus);
+router.get('/oauth/start', requireAuth, startSlackOAuth);
+router.get('/oauth/callback', slackOAuthCallback); // público: Slack redirige acá sin nuestro header Authorization
+router.post('/oauth/unlink-workspace', requireAuth, unlinkSlackWorkspace);
+router.post('/oauth/sync-workspace', requireAuth, syncMySlackWorkspace);
+
 
 export default router;

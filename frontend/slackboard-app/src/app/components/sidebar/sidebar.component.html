@@ -5,15 +5,19 @@
 
   <!-- Header / marca -->
   <div class="sidebar__brand">
-    <div class="brand__mark">SB</div>
-    <div class="brand__text">
-      <h1>SlackBoard</h1>
-      <span class="brand__status">
-        <i class="status-dot"></i>
-        Conectado en tiempo real
-      </span>
-    </div>
+  <img
+    src="assets/Logo.png"
+    alt="SlackBoard"
+    class="brand__logo"
+  />
+
+  <div class="brand__text">
+    <span class="brand__status">
+      <i class="status-dot"></i>
+      Disponible
+    </span>
   </div>
+</div>
 
   <!-- Navegación -->
   <nav class="sidebar__nav">
@@ -134,6 +138,16 @@
             {{ discordLinked === null ? 'Consultando…' : (discordLinked ? '● Vinculado' : '○ No vinculado') }}
           </div>
 
+          <div *ngIf="selectedPlatform.id === 'slack'" style="padding: 2px 8px 8px; font-size: 11px; text-align: center;"
+             [style.color]="slackLinked ? '#22c55e' : '#9CA3AF'">
+            {{ slackLinked === null ? 'Consultando…' : (slackLinked ? '● Vinculado' : '○ No vinculado') }}
+          </div>
+
+          <div *ngIf="selectedPlatform.id === 'slack'" style="padding: 2px 8px 8px; font-size: 11px; text-align: center;"
+             [style.color]="slackLinked ? '#22c55e' : '#9CA3AF'">
+            {{ slackLinked === null ? 'Consultando…' : (slackLinked ? '● Vinculado' : '○ No vinculado') }}
+          </div>
+
           <!-- Lista de canales de la plataforma activa -->
           <div class="channels" [class.channels--switching]="isSwitching">
 
@@ -182,8 +196,7 @@
                     (blur)="updateChannel()"
                     (click)="$event.stopPropagation()">
 
-                  <span *ngIf="editingChannel?._id !== channel._id">{{ channel.name }}</span>
-                </div>
+                  <span *ngIf="editingChannel?._id !== channel._id">{{ channel.displayName || channel.name }}</span>                </div>
 
                 <span *ngIf="channel.members?.length" class="channel-list__count">
                   {{ channel.members.length }}
@@ -287,7 +300,9 @@
       <span class="footer__avatar-dot"></span>
     </div>
     <div class="footer__info">
-      <p class="footer__name">Admin</p>
+      <p class="footer__name">
+  {{ authService.currentUser?.username || 'Usuario' }}
+</p>
       <p class="footer__state">En línea</p>
     </div>
   </div>
@@ -297,4 +312,10 @@
     (close)="closeLinkModal()">
   </app-discord-link-modal>
 
+  <app-slack-link-modal
+    *ngIf="showSlackModal"
+    (close)="closeSlackModal()">
+  </app-slack-link-modal>
+
 </aside>
+

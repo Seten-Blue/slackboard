@@ -4,8 +4,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
-export class DiscordService {
-  private apiUrl = `${environment.apiUrl}/discord/oauth`;
+export class SlackService {
+  private apiUrl = `${environment.apiUrl}/slack/oauth`;
 
   constructor(private http: HttpClient) {}
 
@@ -17,15 +17,8 @@ export class DiscordService {
     return this.http.get(`${this.apiUrl}/start`);
   }
 
-  getMyGuilds(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/my-guilds`);
+  syncWorkspace(teamId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/sync-workspace`, { teamId });
   }
 
-  syncGuild(guildId: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/sync-guild`, { guildId });
-  }
-
-  unlink(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/unlink`, {});
-  }
 }

@@ -120,6 +120,26 @@
   gap: 4px;
 }
 
+.sidebar__brand{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:18px;
+    border-bottom:1px solid var(--border);
+}
+
+.brand__logo{
+    width:90px;
+    height:90px;
+    object-fit:contain;
+    flex-shrink:0;
+}
+
+.brand__text{
+    display:flex;
+    flex-direction:column;
+}
+
 .sidebar__nav::-webkit-scrollbar { width: 6px; }
 .sidebar__nav::-webkit-scrollbar-track { background: transparent; }
 .sidebar__nav::-webkit-scrollbar-thumb {
@@ -576,6 +596,28 @@
   border: 2px solid var(--bg);
 }
 
+.sidebar__brand{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:18px;
+    border-bottom:1px solid var(--border);
+}
+
+.brand__logo{
+    width:90px;
+    height:90px;
+    object-fit:contain;
+    flex-shrink:0;
+}
+
+.brand__text{
+    display:flex;
+    flex-direction:column;
+}
+
+
+
 .footer__name { margin: 0; font-size: 13px; font-weight: 500; }
 .footer__state { margin: 1px 0 0; font-size: 11px; color: var(--text-muted); }
 
@@ -589,3 +631,5 @@ button:focus-visible,
   outline: 2px solid var(--accent-b);
   outline-offset: 2px;
 }
+
+

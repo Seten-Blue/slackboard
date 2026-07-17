@@ -54,6 +54,16 @@
 
         <p class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
 
+        <div *ngIf="message.attachments?.length" class="mt-2 space-y-1.5">
+          <div *ngFor="let url of message.attachments">
+            <img *ngIf="isImageUrl(url)" [src]="url" class="max-w-xs rounded-lg border border-ink-950/10">
+            <a *ngIf="!isImageUrl(url)" [href]="url" target="_blank"
+               class="inline-flex items-center gap-1.5 px-3 py-2 bg-ink-950/[0.04] rounded-lg text-sm text-ink-950/70 hover:bg-ink-950/[0.08] transition-colors">
+              📎 Descargar archivo
+            </a>
+          </div>
+        </div>
+
         <div *ngIf="message.reactions && message.reactions.length > 0" class="flex flex-wrap gap-1 mt-1.5">
           <button
             *ngFor="let reaction of message.reactions"
@@ -85,7 +95,23 @@
 
   <!-- Composer -->
   <div *ngIf="channel" class="flex-shrink-0 border-t border-ink-950/10 bg-white px-5 py-4">
+    <div *ngIf="selectedFile" class="flex items-center gap-2 mb-2 px-3 py-2 bg-signal/5 border border-signal/20 rounded-lg text-sm">
+      <span class="text-ink-950/70 truncate flex-1">📎 {{ selectedFile.name }}</span>
+      <button (click)="removeSelectedFile()" class="text-ink-950/40 hover:text-red-500 flex-shrink-0" title="Quitar archivo">✕</button>
+    </div>
+
     <div class="flex items-end gap-3">
+      <input type="file" #fileInput (change)="onFileSelected($event)" class="hidden">
+
+      <button
+        (click)="fileInput.click()"
+        type="button"
+        [disabled]="uploadingFile"
+        class="w-11 h-11 flex-shrink-0 flex items-center justify-center text-ink-950/40 hover:text-ink-950/70 hover:bg-ink-950/5 rounded-xl transition-colors disabled:opacity-50"
+        title="Adjuntar archivo">
+        📎
+      </button>
+
       <div class="flex-1 relative">
         <textarea
           [(ngModel)]="newMessage"
@@ -102,9 +128,10 @@
 
       <button
         (click)="sendMessage()"
-        [disabled]="!newMessage.trim()"
+        [disabled]="(!newMessage.trim() && !selectedFile) || uploadingFile"
         class="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-signal text-white rounded-xl hover:bg-signal/90 disabled:bg-ink-950/10 disabled:text-ink-950/30 disabled:cursor-not-allowed transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        <svg *ngIf="!uploadingFile" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        <span *ngIf="uploadingFile" class="text-xs">…</span>
       </button>
     </div>
 

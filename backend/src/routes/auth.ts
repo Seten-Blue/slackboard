@@ -11,4 +11,4 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/google', googleAuth);
 
-export default router;ww
+export default router;

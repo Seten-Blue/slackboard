@@ -6,8 +6,14 @@ import {
   deleteMessage,
   addReaction,
 } from '../controllers/messageController';
+import { requireAuth } from '../middleware/auth';
 
 const router = express.Router();
+
+// ← TODAS las rutas de mensajes requieren estar logueado.
+// Sin esto, req.userId sería undefined y cualquiera podría leer/escribir
+// mensajes de cualquier canal, o hacerse pasar por otro usuario.
+router.use(requireAuth);
 
 // GET /api/messages/channel/:channelId - Obtener mensajes de un canal
 router.get('/channel/:channelId', getMessagesByChannel);

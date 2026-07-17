@@ -14,8 +14,15 @@ export interface IUser extends Document {
   discordAvatar?: string;
   discordAccessToken?: string;
   discordRefreshToken?: string;
-  discordTokenExpiresAt?: Date;  resetPasswordTokenHash?: string;
-  resetPasswordExpires?: Date;
+discordTokenExpiresAt?: Date;
+  slackWorkspaces?: {
+    teamId: string;
+    teamName: string;
+    botUserId: string;
+    botAccessToken: string;
+    connectedAt: Date;
+  }[];
+  resetPasswordTokenHash?: string;  resetPasswordExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
@@ -64,6 +71,16 @@ const UserSchema: Schema = new Schema(
     discordAccessToken: { type: String, default: null },
     discordRefreshToken: { type: String, default: null },
     discordTokenExpiresAt: { type: Date, default: null },
+    slackWorkspaces: [
+      {
+        teamId: { type: String, required: true },
+        teamName: { type: String, required: true },
+        botUserId: { type: String, required: true },
+        botAccessToken: { type: String, required: true },
+        connectedAt: { type: Date, default: Date.now },
+      },
+    ],
+    
     resetPasswordTokenHash: {
       type: String,
       default: null,

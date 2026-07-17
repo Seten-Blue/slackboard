@@ -1,0 +1,51 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="onClose()">
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6" (click)="$event.stopPropagation()">
+
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-signal/10 flex items-center justify-center">
+          <span class="font-display font-bold text-signal text-sm">S</span>
+        </div>
+        <h2 class="font-display font-semibold text-base text-ink-950">Slack</h2>
+      </div>
+      <button (click)="onClose()" class="text-ink-950/40 hover:text-ink-950 text-lg leading-none">✕</button>
+    </div>
+
+    <div *ngIf="statusMsg" class="mb-4 px-3 py-2 rounded-lg bg-green-50 border border-green-100 text-green-700 text-sm">
+      {{ statusMsg }}
+    </div>
+    <div *ngIf="errorMsg" class="mb-4 px-3 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm">
+      {{ errorMsg }}
+    </div>
+
+    <div *ngIf="loadingStatus" class="text-sm text-ink-950/40 text-center py-6">Consultando estado…</div>
+
+    <div *ngIf="!loadingStatus">
+      <p class="text-sm text-ink-950/60 mb-4">
+        Cada workspace de Slack que conectes queda vinculado solo a tu cuenta — nadie más ve sus canales.
+      </p>
+
+      <ul *ngIf="workspaces.length > 0" class="space-y-2 max-h-60 overflow-y-auto mb-4">
+        <li *ngFor="let ws of workspaces"
+            class="flex items-center justify-between px-4 py-3 rounded-xl bg-ink-950/[0.03] border border-ink-950/10">
+          <span class="text-sm font-medium text-ink-950 truncate pr-2">{{ ws.teamName }}</span>
+          <button (click)="syncWorkspace(ws)"
+                  [disabled]="syncingTeamId === ws.teamId"
+                  class="px-3 py-1.5 rounded-lg bg-signal text-white text-xs font-medium disabled:opacity-50 transition-colors flex-shrink-0">
+            {{ syncingTeamId === ws.teamId ? 'Sincronizando…' : 'Sincronizar canales' }}
+          </button>
+        </li>
+      </ul>
+
+      <p *ngIf="workspaces.length === 0" class="text-sm text-ink-950/40 text-center py-4">
+        Aún no vinculaste ningún workspace de Slack.
+      </p>
+
+      <button (click)="connect()"
+              class="w-full py-3 rounded-lg bg-signal text-white font-medium text-sm hover:bg-signal/90 transition-colors">
+        {{ workspaces.length > 0 ? 'Conectar otro workspace' : 'Conectar con Slack' }}
+      </button>
+    </div>
+
+  </div>
+</div>

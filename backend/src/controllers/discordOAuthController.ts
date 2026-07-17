@@ -46,7 +46,8 @@ export const oauthCallback = async (req: Request, res: Response) => {
   }
 
   if (!code || !state) {
-    return res.redirect(`${FRONTEND_URL}/chat?discordLinked=error`);  }
+    return res.redirect(`${FRONTEND_URL}/chat?discordLinked=error`);
+  }
 
   try {
     const decoded = jwt.verify(state, JWT_SECRET) as { userId: string; purpose: string };
@@ -57,16 +58,31 @@ export const oauthCallback = async (req: Request, res: Response) => {
     const tokenData = await discordOAuthService.exchangeCode(code);
     const discordUser = await discordOAuthService.fetchUser(tokenData.access_token);
 
-    await User.findByIdAndUpdate(decoded.userId, {
-      discordUserId: discordUser.id,
-      discordUsername: discordUser.username,
-      discordAvatar: discordUser.avatar,
-      discordAccessToken: tokenData.access_token,
-      discordRefreshToken: tokenData.refresh_token,
-      discordTokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
-    });
+    const currentUser: any = await User.findById(decoded.userId);
+    if (!currentUser) throw new Error('Usuario no encontrado');
 
-res.redirect(`${FRONTEND_URL}/chat?discordLinked=success`);  } catch (err: any) {
+    if (currentUser.discordUserId && currentUser.discordUserId !== discordUser.id) {
+      return res.redirect(`${FRONTEND_URL}/chat?discordLinked=conflict`);
+    }
+
+    const claimedByAnother = await User.findOne({
+      discordUserId: discordUser.id,
+      _id: { $ne: decoded.userId },
+    });
+    if (claimedByAnother) {
+      return res.redirect(`${FRONTEND_URL}/chat?discordLinked=taken`);
+    }
+
+    currentUser.discordUserId = discordUser.id;
+    currentUser.discordUsername = discordUser.username;
+    currentUser.discordAvatar = discordUser.avatar;
+    currentUser.discordAccessToken = tokenData.access_token;
+    currentUser.discordRefreshToken = tokenData.refresh_token;
+    currentUser.discordTokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+    await currentUser.save();
+
+    res.redirect(`${FRONTEND_URL}/chat?discordLinked=success`);
+  } catch (err: any) {
     console.error('❌ Error en el callback de OAuth de Discord:', err.message);
     res.redirect(`${FRONTEND_URL}/chat?discordLinked=error`);
   }
@@ -129,5 +145,21 @@ export const syncMyGuild = async (req: AuthRequest, res: Response) => {
     res.json({ success: true, message: `${synced.length} canales sincronizados`, data: synced });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al sincronizar el servidor', error: error.message });
+  }
+};
+
+export const unlinkDiscord = async (req: AuthRequest, res: Response) => {
+  try {
+    await User.findByIdAndUpdate(req.userId, {
+      discordUserId: null,
+      discordUsername: null,
+      discordAvatar: null,
+      discordAccessToken: null,
+      discordRefreshToken: null,
+      discordTokenExpiresAt: null,
+    });
+    res.json({ success: true, message: 'Cuenta de Discord desvinculada.' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: 'Error al desvincular', error: error.message });
   }
 };

@@ -115,20 +115,26 @@ class discordService {
   }
 
   // ============ CANAL de Discord <-> Channel de SlackBoard ============
-  private async resolveOrCreateDiscordChannel(
+ private async resolveOrCreateDiscordChannel(
     discordChannel: TextChannel | DMChannel,
     guildName?: string,
     requestingUserId?: string
   ) {
     const isDM = discordChannel.type === ChannelType.DM;
     const discordChannelId = discordChannel.id;
+    const rawName = isDM
+      ? `DM con ${(discordChannel as DMChannel).recipient?.username || 'usuario'}`
+      : `# ${(discordChannel as TextChannel).name}`;
 
     let channel: any = await Channel.findOne({ discordChannelId });
     if (channel) {
+      if (!channel.displayName) {
+        channel.displayName = rawName;
+      }
       if (requestingUserId && !channel.members.some((m: any) => m.toString() === requestingUserId)) {
         channel.members.push(new mongoose.Types.ObjectId(requestingUserId));
-        await channel.save();
       }
+      await channel.save();
       return channel;
     }
 
@@ -141,6 +147,9 @@ class discordService {
       if (!existingByName.discordChannelId) {
         existingByName.discordChannelId = discordChannelId;
         existingByName.platform = 'discord';
+      }
+      if (!existingByName.displayName) {
+        existingByName.displayName = rawName;
       }
       if (
         requestingUserId &&
@@ -164,6 +173,7 @@ class discordService {
 
     channel = await Channel.create({
       name: fallbackName,
+      displayName: rawName,
       description: isDM
         ? 'Mensaje directo de Discord'
         : `Canal sincronizado desde Discord (#${(discordChannel as TextChannel).name})`,

@@ -13,6 +13,7 @@ import slackRouter from './routes/slack';
 import trelloRouter from './routes/trello';
 import aiRouter from './routes/ai';
 import discordRouter from './routes/discord';
+import whatsappRouter from './routes/whatsapp';
 import { ensureAIChannel } from './services/aiService';
 import discordservice from './services/discordservice';
 import authRouter from './routes/auth';
@@ -92,6 +93,10 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+app.get('/prueba123', (req, res) => {
+  res.send('SI LLEGUE A ESTE BACKEND');
+});
+
 // Usar rutas
 app.use('/api/channels', channelsRouter);
 app.use('/api/messages', messagesRouter);
@@ -100,6 +105,7 @@ app.use('/api/slack', slackRouter);
 app.use('/api/trello', trelloRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/discord', discordRouter);
+app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/auth', authRouter);
 
 // Socket.IO para mensajes en tiempo real

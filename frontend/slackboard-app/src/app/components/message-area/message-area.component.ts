@@ -19,8 +19,11 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   typingTimeout: any;
   currentUser: any;
 
-  private subscriptions: Subscription[] = [];
+ private subscriptions: Subscription[] = [];
   private shouldScrollToBottom = false;
+
+  selectedFile: File | null = null;
+  uploadingFile = false;
 
   constructor(
     private chatService: ChatService,
@@ -129,33 +132,52 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   sendMessage() {
-    if (!this.newMessage.trim() || !this.channel) return;
+    if ((!this.newMessage.trim() && !this.selectedFile) || !this.channel) return;
 
-    const messageData = {
-      content: this.newMessage.trim(),
-      channel: this.channel._id,
-      type: 'text'
+    const proceed = (attachments: string[]) => {
+      const messageData = {
+        content: this.newMessage.trim() || (attachments.length ? '📎 Adjunto' : ''),
+        channel: this.channel._id,
+        type: attachments.length ? 'file' : 'text',
+        attachments
+      };
+
+      this.chatService.sendMessage(messageData).subscribe({
+        next: (response) => {
+          this.messages.push(response.data);
+
+          this.socketService.sendMessage({
+            channelId: this.channel._id,
+            message: response.data
+          });
+
+          this.newMessage = '';
+          this.selectedFile = null;
+          this.shouldScrollToBottom = true;
+        },
+        error: (error) => {
+          console.error('Error enviando mensaje:', error);
+          alert('Error al enviar el mensaje');
+        }
+      });
     };
 
-    this.chatService.sendMessage(messageData).subscribe({
-      next: (response) => {
-        this.messages.push(response.data);
-
-        this.socketService.sendMessage({
-          channelId: this.channel._id,
-          message: response.data
-        });
-
-        this.newMessage = '';
-        this.shouldScrollToBottom = true;
-      },
-      error: (error) => {
-        console.error('Error enviando mensaje:', error);
-        alert('Error al enviar el mensaje');
-      }
-    });
+    if (this.selectedFile) {
+      this.uploadingFile = true;
+      this.chatService.uploadAttachment(this.selectedFile).subscribe({
+        next: (response) => {
+          this.uploadingFile = false;
+          proceed([response.url]);
+        },
+        error: (error) => {
+          this.uploadingFile = false;
+          alert(error?.error?.message || 'No se pudo subir el archivo.');
+        }
+      });
+    } else {
+      proceed([]);
+    }
   }
-
   onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -170,6 +192,19 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       channelId: this.channel._id,
       username: this.currentUser.username
     });
+  }
+
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.selectedFile = input.files?.[0] || null;
+  }
+
+  removeSelectedFile() {
+    this.selectedFile = null;
+  }
+
+  isImageUrl(url: string): boolean {
+    return /\.(png|jpe?g|gif|webp|svg)$/i.test(url || '');
   }
 
   addReaction(messageId: string, emoji: string) {

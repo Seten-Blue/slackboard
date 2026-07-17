@@ -21,6 +21,13 @@ export class ChatService {
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 
+  // 🔹 Nuevo método para subir archivos
+  uploadAttachment(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post(`${this.apiUrl}/upload`, formData);
+  }
+
   getChannels(): Observable<any> {
     return this.http.get(`${this.apiUrl}/channels`);
   }

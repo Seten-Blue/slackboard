@@ -10,6 +10,9 @@ export interface IChannel extends Document {
   createdBy: mongoose.Types.ObjectId;
   slackChannelId?: string;
   discordChannelId?: string;
+  slackTeamId?: string;
+  whatsappPhone?: string;
+  displayName?: string;
   platform: ChannelPlatform;
   aiEnabled?: boolean;
   isAIChannel?: boolean;
@@ -49,14 +52,14 @@ const ChannelSchema: Schema = new Schema(
       default: null,
       index: true,
     },
-    // ← NUEVO: equivalente a slackChannelId pero para Discord.
-    // Permite: (1) reconocer un canal que ya vinculamos antes,
-    // (2) mandar mensajes de vuelta al canal correcto de Discord.
     discordChannelId: {
       type: String,
       default: null,
       index: true,
     },
+    slackTeamId: { type: String, default: null, index: true },
+    whatsappPhone: { type: String, default: null, index: true },
+    displayName: { type: String, default: null },
     platform: {
       type: String,
       enum: ['slack', 'whatsapp', 'discord', 'skype', 'teams', 'other'],

@@ -100,4 +100,22 @@ export class DiscordLinkModalComponent implements OnInit {
   onClose(): void {
     this.close.emit();
   }
+
+  unlink(): void {
+    if (!confirm('¿Desvincular tu cuenta de Discord? Vas a dejar de ver tus canales sincronizados hasta que la vincules de nuevo.')) return;
+    this.discordService.unlink().subscribe({
+      next: () => {
+        this.linked = false;
+        this.discordUsername = null;
+        this.guilds = [];
+        this.statusMsg = 'Cuenta de Discord desvinculada.';
+      },
+      error: (err: any) => {
+        this.errorMsg = err?.error?.message || 'No se pudo desvincular.';
+      }
+    });
+  }
+
+  
 }
+
