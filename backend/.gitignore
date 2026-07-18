@@ -2,3 +2,20 @@
 .env.*
 node_modules/
 !*.env.example
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Backend
+backend/.env
+backend/.env.*
+
+# Frontend
+frontend/.env
+frontend/.env.*
+
+# Node
+node_modules/
+dist/
