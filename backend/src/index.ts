@@ -21,7 +21,7 @@ import { ensureAIChannel } from './services/aiService';
 import discordservice from './services/discordservice';
 import authRouter from './routes/auth';
 // Configurar variables de entorno
-dotenv.config();
+dotenv.config();  
 
 // Inicializar Express
 const app: Express = express();
@@ -152,4 +152,4 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 httpServer.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📡 Socket.IO listo para conexiones en tiempo real`);
-});
+}); 
