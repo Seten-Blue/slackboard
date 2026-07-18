@@ -13,6 +13,7 @@ export interface IMessage extends Document {
   attachments?: string[];
   discordMessageId?: string;
   whatsappMessageId?: string;
+  sentViaBot?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -71,6 +72,12 @@ const MessageSchema: Schema = new Schema(
       type: String,
       default: null,
       index: true,
+    },
+    // ← NUEVO: true si este mensaje se originó en SlackBoard y el bot lo mandó
+    // hacia una plataforma externa (nos dice si podemos editarlo/borrarlo allá)
+    sentViaBot: {
+      type: Boolean,
+      default: false,
     },
   },
   {

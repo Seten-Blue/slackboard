@@ -338,10 +338,12 @@ class discordService {
   }
 
   // ============ SALIDA: SlackBoard -> Discord ============
-  async sendMessage(internalChannelId: string, text: string): Promise<void> {
+  // ← CAMBIO: ahora devuelve el ID del mensaje que Discord creó, para poder
+  // editarlo/borrarlo/reaccionarlo más adelante desde SlackBoard.
+  async sendMessage(internalChannelId: string, text: string): Promise<string | null> {
     if (!this.isConfigured()) {
       console.log('Discord no configurado, mensaje solo local:', { internalChannelId, text });
-      return;
+      return null;
     }
 
     const channelDoc: any = await Channel.findById(internalChannelId);
@@ -354,7 +356,49 @@ class discordService {
       throw new Error('El canal de Discord vinculado ya no existe o no admite mensajes de texto.');
     }
 
-    await (discordChannel as TextChannel).send(text);
+    const sent = await (discordChannel as TextChannel).send(text);
+    return sent.id;
+  }
+
+  private async fetchDiscordMessage(internalChannelId: string, discordMessageId: string) {
+    const channelDoc: any = await Channel.findById(internalChannelId);
+    if (!channelDoc?.discordChannelId) return null;
+
+    const discordChannel = await this.getClient().channels.fetch(channelDoc.discordChannelId);
+    if (!discordChannel || !discordChannel.isTextBased()) return null;
+
+    return (discordChannel as TextChannel).messages.fetch(discordMessageId);
+  }
+
+  async editMessage(internalChannelId: string, discordMessageId: string, newContent: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    const message = await this.fetchDiscordMessage(internalChannelId, discordMessageId);
+    if (message) await message.edit(newContent);
+  }
+
+  async deleteMessageById(internalChannelId: string, discordMessageId: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    const message = await this.fetchDiscordMessage(internalChannelId, discordMessageId);
+    if (message) await message.delete();
+  }
+
+  async addReactionToMessage(internalChannelId: string, discordMessageId: string, emoji: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    const message = await this.fetchDiscordMessage(internalChannelId, discordMessageId);
+    if (message) await message.react(emoji);
+  }
+
+  async removeReactionFromMessage(internalChannelId: string, discordMessageId: string, emoji: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    const message = await this.fetchDiscordMessage(internalChannelId, discordMessageId);
+    if (!message) return;
+
+    const reaction = message.reactions.cache.find(
+      (r) => r.emoji.name === emoji || r.emoji.toString() === emoji
+    );
+    if (reaction) {
+      await reaction.users.remove(this.getClient().user!.id);
+    }
   }
 
   // ============ SINCRONIZACIÓN: traer canales existentes del/los servidor(es) ============

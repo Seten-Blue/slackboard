@@ -13,6 +13,9 @@ import slackRouter from './routes/slack';
 import trelloRouter from './routes/trello';
 import aiRouter from './routes/ai';
 import discordRouter from './routes/discord';
+import path from 'path';
+import uploadRouter from './routes/upload';
+
 import whatsappRouter from './routes/whatsapp';
 import { ensureAIChannel } from './services/aiService';
 import discordservice from './services/discordservice';
@@ -105,6 +108,9 @@ app.use('/api/slack', slackRouter);
 app.use('/api/trello', trelloRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/discord', discordRouter);
+
+app.use('/api/upload', uploadRouter);
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/auth', authRouter);
 
