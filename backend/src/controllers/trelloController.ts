@@ -139,6 +139,21 @@ export const toggleCardLabel = async (req: Request, res: Response) => {
   }
 };
 
+export const updateCheckItem = async (req: Request, res: Response) => {
+  try {
+    const { cardId, checklistId, itemId } = req.params;
+    const { state } = req.body;
+    if (!state || !['complete', 'incomplete'].includes(state)) {
+      return res.status(400).json({ success: false, message: 'Se requiere state: complete | incomplete' });
+    }
+    await trelloService.updateCheckItem(cardId, checklistId, itemId, state);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error actualizando check item:', error.message);
+    res.status(500).json({ success: false, message: 'Error al actualizar item de verificacion', error: error.message });
+  }
+};
+
 // ← NUEVO: adjuntos
 export const getCardAttachments = async (req: Request, res: Response) => {
   try {

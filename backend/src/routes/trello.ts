@@ -12,6 +12,7 @@ import {
   archiveCard,
   getBoardLabels,
   toggleCardLabel,
+  updateCheckItem,
   getCardAttachments,
   addCardAttachmentUrl,
   uploadCardAttachment,
@@ -48,6 +49,9 @@ router.put('/cards/:cardId/archive', archiveCard);
 
 // Etiquetas en una tarjeta
 router.post('/cards/:cardId/labels/:labelId', toggleCardLabel);
+
+// Checklists
+router.put('/cards/:cardId/checklists/:checklistId/items/:itemId', updateCheckItem);
 
 // Adjuntos
 router.get('/cards/:cardId/attachments', getCardAttachments);

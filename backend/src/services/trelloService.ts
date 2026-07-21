@@ -120,6 +120,16 @@ class TrelloService {
     return this.request(`/cards/${cardId}/idLabels/${labelId}`, { method: 'DELETE' });
   }
 
+  // ---------- Checklists ----------
+
+  async updateCheckItem(cardId: string, checklistId: string, itemId: string, state: string): Promise<any> {
+    return this.request(`/cards/${cardId}/checklists/${checklistId}/items/${itemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+  }
+
   // ---------- Adjuntos (NUEVO) ----------
 
   async getAttachments(cardId: string): Promise<any[]> {
