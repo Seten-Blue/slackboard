@@ -76,8 +76,8 @@ export const createCard = async (req: Request, res: Response) => {
 export const updateCard = async (req: Request, res: Response) => {
   try {
     const { cardId } = req.params;
-    const { name, desc, due, dueComplete } = req.body;
-    const card = await trelloService.updateCard(cardId, { name, desc, due, dueComplete });
+    const { name, desc, due, dueComplete, cover } = req.body;
+    const card = await trelloService.updateCard(cardId, { name, desc, due, dueComplete, cover });
     res.json({ success: true, data: card });
   } catch (error: any) {
     console.error('❌ Error actualizando tarjeta:', error.message);
@@ -151,6 +151,32 @@ export const updateCheckItem = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('❌ Error actualizando check item:', error.message);
     res.status(500).json({ success: false, message: 'Error al actualizar item de verificacion', error: error.message });
+  }
+};
+
+export const getCardActions = async (req: Request, res: Response) => {
+  try {
+    const { cardId } = req.params;
+    const actions = await trelloService.getCardActions(cardId);
+    res.json({ success: true, data: actions });
+  } catch (error: any) {
+    console.error('❌ Error obteniendo acciones:', error.message);
+    res.status(500).json({ success: false, message: 'Error al obtener actividad', error: error.message });
+  }
+};
+
+export const addComment = async (req: Request, res: Response) => {
+  try {
+    const { cardId } = req.params;
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'Se requiere text' });
+    }
+    const action = await trelloService.addComment(cardId, text.trim());
+    res.status(201).json({ success: true, data: action });
+  } catch (error: any) {
+    console.error('❌ Error agregando comentario:', error.message);
+    res.status(500).json({ success: false, message: 'Error al agregar comentario', error: error.message });
   }
 };
 

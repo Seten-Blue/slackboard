@@ -13,6 +13,8 @@ import {
   getBoardLabels,
   toggleCardLabel,
   updateCheckItem,
+  getCardActions,
+  addComment,
   getCardAttachments,
   addCardAttachmentUrl,
   uploadCardAttachment,
@@ -52,6 +54,10 @@ router.post('/cards/:cardId/labels/:labelId', toggleCardLabel);
 
 // Checklists
 router.put('/cards/:cardId/checklists/:checklistId/items/:itemId', updateCheckItem);
+
+// Comentarios / Actividad
+router.get('/cards/:cardId/actions', getCardActions);
+router.post('/cards/:cardId/actions/comments', addComment);
 
 // Adjuntos
 router.get('/cards/:cardId/attachments', getCardAttachments);

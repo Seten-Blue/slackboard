@@ -92,11 +92,19 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   editedCardDue = '';
   editedCardDueComplete = false;
   savingCard = false;
+  editingDesc = false;
 
   selectedCardAttachments: any[] = [];
   loadingAttachments = false;
   newAttachmentUrl = '';
   uploadingFile = false;
+
+  cardActions: any[] = [];
+  loadingActions = false;
+  newComment = '';
+  sendingComment = false;
+
+  lightboxUrl: string | null = null;
 
   showAddList = false;
   newListName = '';
@@ -337,12 +345,15 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     this.editedCardDue = card.due ? card.due.substring(0, 10) : '';
     this.editedCardDueComplete = card.dueComplete;
     this.loadCardAttachments(card.id);
+    this.loadCardActions(card.id);
   }
 
   closeCardPanel() {
     this.selectedCard = null;
     this.selectedCardAttachments = [];
     this.newAttachmentUrl = '';
+    this.cardActions = [];
+    this.newComment = '';
   }
 
   saveCard() {
@@ -474,6 +485,118 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   isImageAttachment(attachment: any): boolean {
     if (attachment.mimeType?.startsWith('image/')) return true;
     return /\.(png|jpe?g|gif|webp|svg)$/i.test(attachment.url || attachment.name || '');
+  }
+
+  // ---------- Actividad / Comentarios ----------
+
+  loadCardActions(cardId: string) {
+    this.loadingActions = true;
+    this.trelloService.getCardActions(cardId).subscribe({
+      next: (response) => {
+        this.cardActions = (response.data || []).sort((a: any, b: any) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        this.loadingActions = false;
+      },
+      error: () => {
+        this.loadingActions = false;
+      }
+    });
+  }
+
+  sendComment() {
+    if (!this.selectedCard || !this.newComment.trim() || this.sendingComment) return;
+    this.sendingComment = true;
+    this.trelloService.addComment(this.selectedCard.id, this.newComment.trim()).subscribe({
+      next: (response) => {
+        this.cardActions.unshift(response.data);
+        this.newComment = '';
+        this.sendingComment = false;
+      },
+      error: (error) => {
+        console.error('Error enviando comentario:', error);
+        this.sendingComment = false;
+      }
+    });
+  }
+
+  commentText(action: any): string {
+    return action?.data?.text || '';
+  }
+
+  actionAuthor(action: any): string {
+    return action?.memberCreator?.fullName || action?.memberCreator?.username || 'Alguien';
+  }
+
+  actionAuthorAvatar(action: any): string {
+    const hash = action?.memberCreator?.avatarHash;
+    if (!hash) return '';
+    return `https://trello.com/1/thumb/${hash}/30.png`;
+  }
+
+  actionAuthorInitials(action: any): string {
+    const name = action?.memberCreator?.fullName || action?.memberCreator?.username || '?';
+    return name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase();
+  }
+
+  actionDescription(action: any): string {
+    const type = action?.type;
+    if (type === 'commentCard') return null as any;
+    if (type === 'updateCard' && action?.data?.old?.desc !== undefined) return 'cambio la descripcion';
+    if (type === 'addAttachmentToCard') return `anadio el adjunto "${action?.data?.attachment?.name || ''}"`;
+    if (type === 'addMemberToCard') return `anadio a ${action?.data?.member?.fullName || ''}`;
+    if (type === 'createCard') return 'anadio esta tarjeta';
+    if (type === 'moveCardFromBoard' || type === 'moveCardToBoard') return 'movio esta tarjeta';
+    return null as any;
+  }
+
+  timeAgo(dateStr: string): string {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diffMs = now.getTime() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'ahora mismo';
+    if (diffMin < 60) return `hace ${diffMin} min`;
+    const diffHrs = Math.floor(diffMin / 60);
+    if (diffHrs < 24) return `hace ${diffHrs}h`;
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays < 7) return `hace ${diffDays}d`;
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // ---------- Marcar como Hecho ----------
+
+  toggleDone() {
+    if (!this.selectedCard) return;
+    const newComplete = !this.selectedCard.dueComplete;
+    this.trelloService.updateCard(this.selectedCard.id, {
+      dueComplete: newComplete
+    }).subscribe({
+      next: (response) => {
+        this.selectedCard!.dueComplete = newComplete;
+        const index = this.cards.findIndex(c => c.id === this.selectedCard!.id);
+        if (index !== -1) this.cards[index].dueComplete = newComplete;
+      },
+      error: (error) => {
+        console.error('Error marcando hecha:', error);
+      }
+    });
+  }
+
+  // ---------- Quitar portada ----------
+
+  removeCover() {
+    if (!this.selectedCard) return;
+    this.trelloService.updateCard(this.selectedCard.id, { cover: null }).subscribe({
+      next: () => {
+        if (this.selectedCard) this.selectedCard.cover = null;
+        const index = this.cards.findIndex(c => c.id === this.selectedCard!.id);
+        if (index !== -1) this.cards[index].cover = null;
+      },
+      error: (error) => {
+        console.error('Error quitando portada:', error);
+      }
+    });
   }
 
   // ← NUEVO: URL segura para <img src> — adjuntos subidos van por nuestro

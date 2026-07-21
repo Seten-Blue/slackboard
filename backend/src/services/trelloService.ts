@@ -86,12 +86,13 @@ class TrelloService {
   }
 
   // ← CAMBIO: ahora acepta tambien due y dueComplete
-  async updateCard(cardId: string, data: { name?: string; desc?: string; due?: string | null; dueComplete?: boolean }): Promise<any> {
+  async updateCard(cardId: string, data: { name?: string; desc?: string; due?: string | null; dueComplete?: boolean; cover?: any }): Promise<any> {
     const params = new URLSearchParams();
     if (data.name !== undefined) params.set('name', data.name);
     if (data.desc !== undefined) params.set('desc', data.desc);
     if (data.due !== undefined) params.set('due', data.due === null ? 'null' : data.due);
     if (data.dueComplete !== undefined) params.set('dueComplete', String(data.dueComplete));
+    if (data.cover !== undefined) params.set('cover', data.cover === null ? 'null' : JSON.stringify(data.cover));
     return this.request(`/cards/${cardId}?${params.toString()}`, { method: 'PUT' });
   }
 
@@ -127,6 +128,20 @@ class TrelloService {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),
+    });
+  }
+
+  // ---------- Comentarios / Actividad ----------
+
+  async getCardActions(cardId: string): Promise<any[]> {
+    return this.request(`/cards/${cardId}/actions?filter=commentCard,updateCard:desc,addAttachmentToCard,addMemberToCard,createCard,moveCardFromBoard,moveCardToBoard&limit=50`);
+  }
+
+  async addComment(cardId: string, text: string): Promise<any> {
+    return this.request(`/cards/${cardId}/actions/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
     });
   }
 

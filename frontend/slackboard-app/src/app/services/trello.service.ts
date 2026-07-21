@@ -34,7 +34,7 @@ export class TrelloService {
     return this.http.post(`${this.apiUrl}/trello/cards`, { listId, name, desc });
   }
 
-  updateCard(cardId: string, data: { name?: string; desc?: string; due?: string | null; dueComplete?: boolean }): Observable<any> {
+  updateCard(cardId: string, data: { name?: string; desc?: string; due?: string | null; dueComplete?: boolean; cover?: any }): Observable<any> {
     return this.http.put(`${this.apiUrl}/trello/cards/${cardId}`, data);
   }
 
@@ -73,5 +73,13 @@ export class TrelloService {
       `${this.apiUrl}/trello/cards/${cardId}/checklists/${checklistId}/items/${itemId}`,
       { state }
     );
+  }
+
+  getCardActions(cardId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/trello/cards/${cardId}/actions`);
+  }
+
+  addComment(cardId: string, text: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/trello/cards/${cardId}/actions/comments`, { text });
   }
 }
