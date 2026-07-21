@@ -131,11 +131,29 @@ class TrelloService {
   // Sube el archivo directo a Trello, sin guardar nada en Mongo ni en disco propio
   async addAttachmentByFile(cardId: string, buffer: Buffer, filename: string, mimetype: string): Promise<any> {
     const formData = new FormData();
-    const blob = new Blob([new Uint8Array(buffer)], { type: mimetype });    formData.append('file', blob, filename);
+    const blob = new Blob([new Uint8Array(buffer)], { type: mimetype });
+    formData.append('file', blob, filename);
     return this.request(`/cards/${cardId}/attachments`, {
       method: 'POST',
       body: formData,
     });
+  }
+
+  // ← NUEVO: descarga el binario de un adjunto usando NUESTRAS credenciales
+  // (server-side, nunca expuestas al navegador). El frontend nunca ve el
+  // key/token — solo recibe los bytes ya listos para mostrar.
+  async fetchAttachmentBinary(attachmentUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
+    const separator = attachmentUrl.includes('?') ? '&' : '?';
+    const url = `${attachmentUrl}${separator}${this.authParams()}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`No se pudo descargar el adjunto de Trello (${response.status})`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const arrayBuffer = await response.arrayBuffer();
+    return { buffer: Buffer.from(arrayBuffer), contentType };
   }
 }
 

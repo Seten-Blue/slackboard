@@ -84,9 +84,10 @@ class SlackService {
       }
 
       try {
+        const senderPrefix = username ? `*${username}*: ` : '';
         const result = await this.client.chat.postMessage({
           channel: slackChannelId,
-          text: text,
+          text: senderPrefix + text,
           username: username || 'SlackBoard Bot',
           icon_emoji: ':robot_face:'
         });
@@ -99,9 +100,10 @@ class SlackService {
           try {
             await this.client.conversations.join({ channel: slackChannelId });
 
+            const senderPrefix = username ? `*${username}*: ` : '';
             const retryResult = await this.client.chat.postMessage({
               channel: slackChannelId,
-              text: text,
+              text: senderPrefix + text,
               username: username || 'SlackBoard Bot',
               icon_emoji: ':robot_face:'
             });
@@ -208,25 +210,62 @@ class SlackService {
   
 
 // Hacer que el bot abandone un canal de Slack
-async leaveChannel(channelId: string): Promise<any> {
-  try {
+  async leaveChannel(channelId: string): Promise<any> {
+    try {
+      if (!this.isConfigured()) {
+        return null;
+      }
+
+      const result = await this.client.conversations.leave({
+        channel: channelId
+      });
+
+      console.log(`Bot salio del canal ${channelId}`);
+
+      return result;
+
+    } catch (error: any) {
+      console.error('Error abandonando el canal en Slack:', error.message);
+      throw error;
+    }
+  }
+
+  async createChannel(name: string, isPrivate: boolean = false): Promise<{ channelId: string; name: string }> {
     if (!this.isConfigured()) {
-      return null;
+      throw new Error('Slack no esta configurado');
     }
 
-    const result = await this.client.conversations.leave({
-      channel: channelId
-    });
+    const normalizedName = this.normalizeChannelName(name);
 
-    console.log(`✅ Bot salio del canal ${channelId}`);
+    try {
+      const result = await this.client.conversations.create({
+        name: normalizedName,
+        is_private: isPrivate,
+      });
 
-    return result;
+      const channelId = (result as any).channel?.id;
+      if (!channelId) {
+        throw new Error('No se obtuvo el ID del canal creado');
+      }
 
-  } catch (error: any) {
-    console.error('❌ Error abandonando el canal en Slack:', error.message);
-    throw error;
+      this.channelMap.set(normalizedName, channelId);
+      this.channelMap.set(name.toLowerCase(), channelId);
+
+      console.log(`Canal creado en Slack: ${normalizedName} -> ${channelId}`);
+
+      try {
+        await this.client.conversations.join({ channel: channelId });
+      } catch (joinErr: any) {
+        console.warn('Advertencia: no se pudo unir el bot al canal creado:', joinErr.message);
+      }
+
+      return { channelId, name: normalizedName };
+    } catch (error: any) {
+      const msg = error?.data?.error || error.message;
+      console.error('Error creando canal en Slack:', msg);
+      throw new Error(`Error creando canal en Slack: ${msg}`);
+    }
   }
-}
 
 
   // Renombrar un canal en Slack

@@ -152,4 +152,4 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 httpServer.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📡 Socket.IO listo para conexiones en tiempo real`);
-}); 
+});   

@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import { requireAuth } from '../middleware/auth';
 import {
   getBoards,
   getBoardContents,
@@ -14,16 +15,21 @@ import {
   getCardAttachments,
   addCardAttachmentUrl,
   uploadCardAttachment,
+  viewCardAttachment,
 } from '../controllers/trelloController';
 
 const router = express.Router();
 
-// Almacenamiento en memoria: el archivo nunca toca disco ni Mongo,
-// solo vive en RAM el instante que tarda en reenviarse a Trello.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max por archivo
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
+
+// ← pública a propósito: un <img src> no puede mandar el header Authorization,
+// y el proxy nunca expone el key/token real de Trello
+router.get('/cards/:cardId/attachments/:attachmentId/view', viewCardAttachment);
+
+router.use(requireAuth);
 
 // Tableros
 router.get('/boards', getBoards);

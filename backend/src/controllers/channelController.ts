@@ -2,6 +2,7 @@ import { Response } from 'express';
 import Channel from '../models/Channel';
 import User from '../models/User';
 import slackService from '../services/slackService';
+import discordService from '../services/discordservice';
 import { AuthRequest } from '../middleware/auth';
 
 // Obtener SOLO los canales de los que el usuario autenticado es miembro
@@ -52,22 +53,52 @@ export const getChannelById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Crear un nuevo canal — el creador es siempre el usuario autenticado (JWT), nunca lo que mande el body
+// Crear un nuevo canal -- el creador es siempre el usuario autenticado (JWT), nunca lo que mande el body
 export const createChannel = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, isPrivate } = req.body;
+    const { name, description, isPrivate, platform } = req.body;
 
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
+    const channelPlatform = platform || 'other';
+    let slackChannelId: string | undefined;
+    let discordChannelId: string | undefined;
+    let displayName: string | undefined;
+    let creationError: string | null = null;
+
+    if (channelPlatform === 'slack') {
+      try {
+        const result = await slackService.createChannel(name, isPrivate || false);
+        slackChannelId = result.channelId;
+        displayName = `# ${result.name}`;
+      } catch (err: any) {
+        console.error('No se pudo crear el canal en Slack:', err.message);
+        creationError = `Canal creado localmente pero no en Slack: ${err.message}`;
+      }
+    } else if (channelPlatform === 'discord') {
+      try {
+        const result = await discordService.createChannel(name, isPrivate || false);
+        discordChannelId = result.channelId;
+        displayName = `# ${result.name}`;
+      } catch (err: any) {
+        console.error('No se pudo crear el canal en Discord:', err.message);
+        creationError = `Canal creado localmente pero no en Discord: ${err.message}`;
+      }
+    }
+
     const channel = await Channel.create({
       name,
       description,
       isPrivate: isPrivate || false,
+      platform: channelPlatform,
       createdBy: req.userId,
       members: [req.userId],
+      ...(slackChannelId && { slackChannelId }),
+      ...(discordChannelId && { discordChannelId }),
+      ...(displayName && { displayName }),
     });
 
     const populatedChannel = await Channel.findById(channel._id)
@@ -76,8 +107,9 @@ export const createChannel = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({
       success: true,
-      message: 'Canal creado exitosamente',
+      message: creationError || 'Canal creado exitosamente',
       data: populatedChannel,
+      ...(creationError && { warning: creationError }),
     });
   } catch (error: any) {
     if (error.code === 11000) {

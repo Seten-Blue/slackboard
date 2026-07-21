@@ -179,3 +179,27 @@ export const uploadCardAttachment = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Error al subir el archivo', error: error.message });
   }
 };
+
+// ← NUEVO: sirve el binario de un adjunto como proxy autenticado.
+// El frontend usa esta URL directo en <img src>, sin necesitar el token de Trello.
+export const viewCardAttachment = async (req: Request, res: Response) => {
+  try {
+    const { cardId, attachmentId } = req.params;
+
+    const attachments = await trelloService.getAttachments(cardId);
+    const attachment = attachments.find((a: any) => a.id === attachmentId);
+
+    if (!attachment) {
+      return res.status(404).json({ success: false, message: 'Adjunto no encontrado' });
+    }
+
+    const { buffer, contentType } = await trelloService.fetchAttachmentBinary(attachment.url);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('❌ Error obteniendo adjunto:', error.message);
+    res.status(500).json({ success: false, message: 'Error al obtener el adjunto', error: error.message });
+  }
+};

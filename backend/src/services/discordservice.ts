@@ -495,6 +495,44 @@ class discordService {
     }
     return synced;
   }
+
+  async createChannel(name: string, isPrivate: boolean = false): Promise<{ channelId: string; name: string }> {
+    if (!this.isConfigured()) {
+      throw new Error('Discord no esta configurado');
+    }
+
+    const normalized = normalizeChannelName(name);
+
+    let guild = null;
+    if (this.guildIdFilter) {
+      guild = this.getClient().guilds.cache.get(this.guildIdFilter);
+    }
+    if (!guild) {
+      const guilds = this.getClient().guilds.cache;
+      if (guilds.size > 0) {
+        guild = guilds.first();
+      }
+    }
+
+    if (!guild) {
+      throw new Error('El bot no esta en ningun servidor de Discord');
+    }
+
+    try {
+      const channel = await guild.channels.create({
+        name: normalized,
+        type: ChannelType.GuildText,
+        topic: `Canal creado desde SlackBoard`,
+      });
+
+      console.log(`Canal creado en Discord: ${normalized} -> ${channel.id}`);
+
+      return { channelId: channel.id, name: normalized };
+    } catch (error: any) {
+      console.error('Error creando canal en Discord:', error.message);
+      throw new Error(`Error creando canal en Discord: ${error.message}`);
+    }
+  }
 }
 
 export default new discordService();
