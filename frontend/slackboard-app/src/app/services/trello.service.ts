@@ -63,4 +63,15 @@ export class TrelloService {
     formData.append('file', file);
     return this.http.post(`${this.apiUrl}/trello/cards/${cardId}/attachments/file`, formData);
   }
+
+  getAttachmentViewUrl(cardId: string, attachmentId: string): string {
+    return `${this.apiUrl}/trello/cards/${cardId}/attachments/${attachmentId}/view`;
+  }
+
+  updateCheckItem(cardId: string, checklistId: string, itemId: string, state: string): Observable<any> {
+    return this.http.put(
+      `${this.apiUrl}/trello/cards/${cardId}/checklists/${checklistId}/items/${itemId}`,
+      { state }
+    );
+  }
 }

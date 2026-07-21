@@ -310,7 +310,6 @@ export class SidebarComponent implements OnInit {
       name: this.newChannelName.trim(),
       description: '',
       isPrivate: false,
-      // ← el canal nuevo queda asociado a la plataforma activa en el switcher
       platform: this.selectedPlatform.id
     }).subscribe({
       next: (response) => {
@@ -318,10 +317,13 @@ export class SidebarComponent implements OnInit {
         this.newChannelName = '';
         this.showCreateChannel = false;
         this.selectChannel(response.data);
+        if (response.warning) {
+          alert(response.warning);
+        }
       },
       error: (error) => {
         console.error('Error creando canal:', error);
-        alert('Error al crear el canal');
+        alert(error?.error?.message || 'Error al crear el canal');
       }
     });
   }
@@ -383,5 +385,10 @@ export class SidebarComponent implements OnInit {
     if (this.aiChannel) {
       this.selectChannel(this.aiChannel);
     }
+  }
+
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

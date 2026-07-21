@@ -1,17 +1,26 @@
-<div class="flex flex-col h-full min-h-0 overflow-hidden bg-paper">
-  <!-- Header: selector de tablero -->
-  <header class="flex-shrink-0 bg-white/80 backdrop-blur border-b border-ink-950/10 px-6 py-4">
+<div class="relative flex flex-col h-full min-h-0 overflow-x-hidden overflow-y-visible"
+     [ngClass]="{
+       'bg-ink-950': currentBackground === 'midnight' || currentBackground === 'particles',
+       'bg-gradient-to-br from-[#0f2027] via-[#2c5364] to-[#0f2027]': currentBackground === 'aurora',
+       'bg-gradient-to-br from-[#1a0033] via-[#3b0764] to-[#0f0326]': currentBackground === 'nebula'
+     }">
+
+  <canvas *ngIf="currentBackground === 'particles'" #particleCanvas
+          class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+
+  <!-- Header: selector de tablero + selector de fondo -->
+  <header class="relative z-30 flex-shrink-0 bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4">
     <div class="flex items-center justify-between">
       <div class="relative">
         <button
           (click)="showBoardPicker = !showBoardPicker"
-          class="flex items-center gap-2 font-display font-semibold text-lg text-ink-950 hover:text-signal transition-colors">
-          <span class="text-ink-950/30 font-mono text-base">▤</span>
+          class="flex items-center gap-2 font-display font-semibold text-lg text-white hover:text-[#8b7cf6] transition-colors">
+          <span class="text-white/30 font-mono text-base">▤</span>
           {{ selectedBoard?.name || 'Selecciona un tablero' }}
-          <svg class="w-4 h-4 text-ink-950/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          <svg class="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         </button>
 
-        <div *ngIf="showBoardPicker" class="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg border border-ink-950/10 py-2 z-20">
+        <div *ngIf="showBoardPicker" class="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-ink-950/10 py-2 z-50">
           <button
             *ngFor="let board of boards"
             (click)="selectBoard(board)"
@@ -26,28 +35,48 @@
         </div>
       </div>
 
-      <a *ngIf="selectedBoard" [href]="selectedBoard.url" target="_blank"
-         class="text-xs font-mono text-ink-950/40 hover:text-signal transition-colors">
-        Abrir en Trello ↗
-      </a>
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <button (click)="toggleBackgroundPicker()"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  title="Fondo del tablero">
+            🎨
+          </button>
+
+          <div *ngIf="showBackgroundPicker" class="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl shadow-lg border border-ink-950/10 py-2 z-20">
+            <button *ngFor="let opt of backgroundOptions"
+                    (click)="selectBackground(opt.id)"
+                    class="w-full text-left px-4 py-2 text-sm hover:bg-ink-950/5 transition-colors flex items-center justify-between"
+                    [ngClass]="currentBackground === opt.id ? 'text-signal font-medium' : 'text-ink-950/80'">
+              {{ opt.label }}
+              <span *ngIf="currentBackground === opt.id" class="text-signal">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <a *ngIf="selectedBoard" [href]="selectedBoard.url" target="_blank"
+           class="text-xs font-mono text-white/50 hover:text-white transition-colors">
+          Abrir en Trello ↗
+        </a>
+      </div>
     </div>
   </header>
 
   <!-- Tablero kanban -->
-  <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 py-5">
-    <div *ngIf="loadingBoards || loadingBoard" class="flex items-center gap-2 text-ink-950/40 text-sm">
-      <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+  <div class="relative z-10 flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 py-5">
+    <div *ngIf="loadingBoards || loadingBoard" class="flex items-center gap-2 text-white/50 text-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-[#8b7cf6] animate-pulse"></span>
       Cargando…
     </div>
 
     <div *ngIf="!loadingBoards && boards.length === 0" class="flex flex-col items-center justify-center h-full text-center">
-      <p class="font-display font-semibold text-ink-950 mb-1">No hay tableros conectados</p>
-      <p class="text-sm text-ink-950/50">Crea un tablero en Trello para empezar</p>
+      <p class="font-display font-semibold text-white mb-1">No hay tableros conectados</p>
+      <p class="text-sm text-white/50">Crea un tablero en Trello para empezar</p>
     </div>
 
     <div *ngIf="!loadingBoard && selectedBoard" class="flex gap-4 h-full items-start">
       <div *ngFor="let list of lists"
-           class="w-72 flex-shrink-0 flex flex-col bg-ink-950/[0.03] rounded-xl max-h-full"
+           class="w-72 flex-shrink-0 flex flex-col bg-white/90 backdrop-blur-md rounded-xl max-h-full shadow-lg"
            (dragover)="onDragOver($event)"
            (drop)="onDrop($event, list.id)">
 
@@ -72,6 +101,16 @@
                (click)="openCard(card)"
                class="group bg-white rounded-lg shadow-sm border border-ink-950/5 overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all">
 
+            <!-- Cover image -->
+            <img *ngIf="coverImageUrl(card)" [src]="coverImageUrl(card)"
+                 class="w-full h-28 object-cover" alt="">
+
+            <!-- Cover color block (no image) -->
+            <div *ngIf="!coverImageUrl(card) && coverColor(card)"
+                 class="h-2"
+                 [style.background]="coverColor(card)"></div>
+
+            <!-- Labels -->
             <div *ngIf="card.labels?.length" class="flex gap-1 px-3 pt-2.5">
               <span *ngFor="let label of card.labels"
                     class="h-1.5 w-6 rounded-full"
@@ -81,20 +120,60 @@
             <div class="px-3 py-2">
               <p class="text-sm text-ink-950/85 leading-snug">{{ card.name }}</p>
 
-              <div class="flex items-center gap-3 mt-2 flex-wrap">
-                <span *ngIf="card.due"
+              <!-- Badges row -->
+              <div class="flex items-center gap-2 mt-2 flex-wrap">
+                <!-- Due date with countdown -->
+                <span *ngIf="card.due && !card.dueComplete"
                       class="flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded"
-                      [ngClass]="card.dueComplete ? 'bg-pulse/10 text-pulse' : 'bg-signal/10 text-signal'">
-                  📅 {{ card.due | date:'d MMM' }}
+                      [ngClass]="{
+                        'bg-red-50 text-red-600': dueUrgency(card.due, card.dueComplete) === 'overdue',
+                        'bg-amber-50 text-amber-600': dueUrgency(card.due, card.dueComplete) === 'soon',
+                        'bg-blue-50 text-blue-600': dueUrgency(card.due, card.dueComplete) === 'ok'
+                      }">
+                  <span *ngIf="dueUrgency(card.due, card.dueComplete) === 'overdue'">⚠</span>
+                  <span *ngIf="dueUrgency(card.due, card.dueComplete) !== 'overdue'">📅</span>
+                  {{ dueLabel(card.due, card.dueComplete) }}
+                </span>
+                <span *ngIf="card.due && card.dueComplete"
+                      class="flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded bg-green-50 text-green-600">
+                  ✅ {{ card.due | date:'d MMM' }}
                 </span>
 
+                <!-- Attachments -->
                 <span *ngIf="card.badges?.attachments" class="flex items-center gap-1 text-[11px] font-mono text-ink-950/40">
                   📎 {{ card.badges.attachments }}
                 </span>
 
-                <span *ngIf="card.badges?.checkItems" class="flex items-center gap-1 text-[11px] font-mono text-ink-950/40">
-                  ☑ {{ card.badges.checkItemsChecked }}/{{ card.badges.checkItems }}
+                <!-- Checklist progress -->
+                <span *ngIf="checklistStats(card) as stats"
+                      class="flex items-center gap-1.5 text-[11px] font-mono"
+                      [ngClass]="stats.checked === stats.total ? 'text-green-600' : 'text-ink-950/40'">
+                  ☑
+                  <span class="inline-flex items-center">
+                    <span class="inline-block h-1 rounded-full bg-ink-950/10 w-10 mr-1">
+                      <span class="block h-1 rounded-full bg-green-500"
+                            [style.width]="stats.total > 0 ? (stats.checked / stats.total * 100) + '%' : '0%'"></span>
+                    </span>
+                    {{ stats.checked }}/{{ stats.total }}
+                  </span>
                 </span>
+
+                <!-- Description indicator -->
+                <span *ngIf="hasDescription(card)" class="text-[11px] text-ink-950/30" title="Tiene descripcion">
+                  ▤
+                </span>
+              </div>
+
+              <!-- Member avatars -->
+              <div *ngIf="cardMembers(card).length > 0" class="flex -space-x-1.5 mt-2">
+                <div *ngFor="let member of cardMembers(card)"
+                     class="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white overflow-hidden flex-shrink-0"
+                     [style.background]="member.avatarHash ? '' : '#6366f1'"
+                     [title]="member.fullName || member.username">
+                  <img *ngIf="memberAvatarUrl(member)" [src]="memberAvatarUrl(member)"
+                       class="w-full h-full object-cover" alt="">
+                  <span *ngIf="!memberAvatarUrl(member)">{{ memberInitials(member) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -128,7 +207,7 @@
       </div>
 
       <div class="w-72 flex-shrink-0">
-        <div *ngIf="showAddList" class="bg-white rounded-xl border border-signal/30 p-3">
+        <div *ngIf="showAddList" class="bg-white/95 backdrop-blur-md rounded-xl border border-signal/30 p-3">
           <input
             [(ngModel)]="newListName"
             (keyup.enter)="confirmAddList()"
@@ -147,7 +226,7 @@
         <button
           *ngIf="!showAddList"
           (click)="startAddingList()"
-          class="w-full text-left px-3 py-2.5 text-sm text-ink-950/40 hover:text-ink-950/70 hover:bg-ink-950/[0.03] rounded-xl transition-colors">
+          class="w-full text-left px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
           + Agregar otra lista
         </button>
       </div>
@@ -156,84 +235,162 @@
 
   <!-- Panel lateral de edicion de tarjeta -->
   <div *ngIf="selectedCard" class="fixed inset-0 z-30 flex justify-end" (click)="closeCardPanel()">
-    <div class="absolute inset-0 bg-ink-950/20"></div>
-    <div class="relative w-full max-w-md h-full bg-white shadow-2xl p-6 overflow-y-auto" (click)="$event.stopPropagation()">
-      <button (click)="closeCardPanel()" class="absolute top-4 right-4 text-ink-950/40 hover:text-ink-950/70 text-xl leading-none">
-        ×
-      </button>
+    <div class="absolute inset-0 bg-ink-950/40"></div>
+    <div class="relative w-full max-w-md h-full bg-white shadow-2xl overflow-y-auto" (click)="$event.stopPropagation()">
 
-      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Nombre</label>
-      <input
-        [(ngModel)]="editedCardName"
-        class="w-full text-lg font-display font-semibold text-ink-950 outline-none border-b border-transparent focus:border-signal/50 pb-1 mt-1 mb-5">
+      <!-- Cover -->
+      <div *ngIf="coverImageUrl(selectedCard)" class="relative">
+        <img [src]="coverImageUrl(selectedCard)" class="w-full h-40 object-cover" alt="">
+        <button (click)="closeCardPanel()" class="absolute top-3 right-3 bg-ink-950/50 hover:bg-ink-950/70 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">×</button>
+      </div>
+      <div *ngIf="!coverImageUrl(selectedCard) && coverColor(selectedCard)"
+           class="h-3"
+           [style.background]="coverColor(selectedCard)"></div>
+      <button *ngIf="!coverImageUrl(selectedCard)" (click)="closeCardPanel()"
+              class="absolute top-4 right-4 text-ink-950/40 hover:text-ink-950/70 text-xl leading-none">×</button>
 
-      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Descripcion</label>
-      <textarea
-        [(ngModel)]="editedCardDesc"
-        rows="5"
-        placeholder="Agrega una descripcion mas detallada…"
-        class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg p-3 mt-1 mb-5 resize-none focus:border-signal/50 transition-colors"></textarea>
+      <div class="p-6">
 
-      <div class="flex items-center gap-3 mb-5">
-        <div class="flex-1">
-          <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Fecha limite</label>
-          <input type="date" [(ngModel)]="editedCardDue"
-                 class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg px-3 py-2 mt-1 focus:border-signal/50 transition-colors">
+        <!-- Title -->
+        <input
+          [(ngModel)]="editedCardName"
+          class="w-full text-lg font-display font-semibold text-ink-950 outline-none border-b border-transparent focus:border-signal/50 pb-1 mb-4">
+
+        <!-- In list -->
+        <p class="text-xs text-ink-950/40 mb-4">
+          en <span class="font-medium text-ink-950/60">{{ getListName(selectedCard.idList) }}</span>
+        </p>
+
+        <!-- Members -->
+        <div *ngIf="cardMembers(selectedCard).length > 0" class="mb-4">
+          <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 block">Miembros</label>
+          <div class="flex flex-wrap gap-2">
+            <div *ngFor="let member of cardMembers(selectedCard)"
+                 class="flex items-center gap-1.5 px-2 py-1 bg-ink-950/[0.03] rounded-full">
+              <div class="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0"
+                   [style.background]="memberAvatarUrl(member) ? '' : '#6366f1'">
+                <img *ngIf="memberAvatarUrl(member)" [src]="memberAvatarUrl(member)" class="w-full h-full object-cover" alt="">
+                <span *ngIf="!memberAvatarUrl(member)">{{ memberInitials(member) }}</span>
+              </div>
+              <span class="text-xs text-ink-950/70">{{ member.fullName || member.username }}</span>
+            </div>
+          </div>
         </div>
-        <label *ngIf="editedCardDue" class="flex items-center gap-2 text-sm text-ink-950/70 mt-5">
-          <input type="checkbox" [(ngModel)]="editedCardDueComplete" class="accent-pulse">
-          Completada
-        </label>
-      </div>
 
-      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Etiquetas</label>
-      <div class="flex flex-wrap gap-2 mt-2 mb-5">
-        <button *ngFor="let label of boardLabels"
-                (click)="toggleLabel(label)"
-                class="px-3 py-1 rounded-full text-xs font-medium transition-all"
-                [style.background]="isLabelOnCard(label.id) ? labelColor(label.color) : (labelColor(label.color) + '22')"
-                [style.color]="isLabelOnCard(label.id) ? '#fff' : labelColor(label.color)">
-          {{ label.name || label.color }}
-        </button>
-        <span *ngIf="boardLabels.length === 0" class="text-xs text-ink-950/30">Este tablero no tiene etiquetas</span>
-      </div>
-
-      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Adjuntos</label>
-
-      <div class="mt-2 mb-3 space-y-2">
-        <div *ngFor="let attachment of selectedCardAttachments" class="flex items-center gap-2 p-2 bg-ink-950/[0.03] rounded-lg">
-          <img *ngIf="isImageAttachment(attachment)" [src]="attachment.url" class="w-10 h-10 rounded object-cover flex-shrink-0">
-          <span *ngIf="!isImageAttachment(attachment)" class="w-10 h-10 rounded bg-ink-950/10 flex items-center justify-center flex-shrink-0 text-lg">📎</span>
-          <a [href]="attachment.url" target="_blank" class="text-sm text-ink-950/70 truncate hover:text-signal transition-colors flex-1">
-            {{ attachment.name || attachment.url }}
-          </a>
+        <!-- Due date -->
+        <div *ngIf="selectedCard.due" class="mb-4">
+          <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 block">Fecha limite</label>
+          <div class="flex items-center gap-3">
+            <input type="date" [(ngModel)]="editedCardDue"
+                   class="flex-1 text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg px-3 py-2 focus:border-signal/50 transition-colors">
+            <label class="flex items-center gap-2 text-sm text-ink-950/70">
+              <input type="checkbox" [(ngModel)]="editedCardDueComplete" class="accent-pulse">
+              Completada
+            </label>
+          </div>
+          <p *ngIf="dueLabel(selectedCard.due, selectedCard.dueComplete)"
+             class="text-xs mt-1.5 font-mono"
+             [ngClass]="{
+               'text-red-500': dueUrgency(selectedCard.due, selectedCard.dueComplete) === 'overdue',
+               'text-amber-500': dueUrgency(selectedCard.due, selectedCard.dueComplete) === 'soon',
+               'text-blue-500': dueUrgency(selectedCard.due, selectedCard.dueComplete) === 'ok'
+             }">
+            {{ dueLabel(selectedCard.due, selectedCard.dueComplete) }}
+          </p>
         </div>
-        <p *ngIf="loadingAttachments" class="text-xs text-ink-950/30">Cargando adjuntos…</p>
-      </div>
 
-      <div class="flex items-center gap-2 mb-6">
-        <input type="file" (change)="onFileSelected($event)" [disabled]="uploadingFile" class="hidden" #fileInput>
-        <button (click)="fileInput.click()" [disabled]="uploadingFile"
-                class="px-3 py-1.5 bg-ink-950/[0.05] hover:bg-ink-950/10 text-ink-950/70 text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
-          {{ uploadingFile ? 'Subiendo…' : '📎 Subir archivo' }}
-        </button>
-        <input [(ngModel)]="newAttachmentUrl" (keyup.enter)="addAttachmentUrl()"
-               placeholder="o pega un enlace…"
-               class="flex-1 text-xs outline-none border border-ink-950/10 rounded-lg px-2.5 py-1.5 placeholder:text-ink-950/30">
-      </div>
+        <!-- Checklists -->
+        <div *ngIf="selectedCard.checklists?.length" class="mb-5">
+          <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 block">Listas de verificacion</label>
+          <div *ngFor="let cl of selectedCard.checklists" class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm text-ink-950/70 font-medium">{{ cl.name }}</span>
+              <span class="text-[11px] font-mono text-ink-950/40">
+                {{ checkedCount(cl) }}/{{ (cl.checkItems || []).length }}
+              </span>
+            </div>
+            <div class="h-1.5 bg-ink-950/10 rounded-full overflow-hidden mb-2">
+              <div class="h-full bg-green-500 rounded-full transition-all"
+                   [style.width]="(cl.checkItems || []).length > 0 ? (checkedCount(cl) / (cl.checkItems || []).length * 100) + '%' : '0%'"></div>
+            </div>
+            <div *ngFor="let item of cl.checkItems" class="flex items-center gap-2 py-0.5 pl-1">
+              <input type="checkbox"
+                     [checked]="item.state === 'complete'"
+                     (change)="toggleCheckItem(selectedCard, cl.id, item.id, item.state)"
+                     class="accent-green-500 w-3.5 h-3.5">
+              <span class="text-sm"
+                    [ngClass]="item.state === 'complete' ? 'text-ink-950/40 line-through' : 'text-ink-950/80'">
+                {{ item.name }}
+              </span>
+            </div>
+          </div>
+        </div>
 
-      <div class="flex items-center gap-2">
-        <button
-          (click)="saveCard()"
-          [disabled]="savingCard"
-          class="px-4 py-2 bg-signal text-white text-sm font-medium rounded-lg hover:bg-signal/90 disabled:opacity-50 transition-colors">
-          {{ savingCard ? 'Guardando…' : 'Guardar cambios' }}
-        </button>
-        <button
-          (click)="archiveCard(selectedCard)"
-          class="px-4 py-2 text-ink-950/50 hover:text-red-500 text-sm font-medium transition-colors">
-          Archivar tarjeta
-        </button>
+        <hr class="border-ink-950/5 mb-5" *ngIf="selectedCard.checklists?.length || selectedCard.due">
+
+        <!-- Description -->
+        <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Descripcion</label>
+        <textarea
+          [(ngModel)]="editedCardDesc"
+          rows="4"
+          placeholder="Agrega una descripcion mas detallada…"
+          class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg p-3 mt-1 mb-5 resize-none focus:border-signal/50 transition-colors"></textarea>
+
+        <!-- Labels -->
+        <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Etiquetas</label>
+        <div class="flex flex-wrap gap-2 mt-2 mb-5">
+          <button *ngFor="let label of boardLabels"
+                  (click)="toggleLabel(label)"
+                  class="px-3 py-1 rounded-full text-xs font-medium transition-all"
+                  [style.background]="isLabelOnCard(label.id) ? labelColor(label.color) : (labelColor(label.color) + '22')"
+                  [style.color]="isLabelOnCard(label.id) ? '#fff' : labelColor(label.color)">
+            {{ label.name || label.color }}
+          </button>
+          <span *ngIf="boardLabels.length === 0" class="text-xs text-ink-950/30">Este tablero no tiene etiquetas</span>
+        </div>
+
+        <!-- Attachments -->
+        <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Adjuntos</label>
+
+        <div class="mt-2 mb-3 space-y-2">
+          <div *ngFor="let attachment of selectedCardAttachments" class="flex items-center gap-2 p-2 bg-ink-950/[0.03] rounded-lg">
+            <img *ngIf="isImageAttachment(attachment)" [src]="attachmentSrc(attachment)" class="w-10 h-10 rounded object-cover flex-shrink-0">
+            <span *ngIf="!isImageAttachment(attachment)" class="w-10 h-10 rounded bg-ink-950/10 flex items-center justify-center flex-shrink-0 text-lg">📎</span>
+            <a [href]="attachmentSrc(attachment)" target="_blank" class="text-sm text-ink-950/70 truncate hover:text-signal transition-colors flex-1">
+              {{ attachment.name || attachment.url }}
+            </a>
+          </div>
+          <p *ngIf="loadingAttachments" class="text-xs text-ink-950/30">Cargando adjuntos…</p>
+        </div>
+
+        <div class="flex items-center gap-2 mb-6">
+          <input type="file" (change)="onFileSelected($event)" [disabled]="uploadingFile" class="hidden" #fileInput>
+          <button (click)="fileInput.click()" [disabled]="uploadingFile"
+                  class="px-3 py-1.5 bg-ink-950/[0.05] hover:bg-ink-950/10 text-ink-950/70 text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
+            {{ uploadingFile ? 'Subiendo…' : '📎 Subir archivo' }}
+          </button>
+          <input [(ngModel)]="newAttachmentUrl" (keyup.enter)="addAttachmentUrl()"
+                 placeholder="o pega un enlace…"
+                 class="flex-1 text-xs outline-none border border-ink-950/10 rounded-lg px-2.5 py-1.5 placeholder:text-ink-950/30">
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-2 pb-4">
+          <a *ngIf="selectedCard.shortUrl" [href]="selectedCard.shortUrl" target="_blank"
+             class="text-xs text-ink-950/30 hover:text-signal transition-colors">Ver en Trello ↗</a>
+          <div class="flex-1"></div>
+          <button
+            (click)="saveCard()"
+            [disabled]="savingCard"
+            class="px-4 py-2 bg-signal text-white text-sm font-medium rounded-lg hover:bg-signal/90 disabled:opacity-50 transition-colors">
+            {{ savingCard ? 'Guardando…' : 'Guardar cambios' }}
+          </button>
+          <button
+            (click)="archiveCard(selectedCard)"
+            class="px-4 py-2 text-ink-950/50 hover:text-red-500 text-sm font-medium transition-colors">
+            Archivar
+          </button>
+        </div>
       </div>
     </div>
   </div>

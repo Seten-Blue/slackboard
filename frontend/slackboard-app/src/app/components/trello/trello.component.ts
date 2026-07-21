@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { TrelloService } from '../../services/trello.service';
 
 interface TrelloBoard {
@@ -26,9 +26,23 @@ interface TrelloCard {
   labels: any[];
   closed: boolean;
   badges?: any;
+  cover?: any;
+  members?: any[];
+  idMembers?: string[];
+  shortUrl?: string;
+  checklists?: any[];
 }
 
-// Paleta aproximada de los colores de etiqueta de Trello
+type BoardBackground = 'particles' | 'aurora' | 'nebula' | 'midnight';
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  r: number;
+}
+
 const TRELLO_LABEL_COLORS: Record<string, string> = {
   green: '#4BCE97',
   yellow: '#F5CD47',
@@ -43,17 +57,27 @@ const TRELLO_LABEL_COLORS: Record<string, string> = {
   null: '#DFE1E6',
 };
 
+const BACKGROUND_OPTIONS: { id: BoardBackground; label: string }[] = [
+  { id: 'particles', label: 'Partículas' },
+  { id: 'aurora', label: 'Aurora' },
+  { id: 'nebula', label: 'Nebulosa' },
+  { id: 'midnight', label: 'Medianoche' },
+];
+
 @Component({
   selector: 'app-trello',
   templateUrl: './trello.component.html',
   styleUrls: ['./trello.component.scss']
 })
-export class TrelloComponent implements OnInit {
+export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('particleCanvas') particleCanvasRef?: ElementRef<HTMLCanvasElement>;
+
   boards: TrelloBoard[] = [];
   selectedBoard: TrelloBoard | null = null;
   lists: TrelloList[] = [];
   cards: TrelloCard[] = [];
   boardLabels: any[] = [];
+  boardMembers: any[] = [];
 
   loadingBoards = true;
   loadingBoard = false;
@@ -80,10 +104,28 @@ export class TrelloComponent implements OnInit {
 
   private draggedCard: TrelloCard | null = null;
 
+  // ============ FONDO DEL TABLERO ============
+  backgroundOptions = BACKGROUND_OPTIONS;
+  showBackgroundPicker = false;
+  currentBackground: BoardBackground = 'particles';
+
+  private particles: Particle[] = [];
+  private animationFrameId: number | null = null;
+  private resizeListener = () => this.resizeCanvas();
+
   constructor(private trelloService: TrelloService) {}
 
   ngOnInit() {
     this.loadBoards();
+  }
+
+  ngAfterViewInit(): void {
+    window.addEventListener('resize', this.resizeListener);
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('resize', this.resizeListener);
+    this.stopParticles();
   }
 
   loadBoards() {
@@ -107,6 +149,7 @@ export class TrelloComponent implements OnInit {
     this.selectedBoard = board;
     this.showBoardPicker = false;
     this.loadBoardContents();
+    this.loadBoardBackground();
   }
 
   loadBoardContents() {
@@ -115,11 +158,13 @@ export class TrelloComponent implements OnInit {
     this.lists = [];
     this.cards = [];
     this.boardLabels = [];
+    this.boardMembers = [];
 
     this.trelloService.getBoardContents(this.selectedBoard.id).subscribe({
       next: (response) => {
         this.lists = (response.data.lists || []).sort((a: TrelloList, b: TrelloList) => a.pos - b.pos);
         this.cards = (response.data.cards || []).filter((c: TrelloCard) => !c.closed);
+        this.boardMembers = response.data.members || [];
         this.loadingBoard = false;
       },
       error: (error) => {
@@ -146,6 +191,114 @@ export class TrelloComponent implements OnInit {
 
   labelColor(colorName: string | null): string {
     return TRELLO_LABEL_COLORS[colorName || 'null'] || TRELLO_LABEL_COLORS['null'];
+  }
+
+  // ---------- Due date helpers ----------
+
+  dueLabel(due: string | null, complete: boolean): string {
+    if (!due || complete) return '';
+    const now = new Date();
+    const dueDate = new Date(due);
+    const diffMs = dueDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return `Vencida hace ${Math.abs(diffDays)}d`;
+    if (diffDays === 0) return 'Vence hoy';
+    if (diffDays === 1) return 'Vence manana';
+    return `Vence en ${diffDays}d`;
+  }
+
+  dueUrgency(due: string | null, complete: boolean): 'overdue' | 'soon' | 'ok' | '' {
+    if (!due || complete) return '';
+    const now = new Date();
+    const dueDate = new Date(due);
+    const diffMs = dueDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'overdue';
+    if (diffDays <= 2) return 'soon';
+    return 'ok';
+  }
+
+  // ---------- Checklist helpers ----------
+
+  checklistStats(card: TrelloCard): { total: number; checked: number } | null {
+    const checklists = card.checklists;
+    if (!checklists || checklists.length === 0) return null;
+    let total = 0;
+    let checked = 0;
+    for (const cl of checklists) {
+      for (const item of (cl.checkItems || [])) {
+        total++;
+        if (item.state === 'complete') checked++;
+      }
+    }
+    return total > 0 ? { total, checked } : null;
+  }
+
+  // ---------- Member helpers ----------
+
+  cardMembers(card: TrelloCard): any[] {
+    if (!card.members || card.members.length === 0) return [];
+    return card.members;
+  }
+
+  memberAvatarUrl(member: any): string {
+    if (!member.avatarHash) return '';
+    return `https://trello.com/1/thumb/${member.avatarHash}/30.png`;
+  }
+
+  memberInitials(member: any): string {
+    const name = member.fullName || member.username || '?';
+    return name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase();
+  }
+
+  // ---------- Cover helpers ----------
+
+  coverImageUrl(card: TrelloCard): string | null {
+    if (!card.cover) return null;
+    if (card.cover.url) return card.cover.url;
+    if (card.cover.scaled) {
+      const scaled = card.cover.scaled.find((s: any) => s.width >= 200) || card.cover.scaled[0];
+      return scaled?.url || null;
+    }
+    return null;
+  }
+
+  coverColor(card: TrelloCard): string | null {
+    if (!card.cover) return null;
+    return card.cover.color || null;
+  }
+
+  // ---------- Description preview ----------
+
+  hasDescription(card: TrelloCard): boolean {
+    return !!(card.desc && card.desc.trim().length > 0);
+  }
+
+  // ---------- List name ----------
+
+  getListName(listId: string): string {
+    const list = this.lists.find(l => l.id === listId);
+    return list?.name || '';
+  }
+
+  // ---------- Checklist toggle ----------
+
+  toggleCheckItem(card: TrelloCard, checklistId: string, itemId: string, currentState: string) {
+    const newState = currentState === 'complete' ? 'incomplete' : 'complete';
+    this.trelloService.updateCheckItem(card.id, checklistId, itemId, newState).subscribe({
+      next: () => {
+        const cl = card.checklists?.find((c: any) => c.id === checklistId);
+        const item = cl?.checkItems?.find((i: any) => i.id === itemId);
+        if (item) item.state = newState;
+      },
+      error: (error) => {
+        console.error('Error actualizando checklist:', error);
+      }
+    });
+  }
+
+  checkedCount(cl: any): number {
+    return (cl.checkItems || []).filter((i: any) => i.state === 'complete').length;
   }
 
   // ---------- Tarjetas ----------
@@ -221,7 +374,7 @@ export class TrelloComponent implements OnInit {
   }
 
   archiveCard(card: TrelloCard) {
-    if (!confirm(`?Archivar la tarjeta "${card.name}"?`)) return;
+    if (!confirm(`¿Archivar la tarjeta "${card.name}"?`)) return;
 
     this.trelloService.archiveCard(card.id).subscribe({
       next: () => {
@@ -317,8 +470,23 @@ export class TrelloComponent implements OnInit {
     });
   }
 
+  // ← FIX: ahora también revisa mimeType (más confiable que solo la extensión)
   isImageAttachment(attachment: any): boolean {
-    return /\.(png|jpe?g|gif|webp|svg)$/i.test(attachment.url || '');
+    if (attachment.mimeType?.startsWith('image/')) return true;
+    return /\.(png|jpe?g|gif|webp|svg)$/i.test(attachment.url || attachment.name || '');
+  }
+
+  // ← NUEVO: URL segura para <img src> — adjuntos subidos van por nuestro
+  // proxy autenticado; adjuntos tipo "link externo" se muestran directo.
+  attachmentSrc(attachment: any): string {
+    if (this.selectedCard && (attachment.isUpload || this.isTrelloHosted(attachment.url))) {
+      return this.trelloService.getAttachmentViewUrl(this.selectedCard.id, attachment.id);
+    }
+    return attachment.url;
+  }
+
+  private isTrelloHosted(url: string): boolean {
+    return !!url && /trello\.com/i.test(url);
   }
 
   // ---------- Listas ----------
@@ -350,7 +518,7 @@ export class TrelloComponent implements OnInit {
   }
 
   archiveList(list: TrelloList) {
-    if (!confirm(`?Archivar la lista "${list.name}" y todas sus tarjetas?`)) return;
+    if (!confirm(`¿Archivar la lista "${list.name}" y todas sus tarjetas?`)) return;
 
     this.trelloService.archiveList(list.id).subscribe({
       next: () => {
@@ -396,5 +564,120 @@ export class TrelloComponent implements OnInit {
         alert(error?.error?.message || 'No fue posible mover la tarjeta.');
       }
     });
+  }
+
+  // ---------- Fondo del tablero ----------
+
+  private storageKey(boardId: string): string {
+    return `trello-bg-${boardId}`;
+  }
+
+  private loadBoardBackground(): void {
+    this.stopParticles();
+    if (!this.selectedBoard) return;
+
+    const stored = localStorage.getItem(this.storageKey(this.selectedBoard.id)) as BoardBackground | null;
+    this.currentBackground = stored || 'particles';
+
+    if (this.currentBackground === 'particles') {
+      // el canvas todavía no existe en el DOM hasta el próximo ciclo de detección
+      setTimeout(() => this.startParticles(), 0);
+    }
+  }
+
+  toggleBackgroundPicker(): void {
+    this.showBackgroundPicker = !this.showBackgroundPicker;
+  }
+
+  selectBackground(bg: BoardBackground): void {
+    this.currentBackground = bg;
+    this.showBackgroundPicker = false;
+
+    if (this.selectedBoard) {
+      localStorage.setItem(this.storageKey(this.selectedBoard.id), bg);
+    }
+
+    if (bg === 'particles') {
+      setTimeout(() => this.startParticles(), 0);
+    } else {
+      this.stopParticles();
+    }
+  }
+
+  private resizeCanvas(): void {
+    const canvas = this.particleCanvasRef?.nativeElement;
+    if (!canvas) return;
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
+
+  private startParticles(): void {
+    const canvas = this.particleCanvasRef?.nativeElement;
+    if (!canvas) return;
+
+    this.stopParticles();
+    this.resizeCanvas();
+
+    const count = 55;
+    this.particles = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      r: Math.random() * 1.6 + 0.6,
+    }));
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const linkDistance = 130;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const p of this.particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(139, 124, 246, 0.85)';
+        ctx.fill();
+      }
+
+      for (let i = 0; i < this.particles.length; i++) {
+        for (let j = i + 1; j < this.particles.length; j++) {
+          const a = this.particles[i];
+          const b = this.particles[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < linkDistance) {
+            const opacity = 1 - dist / linkDistance;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = `rgba(76, 63, 201, ${opacity * 0.4})`;
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+      }
+
+      this.animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+  }
+
+  private stopParticles(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
   }
 }

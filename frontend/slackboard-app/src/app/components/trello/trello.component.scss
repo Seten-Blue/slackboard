@@ -14,3 +14,8 @@ div::-webkit-scrollbar-thumb {
   background: rgba(20, 17, 42, 0.12);
   border-radius: 999px;
 }
+
+:host {
+  display: block;
+  height: 100%;
+}
