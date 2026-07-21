@@ -233,14 +233,15 @@
     </div>
   </div>
 
-  <!-- Panel lateral de edicion de tarjeta -->
-  <div *ngIf="selectedCard" class="fixed inset-0 z-30 flex justify-end" (click)="closeCardPanel()">
-    <div class="absolute inset-0 bg-ink-950/40"></div>
-    <div class="relative w-full max-w-2xl h-full bg-[#f4f5f7] shadow-2xl overflow-y-auto" (click)="$event.stopPropagation()">
+  <!-- Panel de edicion de tarjeta (centrado) -->
+  <div *ngIf="selectedCard" class="fixed inset-0 z-30 flex items-center justify-center p-4 md:p-8" (click)="closeCardPanel()">
+    <div class="absolute inset-0 bg-ink-950/50"></div>
+    <div class="relative w-full max-w-3xl max-h-[90vh] bg-[#f4f5f7] rounded-xl shadow-2xl overflow-y-auto" (click)="$event.stopPropagation()">
 
       <!-- Cover -->
-      <div *ngIf="coverImageUrl(selectedCard)" class="relative bg-ink-950/5">
-        <img [src]="coverImageUrl(selectedCard)" class="w-full h-48 object-cover" alt="">
+      <div *ngIf="coverImageUrl(selectedCard)" class="relative">
+        <img [src]="coverImageUrl(selectedCard)" class="w-full h-52 object-cover rounded-t-xl cursor-pointer"
+             (click)="openLightbox(coverImageUrl(selectedCard), $event)" alt="">
         <button (click)="closeCardPanel()" class="absolute top-3 right-3 bg-ink-950/50 hover:bg-ink-950/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-lg">×</button>
         <button (click)="removeCover()"
                 class="absolute bottom-3 right-3 bg-white/90 hover:bg-white text-ink-950/70 text-xs font-medium px-3 py-1.5 rounded-lg shadow transition-colors">
@@ -248,12 +249,17 @@
         </button>
       </div>
 
-      <div class="flex">
+      <div *ngIf="!coverImageUrl(selectedCard)" class="relative">
+        <button (click)="closeCardPanel()" class="absolute top-3 right-3 text-ink-950/40 hover:text-ink-950/70 text-2xl leading-none z-10">×</button>
+      </div>
+
+      <div class="flex min-h-0">
         <!-- Main column -->
-        <div class="flex-1 p-6 pb-20 min-w-0">
+        <div class="flex-1 p-6 min-w-0">
           <!-- Title -->
           <input
             [(ngModel)]="editedCardName"
+            (blur)="autoSaveName()"
             class="w-full text-xl font-display font-semibold text-ink-950 outline-none bg-transparent border-b border-transparent focus:border-signal/50 pb-1 mb-1">
 
           <!-- In list -->
@@ -273,16 +279,35 @@
             </div>
           </div>
 
+          <!-- Members -->
+          <div *ngIf="cardMembers(selectedCard).length > 0" class="mb-5">
+            <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 block">Miembros</label>
+            <div class="flex flex-wrap gap-2">
+              <div *ngFor="let member of cardMembers(selectedCard)"
+                   class="flex items-center gap-1.5 px-2 py-1 bg-white rounded-full border border-ink-950/10">
+                <div class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
+                     [style.background]="memberAvatarUrl(member) ? '' : '#6366f1'">
+                  <img *ngIf="memberAvatarUrl(member)" [src]="memberAvatarUrl(member)" class="w-full h-full object-cover" alt="">
+                  <span *ngIf="!memberAvatarUrl(member)">{{ memberInitials(member) }}</span>
+                </div>
+                <span class="text-xs text-ink-950/70">{{ member.fullName || member.username }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Due date -->
           <div *ngIf="selectedCard.due" class="mb-5">
             <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 block">Fechas</label>
             <div class="flex items-center gap-3 flex-wrap">
               <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-ink-950/10">
                 <input type="date" [(ngModel)]="editedCardDue"
+                       (change)="autoSaveDue()"
                        class="text-sm text-ink-950/80 outline-none">
               </div>
               <label class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-ink-950/10 cursor-pointer">
-                <input type="checkbox" [(ngModel)]="editedCardDueComplete" class="accent-green-600 w-3.5 h-3.5">
+                <input type="checkbox" [(ngModel)]="editedCardDueComplete"
+                       (change)="autoSaveDueComplete()"
+                       class="accent-green-600 w-3.5 h-3.5">
                 <span class="text-sm text-ink-950/70">Cumplida</span>
               </label>
               <span *ngIf="dueLabel(selectedCard.due, selectedCard.dueComplete)"
@@ -336,7 +361,7 @@
                 rows="4"
                 placeholder="Anadir una descripcion mas detallada..."
                 class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg p-3 resize-none focus:border-signal/50 transition-colors bg-white"
-                (blur)="editingDesc = false"></textarea>
+                (blur)="editingDesc = false; autoSaveDesc()"></textarea>
             </div>
           </div>
 
@@ -344,12 +369,16 @@
           <div *ngIf="selectedCardAttachments.length > 0 || loadingAttachments" class="mb-5">
             <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 block">Adjuntos</label>
             <div class="space-y-2">
-              <div *ngFor="let attachment of selectedCardAttachments" class="flex items-center gap-3 p-2 bg-white rounded-lg border border-ink-950/10">
-                <img *ngIf="isImageAttachment(attachment)" [src]="attachmentSrc(attachment)" class="w-12 h-12 rounded object-cover flex-shrink-0">
+              <div *ngFor="let attachment of selectedCardAttachments"
+                   class="flex items-center gap-3 p-2 bg-white rounded-lg border border-ink-950/10 cursor-pointer hover:shadow-sm transition-shadow"
+                   (click)="isImageAttachment(attachment) && openLightbox(attachmentSrc(attachment), $event)">
+                <img *ngIf="isImageAttachment(attachment)" [src]="attachmentSrc(attachment)"
+                     class="w-16 h-16 rounded object-cover flex-shrink-0" alt="">
                 <span *ngIf="!isImageAttachment(attachment)" class="w-12 h-12 rounded bg-ink-950/5 flex items-center justify-center flex-shrink-0 text-xl">📎</span>
-                <a [href]="attachmentSrc(attachment)" target="_blank" class="text-sm text-ink-950/70 truncate hover:text-signal transition-colors flex-1">
-                  {{ attachment.name || attachment.url }}
-                </a>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-ink-950/70 truncate">{{ attachment.name || 'Sin nombre' }}</p>
+                  <p *ngIf="isImageAttachment(attachment)" class="text-[11px] text-ink-950/30 mt-0.5">Click para ver</p>
+                </div>
               </div>
             </div>
             <p *ngIf="loadingAttachments" class="text-xs text-ink-950/30 mt-2">Cargando adjuntos...</p>
@@ -391,8 +420,14 @@
                     <span *ngIf="actionDescription(action)"> {{ actionDescription(action) }}</span>
                     <span *ngIf="action.type === 'commentCard'"> comento:</span>
                   </div>
+                  <!-- Comment content -->
                   <div *ngIf="action.type === 'commentCard'" class="mt-1 text-sm text-ink-950/80 bg-white rounded-lg px-3 py-2 border border-ink-950/10">
-                    {{ commentText(action) }}
+                    <!-- If comment is an image URL -->
+                    <img *ngIf="commentHasImages(action)" [src]="commentImageUrl(action)"
+                         class="max-w-xs max-h-48 rounded cursor-pointer hover:shadow-md transition-shadow"
+                         (click)="openLightbox(commentImageUrl(action), $event)" alt="">
+                    <!-- Otherwise show text -->
+                    <span *ngIf="!commentHasImages(action)">{{ commentText(action) }}</span>
                   </div>
                   <p class="text-[11px] text-ink-950/30 mt-0.5">{{ timeAgo(action.date) }}</p>
                 </div>
@@ -402,7 +437,7 @@
         </div>
 
         <!-- Right sidebar: Actions -->
-        <div class="w-48 flex-shrink-0 border-l border-ink-950/10 bg-[#f0f1f4] p-3 hidden md:block">
+        <div class="w-48 flex-shrink-0 border-l border-ink-950/10 bg-[#f0f1f4] p-3 hidden md:block rounded-r-xl">
           <p class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold mb-2 px-1">Acciones</p>
 
           <button *ngIf="selectedCard.due"
@@ -413,14 +448,9 @@
             {{ selectedCard.dueComplete ? 'Hecho' : 'Marcar hecha' }}
           </button>
 
-          <button *ngIf="!coverImageUrl(selectedCard)"
-                  (click)="removeCover()"
-                  class="w-full text-left px-3 py-2 text-sm text-ink-950/70 bg-white hover:bg-ink-950/5 rounded-lg mb-1.5 flex items-center gap-2 border border-ink-950/10 transition-colors opacity-0 pointer-events-none">
-          </button>
-
           <button (click)="saveCard()" [disabled]="savingCard"
                   class="w-full text-left px-3 py-2 text-sm text-ink-950/70 bg-white hover:bg-ink-950/5 rounded-lg mb-1.5 flex items-center gap-2 border border-ink-950/10 transition-colors disabled:opacity-50">
-            <span>💾</span> {{ savingCard ? 'Guardando...' : 'Guardar' }}
+            <span>💾</span> Guardar
           </button>
 
           <div class="border-t border-ink-950/10 my-3"></div>
@@ -437,5 +467,11 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div *ngIf="lightboxUrl" class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80" (click)="closeLightbox()">
+    <button class="absolute top-4 right-4 text-white/70 hover:text-white text-3xl leading-none z-10">×</button>
+    <img [src]="lightboxUrl" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" (click)="$event.stopPropagation()" alt="">
   </div>
 </div>

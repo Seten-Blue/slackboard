@@ -384,6 +384,80 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  // ---------- Auto-save helpers ----------
+
+  autoSaveName() {
+    if (!this.selectedCard) return;
+    const name = this.editedCardName.trim();
+    if (!name || name === this.selectedCard.name) return;
+    this.trelloService.updateCard(this.selectedCard.id, { name }).subscribe({
+      next: (response) => {
+        const index = this.cards.findIndex(c => c.id === this.selectedCard!.id);
+        if (index !== -1) this.cards[index].name = name;
+        if (this.selectedCard) this.selectedCard.name = name;
+      }
+    });
+  }
+
+  autoSaveDesc() {
+    if (!this.selectedCard) return;
+    const desc = this.editedCardDesc;
+    if (desc === (this.selectedCard.desc || '')) return;
+    this.trelloService.updateCard(this.selectedCard.id, { desc }).subscribe({
+      next: (response) => {
+        if (this.selectedCard) this.selectedCard.desc = desc;
+        const index = this.cards.findIndex(c => c.id === this.selectedCard!.id);
+        if (index !== -1) this.cards[index].desc = desc;
+      }
+    });
+  }
+
+  autoSaveDue() {
+    if (!this.selectedCard) return;
+    const due = this.editedCardDue ? this.editedCardDue : null;
+    if (due === (this.selectedCard.due ? this.selectedCard.due.substring(0, 10) : null)) return;
+    this.trelloService.updateCard(this.selectedCard.id, { due }).subscribe({
+      next: (response) => {
+        if (this.selectedCard) this.selectedCard.due = response.data.due;
+      }
+    });
+  }
+
+  autoSaveDueComplete() {
+    if (!this.selectedCard) return;
+    const dueComplete = this.editedCardDueComplete;
+    if (dueComplete === this.selectedCard.dueComplete) return;
+    this.trelloService.updateCard(this.selectedCard.id, { dueComplete }).subscribe({
+      next: (response) => {
+        if (this.selectedCard) this.selectedCard.dueComplete = dueComplete;
+        const index = this.cards.findIndex(c => c.id === this.selectedCard!.id);
+        if (index !== -1) this.cards[index].dueComplete = dueComplete;
+      }
+    });
+  }
+
+  // ---------- Lightbox ----------
+
+  openLightbox(url: string | null, event: Event) {
+    event.stopPropagation();
+    if (url) this.lightboxUrl = url;
+  }
+
+  closeLightbox() {
+    this.lightboxUrl = null;
+  }
+
+  // ---------- Comment image parsing ----------
+
+  commentHasImages(action: any): boolean {
+    const text = action?.data?.text || '';
+    return /\.(png|jpe?g|gif|webp|svg)(\?[^)]*)?$/i.test(text.trim());
+  }
+
+  commentImageUrl(action: any): string {
+    return (action?.data?.text || '').trim();
+  }
+
   archiveCard(card: TrelloCard) {
     if (!confirm(`¿Archivar la tarjeta "${card.name}"?`)) return;
 
