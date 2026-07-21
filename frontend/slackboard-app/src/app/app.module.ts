@@ -20,6 +20,7 @@ import { ResetPasswordComponent } from './components/reset-password/reset-passwo
 import { DiscordLinkModalComponent } from './components/discord-link-modal/discord-link-modal.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { SlackLinkModalComponent } from './components/slack-link-modal/slack-link-modal.component';
+import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
 
 @NgModule({
   declarations: [
@@ -35,7 +36,8 @@ import { SlackLinkModalComponent } from './components/slack-link-modal/slack-lin
     ForgotPasswordComponent,
     ResetPasswordComponent,
     DiscordLinkModalComponent,
-    SlackLinkModalComponent
+    SlackLinkModalComponent,
+    ProfileSettingsComponent
   ],
   imports: [
     BrowserModule,

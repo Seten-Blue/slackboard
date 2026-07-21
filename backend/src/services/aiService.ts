@@ -15,10 +15,10 @@ const SLASH_REGEX = /^\/zork\s+([\s\S]+)/i;
 const MENTION_REGEX = /@zork\b/i;
 
 const SWITCH_LINES = [
-  'Se me acabaron los pensamientos de ese modelo, así que salté a otro nivel de la cabeza.',
-  'Cambié de canal mental por un rato, ahora corro con otro cerebro.',
-  'Se agotó ese modo de pensar por hoy, probando un nivel distinto.',
-  'Reacomodé mis circuitos y salté a otro modelo para seguir charlando.',
+  'Se me acabaron los pensamientos de ese modelo, asi que salte a otro nivel de la cabeza.',
+  'Cambie de canal mental por un rato, ahora corro con otro cerebro.',
+  'Se agoto ese modo de pensar por hoy, probando un nivel distinto.',
+  'Reacomode mis circuitos y salte a otro modelo para seguir charlando.',
 ];
 
 let cachedAIUserId: string | null = null;
@@ -157,7 +157,7 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
   } else {
     const rawQuestion = extractQuestion(text);
     if (rawQuestion === null) return;
-    finalQuestion = rawQuestion.length > 0 ? rawQuestion : '¿En qué te puedo ayudar?';
+    finalQuestion = rawQuestion.length > 0 ? rawQuestion : '?En que te puedo ayudar?';
   }
 
   try {
@@ -180,12 +180,12 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
       }
     }
   } catch (error: any) {
-    console.error('❌ Error en la integración de IA:', error.message);
+    console.error('❌ Error en la integracion de IA:', error.message);
 
     const isQuotaError = error instanceof QuotaExceededError;
     const friendlyMessage = isQuotaError
-      ? 'Uy, hoy ya usé todas mis consultas gratis en todos los modelos que tengo disponibles. Probá de nuevo más tarde, o si sos vos Juan, ya sabés qué hacer con la facturación 😅'
-      : 'Uy, se me trabó algo por un segundo. Probá de nuevo en un rato.';
+      ? 'Uy, hoy ya use todas mis consultas gratis en todos los modelos que tengo disponibles. Proba de nuevo mas tarde, o si sos vos Juan, ya sabes que hacer con la facturacion 😅'
+      : 'Uy, se me trabo algo por un segundo. Proba de nuevo en un rato.';
 
     try {
       await emitAIMessage(friendlyMessage, channel, aiUserId, io);

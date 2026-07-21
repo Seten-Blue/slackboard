@@ -9,7 +9,7 @@ async function run() {
   const newPassword = process.argv[3];
 
   if (!email || !newPassword) {
-    console.error('Uso: node dist/scripts/resetAdminPassword.js <email> <nuevaContraseña>');
+    console.error('Uso: node dist/scripts/resetAdminPassword.js <email> <nuevaContrasena>');
     process.exit(1);
   }
 
@@ -17,14 +17,14 @@ async function run() {
 
   const user: any = await User.findOne({ email });
   if (!user) {
-    console.error(`❌ No se encontró ningún usuario con email ${email}`);
+    console.error(`❌ No se encontro ningun usuario con email ${email}`);
     process.exit(1);
   }
 
-  user.password = newPassword; // el pre-save hook del modelo lo hashea automáticamente
+  user.password = newPassword; // el pre-save hook del modelo lo hashea automaticamente
   await user.save();
 
-  console.log(`✅ Contraseña actualizada para ${email}. Ya puedes iniciar sesión con la nueva contraseña.`);
+  console.log(`✅ Contrasena actualizada para ${email}. Ya puedes iniciar sesion con la nueva contrasena.`);
   await mongoose.disconnect();
   process.exit(0);
 }

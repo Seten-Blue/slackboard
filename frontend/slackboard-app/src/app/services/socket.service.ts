@@ -71,7 +71,7 @@ export class SocketService {
     });
   }
 
-  // ← NUEVO: se agrega/quita una reacción desde la plataforma externa
+  // ← NUEVO: se agrega/quita una reaccion desde la plataforma externa
   onMessageReaction(): Observable<any> {
     return new Observable(observer => {
       if (this.socket) {

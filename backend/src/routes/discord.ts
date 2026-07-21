@@ -14,15 +14,15 @@ import {
 const router = express.Router();
 
 
-// Estado de la integración
+// Estado de la integracion
 router.get('/status', (req: Request, res: Response) => {
   const configured = discordservice.isConfigured();
   res.json({
     success: true,
     configured,
     message: configured
-      ? 'Discord está configurado y funcionando'
-      : 'Discord no está configurado (o el bot todavía no terminó de conectar). Verifica DISCORD_BOT_TOKEN.',
+      ? 'Discord esta configurado y funcionando'
+      : 'Discord no esta configurado (o el bot todavia no termino de conectar). Verifica DISCORD_BOT_TOKEN.',
   });
 });
 
@@ -46,9 +46,9 @@ router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Respons
 });
 
 // Enviar mensaje desde SlackBoard hacia Discord
-// Nota: a diferencia de Slack (que recibía channelName), aquí se manda el
+// Nota: a diferencia de Slack (que recibia channelName), aqui se manda el
 // _id interno del Channel de SlackBoard, porque los nombres de canal de
-// Discord no son únicos entre servidores.
+// Discord no son unicos entre servidores.
 router.post('/send-message', async (req: Request, res: Response) => {
   try {
     const { channelId, text } = req.body;
@@ -76,10 +76,10 @@ router.post('/send-message', async (req: Request, res: Response) => {
   }
 });
 
-// ===== OAuth por usuario (vinculación real de cuenta) =====
+// ===== OAuth por usuario (vinculacion real de cuenta) =====
 router.get('/oauth/status', requireAuth, getOAuthStatus);
 router.get('/oauth/start', requireAuth, startOAuth);
-router.get('/oauth/callback', oauthCallback); // público: Discord redirige acá sin nuestro header Authorization
+router.get('/oauth/callback', oauthCallback); // publico: Discord redirige aca sin nuestro header Authorization
 router.get('/oauth/my-guilds', requireAuth, getMyGuilds);
 router.post('/oauth/sync-guild', requireAuth, syncMyGuild);
 router.post('/oauth/unlink', requireAuth, unlinkDiscord);

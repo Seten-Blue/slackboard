@@ -27,7 +27,7 @@ const upload = multer({
 
 router.post('/', requireAuth, upload.single('file'), (req: Request, res: Response) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No se recibió ningún archivo' });
+    return res.status(400).json({ success: false, message: 'No se recibio ningun archivo' });
   }
 
   const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';

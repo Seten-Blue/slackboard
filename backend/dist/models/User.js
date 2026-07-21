@@ -32,20 +32,23 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const UserSchema = new mongoose_1.Schema({
     email: {
         type: String,
         required: true,
         unique: true,
-        lowercase: true,
         trim: true,
+        lowercase: true,
     },
     username: {
         type: String,
         required: true,
-        unique: true,
         trim: true,
     },
     password: {
@@ -54,7 +57,7 @@ const UserSchema = new mongoose_1.Schema({
     },
     avatar: {
         type: String,
-        default: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default',
+        default: null,
     },
     status: {
         type: String,
@@ -66,7 +69,45 @@ const UserSchema = new mongoose_1.Schema({
         enum: ['admin', 'user'],
         default: 'user',
     },
+    googleId: {
+        type: String,
+        default: null,
+        index: true,
+    },
+    discordUserId: { type: String, default: null, index: true },
+    discordUsername: { type: String, default: null },
+    discordAvatar: { type: String, default: null },
+    discordAccessToken: { type: String, default: null },
+    discordRefreshToken: { type: String, default: null },
+    discordTokenExpiresAt: { type: Date, default: null },
+    slackWorkspaces: [
+        {
+            teamId: { type: String, required: true },
+            teamName: { type: String, required: true },
+            botUserId: { type: String, required: true },
+            botAccessToken: { type: String, required: true },
+            connectedAt: { type: Date, default: Date.now },
+        },
+    ],
+    resetPasswordTokenHash: {
+        type: String,
+        default: null,
+    },
+    resetPasswordExpires: {
+        type: Date,
+        default: null,
+    },
 }, {
     timestamps: true,
 });
+UserSchema.pre('save', async function (next) {
+    const user = this;
+    if (!user.isModified('password'))
+        return next();
+    user.password = await bcryptjs_1.default.hash(user.password, 10);
+    next();
+});
+UserSchema.methods.comparePassword = async function (candidate) {
+    return bcryptjs_1.default.compare(candidate, this.password);
+};
 exports.default = mongoose_1.default.model('User', UserSchema);

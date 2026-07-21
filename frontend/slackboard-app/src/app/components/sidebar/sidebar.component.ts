@@ -51,8 +51,8 @@ export class SidebarComponent implements OnInit {
 
   dashboardSubItems: DashboardSubItem[] = [
     { id: 'activity', label: 'Actividad' },
-    { id: 'traffic', label: 'Tráfico' },
-    { id: 'stats', label: 'Estadísticas' }
+    { id: 'traffic', label: 'Trafico' },
+    { id: 'stats', label: 'Estadisticas' }
   ];
   activeDashboardItem = 'stats';
 
@@ -82,10 +82,10 @@ export class SidebarComponent implements OnInit {
   isSwitching = false;
   syncingPlatform = false;
   showLinkModal = false;
-  discordLinked: boolean | null = null; // null = todavía no se consultó
+  discordLinked: boolean | null = null; // null = todavia no se consulto
 
   showSlackModal = false;
-  slackLinked: boolean | null = null; // null = todavía no se consultó
+  slackLinked: boolean | null = null; // null = todavia no se consulto
   
 
   get selectedPlatform(): Platform {
@@ -102,6 +102,8 @@ export class SidebarComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.authService.refreshUser().subscribe();
+
     this.loadChannels();
 
     this.chatService.currentChannel$.subscribe(channel => {
@@ -204,7 +206,7 @@ export class SidebarComponent implements OnInit {
 
   // ← NUEVO: trae los canales reales desde Slack/Discord y refresca la lista
   syncCurrentPlatform(): void {
-    // Discord ya tiene vinculación real por usuario — abrimos la card en vez
+    // Discord ya tiene vinculacion real por usuario — abrimos la card en vez
     // del sync directo, que a su vez decide "conectar" o "listar servidores"
     if (this.selectedPlatform.id === 'discord') {
       this.showLinkModal = true;
@@ -224,8 +226,8 @@ export class SidebarComponent implements OnInit {
       return;
     }
 
-    // Las demás plataformas siguen con el sync directo del bot compartido
-    // hasta que armemos su OAuth también
+    // Las demas plataformas siguen con el sync directo del bot compartido
+    // hasta que armemos su OAuth tambien
     if (this.syncingPlatform) return;
     this.syncingPlatform = true;
 
@@ -252,9 +254,9 @@ export class SidebarComponent implements OnInit {
 
   /**
    * Filtra los canales por la plataforma seleccionada.
-   * Si el backend todavía no manda "platform" en ningún canal
+   * Si el backend todavia no manda "platform" en ningun canal
    * (retrocompatibilidad con datos viejos), se muestran todos
-   * para no dejar la lista vacía.
+   * para no dejar la lista vacia.
    */
   get filteredChannels() {
     const hasPlatformField = this.channels.some(c => c.platform);
@@ -275,7 +277,7 @@ export class SidebarComponent implements OnInit {
     return channel._id;
   }
 
-  // ============ CHAT (sin cambios de lógica) ============
+  // ============ CHAT (sin cambios de logica) ============
   loadChannels(): void {
     this.loading = true;
     this.chatService.getChannels().subscribe({
@@ -357,7 +359,7 @@ export class SidebarComponent implements OnInit {
   }
 
   deleteChannel(channel: any): void {
-    if (!confirm(`¿Abandonar el canal "${channel.name}"?`)) return;
+    if (!confirm(`?Abandonar el canal "${channel.name}"?`)) return;
 
     this.chatService.deleteChannel(channel._id).subscribe({
       next: () => {

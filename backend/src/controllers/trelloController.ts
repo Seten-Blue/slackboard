@@ -6,7 +6,7 @@ export const getBoards = async (req: Request, res: Response) => {
     if (!trelloService.isConfigured()) {
       return res.status(400).json({
         success: false,
-        message: 'Trello no está configurado. Verifica TRELLO_API_KEY y TRELLO_TOKEN en .env',
+        message: 'Trello no esta configurado. Verifica TRELLO_API_KEY y TRELLO_TOKEN en .env',
       });
     }
     const boards = await trelloService.getBoards();
@@ -170,7 +170,7 @@ export const uploadCardAttachment = async (req: Request, res: Response) => {
     const { cardId } = req.params;
     const file = (req as any).file;
     if (!file) {
-      return res.status(400).json({ success: false, message: 'No se recibió ningún archivo' });
+      return res.status(400).json({ success: false, message: 'No se recibio ningun archivo' });
     }
     const attachment = await trelloService.addAttachmentByFile(cardId, file.buffer, file.originalname, file.mimetype);
     res.status(201).json({ success: true, data: attachment });

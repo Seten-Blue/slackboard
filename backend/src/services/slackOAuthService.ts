@@ -13,6 +13,7 @@ const BOT_SCOPES = [
   'channels:join',
   'channels:manage',
   'chat:write',
+  'chat:write.customize',
   'groups:history',
   'groups:read',
   'groups:write',
@@ -42,7 +43,7 @@ class SlackOAuthService {
     
   }
 
-  // Trae los canales de UN workspace específico usando SU PROPIO token — no el global
+  // Trae los canales de UN workspace especifico usando SU PROPIO token — no el global
   async fetchWorkspaceChannels(botAccessToken: string): Promise<any[]> {
     const params = new URLSearchParams({
       types: 'public_channel,private_channel',
@@ -56,7 +57,7 @@ class SlackOAuthService {
 
     const data = await response.json();
     if (!data.ok) {
-      throw new Error(`Slack rechazó la solicitud de canales: ${data.error}`);
+      throw new Error(`Slack rechazo la solicitud de canales: ${data.error}`);
     }
 
     return data.channels || [];
@@ -87,7 +88,7 @@ class SlackOAuthService {
     const data = (await response.json()) as SlackOAuthResponse;
 
     if (!data.ok) {
-      throw new Error(`Slack rechazó el intercambio de código: ${data.error || 'error desconocido'}`);
+      throw new Error(`Slack rechazo el intercambio de codigo: ${data.error || 'error desconocido'}`);
     }
 
     return data;

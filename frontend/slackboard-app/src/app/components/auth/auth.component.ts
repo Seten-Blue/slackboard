@@ -15,6 +15,9 @@ export class AuthComponent implements AfterViewInit {
   email = '';
   username = '';
   password = '';
+  nombre = '';
+  apellido = '';
+  telefono = '';
   loading = false;
   errorMsg: string | null = null;
 
@@ -66,7 +69,7 @@ export class AuthComponent implements AfterViewInit {
 
   submit(): void {
     if (!this.email.trim() || !this.password.trim() || (this.mode === 'register' && !this.username.trim())) {
-      this.errorMsg = 'Completá todos los campos.';
+      this.errorMsg = 'Completa todos los campos.';
       return;
     }
 
@@ -75,7 +78,14 @@ export class AuthComponent implements AfterViewInit {
 
     const request$ = this.mode === 'login'
       ? this.authService.login(this.email.trim(), this.password)
-      : this.authService.register(this.email.trim(), this.username.trim(), this.password);
+      : this.authService.register(
+          this.email.trim(),
+          this.username.trim(),
+          this.password,
+          this.nombre.trim() || undefined,
+          this.apellido.trim() || undefined,
+          this.telefono.trim() || undefined
+        );
 
     request$.subscribe({
       next: () => {
@@ -84,7 +94,7 @@ export class AuthComponent implements AfterViewInit {
       },
       error: (err: any) => {
         this.loading = false;
-        this.errorMsg = err?.error?.message || 'Ocurrió un error. Intentá de nuevo.';
+        this.errorMsg = err?.error?.message || 'Ocurrio un error. Intenta de nuevo.';
       }
     });
   }

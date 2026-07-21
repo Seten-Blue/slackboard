@@ -221,7 +221,7 @@ export class TrelloComponent implements OnInit {
   }
 
   archiveCard(card: TrelloCard) {
-    if (!confirm(`¿Archivar la tarjeta "${card.name}"?`)) return;
+    if (!confirm(`?Archivar la tarjeta "${card.name}"?`)) return;
 
     this.trelloService.archiveCard(card.id).subscribe({
       next: () => {
@@ -350,7 +350,7 @@ export class TrelloComponent implements OnInit {
   }
 
   archiveList(list: TrelloList) {
-    if (!confirm(`¿Archivar la lista "${list.name}" y todas sus tarjetas?`)) return;
+    if (!confirm(`?Archivar la lista "${list.name}" y todas sus tarjetas?`)) return;
 
     this.trelloService.archiveList(list.id).subscribe({
       next: () => {

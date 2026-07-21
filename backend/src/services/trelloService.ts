@@ -9,7 +9,7 @@ class TrelloService {
     this.token = (process.env.TRELLO_TOKEN || '').trim();
 
     if (!this.key || !this.token) {
-      console.warn('⚠️  TRELLO_API_KEY o TRELLO_TOKEN no configurados. La integración con Trello no funcionará.');
+      console.warn('⚠️  TRELLO_API_KEY o TRELLO_TOKEN no configurados. La integracion con Trello no funcionara.');
     } else {
       console.log('✅ Trello configurado');
     }
@@ -69,7 +69,7 @@ class TrelloService {
   // ---------- Tarjetas ----------
 
   async getCardsByBoard(boardId: string): Promise<any[]> {
-    // ← CAMBIO: se agregó 'badges' para traer contador de adjuntos/comentarios/checklist sin llamadas extra
+    // ← CAMBIO: se agrego 'badges' para traer contador de adjuntos/comentarios/checklist sin llamadas extra
     return this.request(`/boards/${boardId}/cards?fields=id,name,desc,idList,pos,due,dueComplete,labels,closed,badges`);
   }
 
@@ -82,7 +82,7 @@ class TrelloService {
     return this.request(`/cards?${params.toString()}`, { method: 'POST' });
   }
 
-  // ← CAMBIO: ahora acepta también due y dueComplete
+  // ← CAMBIO: ahora acepta tambien due y dueComplete
   async updateCard(cardId: string, data: { name?: string; desc?: string; due?: string | null; dueComplete?: boolean }): Promise<any> {
     const params = new URLSearchParams();
     if (data.name !== undefined) params.set('name', data.name);

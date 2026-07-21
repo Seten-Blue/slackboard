@@ -3,14 +3,14 @@ import Channel from '../models/Channel';
 import geminiService from '../services/geminiService';
 import { ensureAIChannel } from '../services/aiService';
 
-// Estado de la integración de IA
+// Estado de la integracion de IA
 export const getAIStatus = async (req: Request, res: Response) => {
   res.json({
     success: true,
     configured: geminiService.isConfigured(),
     message: geminiService.isConfigured()
-      ? 'Gemini está configurado y funcionando'
-      : 'Gemini no está configurado. Verifica GEMINI_API_KEY en .env',
+      ? 'Gemini esta configurado y funcionando'
+      : 'Gemini no esta configurado. Verifica GEMINI_API_KEY en .env',
   });
 };
 
@@ -45,7 +45,7 @@ export const toggleAIForChannel = async (req: Request, res: Response) => {
   }
 };
 
-// Fuerza la creación (o devuelve si ya existe) del canal dedicado a la IA
+// Fuerza la creacion (o devuelve si ya existe) del canal dedicado a la IA
 export const getOrCreateAIChannel = async (req: Request, res: Response) => {
   try {
     const channel = await ensureAIChannel();

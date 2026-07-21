@@ -8,7 +8,7 @@
       <div>
         <h2 class="font-display font-semibold text-lg text-ink-950">Zork</h2>
         <p class="text-sm text-ink-950/50">
-          Escribí <code class="font-mono text-xs bg-ink-950/5 px-1.5 py-0.5 rounded">@zork</code> en cualquier canal, o hablá directo acá
+          Escribi <code class="font-mono text-xs bg-ink-950/5 px-1.5 py-0.5 rounded">@zork</code> en cualquier canal, o habla directo aca
         </p>
       </div>
     </div>
@@ -24,7 +24,7 @@
     <div *ngIf="loading" class="flex justify-center items-center h-full">
       <div class="flex items-center gap-2 text-ink-950/40 text-sm">
         <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
-        Cargando conversación…
+        Cargando conversacion…
       </div>
     </div>
 
@@ -32,8 +32,8 @@
       <div class="w-14 h-14 rounded-2xl bg-signal/10 flex items-center justify-center mb-4">
         <span class="font-display font-bold text-signal text-xl">Z</span>
       </div>
-      <p class="font-display font-semibold text-ink-950 mb-1">Escribí algo para empezar</p>
-      <p class="text-sm text-ink-950/50">Zork está para ayudarte</p>
+      <p class="font-display font-semibold text-ink-950 mb-1">Escribi algo para empezar</p>
+      <p class="text-sm text-ink-950/50">Zork esta para ayudarte</p>
     </div>
 
     <div *ngFor="let msg of messages" class="flex items-end gap-2" [class.justify-end]="!isAIMessage(msg)">
@@ -80,6 +80,6 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
       </button>
     </div>
-    <div class="mt-2 text-xs text-ink-950/35">Enter para enviar · Shift+Enter para nueva línea</div>
+    <div class="mt-2 text-xs text-ink-950/35">Enter para enviar · Shift+Enter para nueva linea</div>
   </div>
 </div>

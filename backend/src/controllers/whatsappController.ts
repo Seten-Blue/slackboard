@@ -7,7 +7,7 @@ import Message from '../models/Message';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 
-// GET /api/whatsapp/webhook — verificación inicial que exige Meta al configurar
+// GET /api/whatsapp/webhook — verificacion inicial que exige Meta al configurar
 export const verifyWebhook = (req: Request, res: Response) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -44,7 +44,7 @@ async function resolveOrCreateWhatsAppChannel(phone: string, profileName?: strin
   channel = await Channel.create({
     name: `whatsapp-${phone}`,
     displayName: profileName ? `${profileName} (WhatsApp)` : phone,
-    description: 'Conversación de WhatsApp Business',
+    description: 'Conversacion de WhatsApp Business',
     isPrivate: true,
     platform: 'whatsapp',
     whatsappPhone: phone,
@@ -58,7 +58,7 @@ async function resolveOrCreateWhatsAppChannel(phone: string, profileName?: strin
 
 // POST /api/whatsapp/webhook — mensajes entrantes reales de clientes
 export const receiveWebhook = async (req: Request, res: Response) => {
-  // Responder rápido: Meta reintenta la entrega si no recibe 200 en pocos segundos
+  // Responder rapido: Meta reintenta la entrega si no recibe 200 en pocos segundos
   res.sendStatus(200);
 
   try {
@@ -66,7 +66,7 @@ export const receiveWebhook = async (req: Request, res: Response) => {
     const change = entry?.changes?.[0];
     const value = change?.value;
     const message = value?.messages?.[0];
-    if (!message) return; // puede ser un evento de "entregado/leído", no un mensaje nuevo
+    if (!message) return; // puede ser un evento de "entregado/leido", no un mensaje nuevo
 
     const fromPhone = message.from;
     const profileName = value.contacts?.[0]?.profile?.name;
@@ -94,7 +94,7 @@ export const receiveWebhook = async (req: Request, res: Response) => {
         console.error('⚠️ No se pudo descargar adjunto de WhatsApp:', mediaError.message);
       }
     } else {
-      content = `[mensaje de tipo ${message.type} no soportado aún]`;
+      content = `[mensaje de tipo ${message.type} no soportado aun]`;
     }
 
     const created = await Message.create({

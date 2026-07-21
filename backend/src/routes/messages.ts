@@ -11,7 +11,7 @@ import { requireAuth } from '../middleware/auth';
 const router = express.Router();
 
 // ← TODAS las rutas de mensajes requieren estar logueado.
-// Sin esto, req.userId sería undefined y cualquiera podría leer/escribir
+// Sin esto, req.userId seria undefined y cualquiera podria leer/escribir
 // mensajes de cualquier canal, o hacerse pasar por otro usuario.
 router.use(requireAuth);
 
@@ -27,7 +27,7 @@ router.put('/:id', updateMessage);
 // DELETE /api/messages/:id - Eliminar un mensaje
 router.delete('/:id', deleteMessage);
 
-// POST /api/messages/:messageId/reaction - Agregar/quitar reacción
+// POST /api/messages/:messageId/reaction - Agregar/quitar reaccion
 router.post('/:messageId/reaction', addReaction);
 
 export default router;

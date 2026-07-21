@@ -81,7 +81,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    // ← NUEVO: alguien editó un mensaje desde una plataforma externa (Discord por ahora)
+    // ← NUEVO: alguien edito un mensaje desde una plataforma externa (Discord por ahora)
     const updatedSub = this.socketService.onMessageUpdated().subscribe((data: any) => {
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
@@ -93,12 +93,12 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    // ← NUEVO: alguien borró un mensaje desde una plataforma externa
+    // ← NUEVO: alguien borro un mensaje desde una plataforma externa
     const deletedSub = this.socketService.onMessageDeleted().subscribe((data: any) => {
       this.messages = this.messages.filter(m => m._id !== data.messageId);
     });
 
-    // ← NUEVO: se agregó/quitó una reacción desde una plataforma externa
+    // ← NUEVO: se agrego/quito una reaccion desde una plataforma externa
     const reactionSub = this.socketService.onMessageReaction().subscribe((data: any) => {
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
@@ -216,12 +216,12 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         }
       },
       error: (error) => {
-        console.error('Error agregando reacción:', error);
+        console.error('Error agregando reaccion:', error);
       }
     });
   }
 
-  // ← NUEVO: agrupa mensajes consecutivos del mismo usuario (misma lógica que Discord/Linear)
+  // ← NUEVO: agrupa mensajes consecutivos del mismo usuario (misma logica que Discord/Linear)
   shouldGroupWithPrevious(index: number): boolean {
     if (index === 0) return false;
     const current = this.messages[index];

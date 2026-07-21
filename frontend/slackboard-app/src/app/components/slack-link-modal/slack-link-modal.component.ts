@@ -40,7 +40,7 @@ export class SlackLinkModalComponent implements OnInit {
       },
       error: () => {
         this.loadingStatus = false;
-        this.errorMsg = 'No se pudo consultar el estado de la vinculación.';
+        this.errorMsg = 'No se pudo consultar el estado de la vinculacion.';
       }
     });
   }
@@ -52,7 +52,7 @@ export class SlackLinkModalComponent implements OnInit {
         window.location.href = response.url;
       },
       error: (err: any) => {
-        this.errorMsg = err?.error?.message || 'No se pudo iniciar la vinculación con Slack.';
+        this.errorMsg = err?.error?.message || 'No se pudo iniciar la vinculacion con Slack.';
       }
     });
   }

@@ -6,6 +6,10 @@ export interface IUser extends Document {
   username: string;
   password: string;
   avatar?: string;
+  nombre?: string;
+  apellido?: string;
+  telefono?: string;
+  idioma?: string;
   status: 'online' | 'offline' | 'away';
   role: 'admin' | 'user';
   googleId?: string;
@@ -49,6 +53,26 @@ const UserSchema: Schema = new Schema(
     avatar: {
       type: String,
       default: null,
+    },
+    nombre: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    apellido: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    telefono: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    idioma: {
+      type: String,
+      default: null,
+      trim: true,
     },
     status: {
       type: String,

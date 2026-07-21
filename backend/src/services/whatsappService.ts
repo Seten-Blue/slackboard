@@ -47,7 +47,7 @@ class WhatsAppService {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(`WhatsApp rechazó el mensaje: ${data.error?.message || JSON.stringify(data)}`);
+      throw new Error(`WhatsApp rechazo el mensaje: ${data.error?.message || JSON.stringify(data)}`);
     }
     return data;
   }
@@ -73,12 +73,12 @@ class WhatsAppService {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(`WhatsApp rechazó el adjunto: ${data.error?.message || JSON.stringify(data)}`);
+      throw new Error(`WhatsApp rechazo el adjunto: ${data.error?.message || JSON.stringify(data)}`);
     }
     return data;
   }
 
-  // Descarga un archivo entrante: WhatsApp manda un media_id, no una URL pública directa
+  // Descarga un archivo entrante: WhatsApp manda un media_id, no una URL publica directa
   async downloadIncomingMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string }> {
     const metaResponse = await fetch(`${GRAPH_API_BASE}/${mediaId}`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },

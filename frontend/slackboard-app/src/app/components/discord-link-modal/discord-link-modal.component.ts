@@ -47,7 +47,7 @@ export class DiscordLinkModalComponent implements OnInit {
       },
       error: () => {
         this.loadingStatus = false;
-        this.errorMsg = 'No se pudo consultar el estado de la vinculación.';
+        this.errorMsg = 'No se pudo consultar el estado de la vinculacion.';
       }
     });
   }
@@ -59,7 +59,7 @@ export class DiscordLinkModalComponent implements OnInit {
         window.location.href = response.url;
       },
       error: (err: any) => {
-        this.errorMsg = err?.error?.message || 'No se pudo iniciar la vinculación con Discord.';
+        this.errorMsg = err?.error?.message || 'No se pudo iniciar la vinculacion con Discord.';
       }
     });
   }
@@ -102,7 +102,7 @@ export class DiscordLinkModalComponent implements OnInit {
   }
 
   unlink(): void {
-    if (!confirm('¿Desvincular tu cuenta de Discord? Vas a dejar de ver tus canales sincronizados hasta que la vincules de nuevo.')) return;
+    if (!confirm('?Desvincular tu cuenta de Discord? Vas a dejar de ver tus canales sincronizados hasta que la vincules de nuevo.')) return;
     this.discordService.unlink().subscribe({
       next: () => {
         this.linked = false;

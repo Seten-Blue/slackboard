@@ -27,7 +27,7 @@ export const getMessagesByChannel = async (req: AuthRequest, res: Response) => {
       success: true,
       count: messages.length,
       total,
-      data: messages.reverse(), // Ordenar de más antiguo a más reciente
+      data: messages.reverse(), // Ordenar de mas antiguo a mas reciente
     });
   } catch (error: any) {
     res.status(500).json({
@@ -66,14 +66,15 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
     const populatedMessage: any = await Message.findById(message._id)
       .populate('sender', 'username email avatar status');
 
-    // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condición de carrera
+    // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condicion de carrera
     res.status(201).json({
       success: true,
       message: 'Mensaje enviado',
       data: populatedMessage,
     });
 
-    const senderUsername = populatedMessage?.sender?.username || 'SlackBoard';
+    const senderUsername = populatedMessage?.sender?.username || 'Usuario de SlackBoard';
+    const senderAvatar = populatedMessage?.sender?.avatar || undefined;
 
     // Todo lo que sigue corre en segundo plano, sin bloquear la respuesta
     (async () => {
@@ -95,9 +96,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
         if (channelExists.discordChannelId) {
           const discordservice = require('../services/discordservice').default;
           if (discordservice.isConfigured()) {
-            // se manda con el nombre del usuario delante, ya que Discord no
-            // deja "impersonar" el remitente como sí hace el webhook de Slack
-            await discordservice.sendMessage(String(channelExists._id), `**${senderUsername}:** ${content}`);
+            await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar);
             console.log('✅ Mensaje sincronizado con Discord');
           }
         }
@@ -128,7 +127,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
           senderId: req.userId,
         });
       } catch (aiError: any) {
-        console.error('⚠️ Error disparando integración de IA:', aiError.message);
+        console.error('⚠️ Error disparando integracion de IA:', aiError.message);
       }
     })();
 
@@ -152,7 +151,7 @@ export const updateMessage = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
     }
     if (existing.sender.toString() !== req.userId) {
-      return res.status(403).json({ success: false, message: 'No podés editar un mensaje de otro usuario' });
+      return res.status(403).json({ success: false, message: 'No podes editar un mensaje de otro usuario' });
     }
 
     existing.content = content;
@@ -183,7 +182,7 @@ export const deleteMessage = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
     }
     if (existing.sender.toString() !== req.userId) {
-      return res.status(403).json({ success: false, message: 'No podés eliminar un mensaje de otro usuario' });
+      return res.status(403).json({ success: false, message: 'No podes eliminar un mensaje de otro usuario' });
     }
 
     await Message.findByIdAndDelete(req.params.id);
@@ -201,7 +200,7 @@ export const deleteMessage = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Agregar/quitar reacción a un mensaje
+// Agregar/quitar reaccion a un mensaje
 export const addReaction = async (req: AuthRequest, res: Response) => {
   try {
     const { messageId } = req.params;
@@ -216,13 +215,13 @@ export const addReaction = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Buscar si ya existe esa reacción
+    // Buscar si ya existe esa reaccion
     const existingReaction = message.reactions.find((r) => r.emoji === emoji);
 
     if (existingReaction) {
       const alreadyReacted = existingReaction.users.some((u) => u.toString() === userId);
       if (alreadyReacted) {
-        // Ya había reaccionado: quitar su reacción
+        // Ya habia reaccionado: quitar su reaccion
         existingReaction.users = existingReaction.users.filter(
           (id) => id.toString() !== userId
         );
@@ -243,13 +242,13 @@ export const addReaction = async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      message: 'Reacción actualizada',
+      message: 'Reaccion actualizada',
       data: updatedMessage,
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: 'Error al agregar reacción',
+      message: 'Error al agregar reaccion',
       error: error.message,
     });
   }

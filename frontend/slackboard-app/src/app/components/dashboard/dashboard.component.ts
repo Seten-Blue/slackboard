@@ -49,7 +49,7 @@ export class DashboardComponent implements OnInit {
         this.prepareChartData();
       },
       error: (error) => {
-        console.error('Error cargando estadísticas:', error);
+        console.error('Error cargando estadisticas:', error);
         this.loading = false;
       }
     });
@@ -58,7 +58,7 @@ export class DashboardComponent implements OnInit {
   prepareChartData() {
     if (!this.stats) return;
 
-    // Gráfica de mensajes por canal
+    // Grafica de mensajes por canal
     if (this.stats.messagesPerChannel && this.stats.messagesPerChannel.length > 0) {
       this.channelChartData = {
         labels: this.stats.messagesPerChannel.map((c: any) => c.channelName),
@@ -84,7 +84,7 @@ export class DashboardComponent implements OnInit {
       };
     }
 
-    // Gráfica de horas pico
+    // Grafica de horas pico
     if (this.stats.peakHours && this.stats.peakHours.length > 0) {
       // Crear un array de 24 horas con valores por defecto
       const hourlyData = new Array(24).fill(0);
@@ -112,28 +112,28 @@ export class DashboardComponent implements OnInit {
   askAI() {
     if (!this.aiQuestion.trim()) return;
 
-    // IA simple basada en reglas (puedes mejorarla con OpenAI después)
+    // IA simple basada en reglas (puedes mejorarla con OpenAI despues)
     const question = this.aiQuestion.toLowerCase();
 
     if (question.includes('canal') && (question.includes('activo') || question.includes('popular'))) {
       const topChannel = this.stats.messagesPerChannel[0];
-      this.aiResponse = `El canal más activo es #${topChannel.channelName} con ${topChannel.count} mensajes.`;
+      this.aiResponse = `El canal mas activo es #${topChannel.channelName} con ${topChannel.count} mensajes.`;
     } else if (question.includes('usuario') && question.includes('activo')) {
       const topUser = this.stats.topUsers[0];
-      this.aiResponse = `El usuario más activo es ${topUser.username} con ${topUser.messageCount} mensajes.`;
+      this.aiResponse = `El usuario mas activo es ${topUser.username} con ${topUser.messageCount} mensajes.`;
     } else if (question.includes('mensaje') && question.includes('total')) {
       this.aiResponse = `Hay un total de ${this.stats.overview.totalMessages} mensajes en el workspace.`;
     } else if (question.includes('hora') && question.includes('pico')) {
       const peakHour = this.stats.peakHours.reduce((max: any, hour: any) => 
         hour.messageCount > (max.messageCount || 0) ? hour : max, {});
       this.aiResponse = `La hora pico es a las ${peakHour.hour}:00 con ${peakHour.messageCount} mensajes.`;
-    } else if (question.includes('usuarios') && question.includes('línea')) {
-      this.aiResponse = `Actualmente hay ${this.stats.overview.activeUsers} usuarios en línea.`;
+    } else if (question.includes('usuarios') && question.includes('linea')) {
+      this.aiResponse = `Actualmente hay ${this.stats.overview.activeUsers} usuarios en linea.`;
     } else {
-      this.aiResponse = `📊 Datos clave: ${this.stats.overview.totalUsers} usuarios, ${this.stats.overview.totalChannels} canales, ${this.stats.overview.totalMessages} mensajes totales. Pregunta sobre canales, usuarios o estadísticas específicas.`;
+      this.aiResponse = `📊 Datos clave: ${this.stats.overview.totalUsers} usuarios, ${this.stats.overview.totalChannels} canales, ${this.stats.overview.totalMessages} mensajes totales. Pregunta sobre canales, usuarios o estadisticas especificas.`;
     }
 
-    // Limpiar la pregunta después de un momento
+    // Limpiar la pregunta despues de un momento
     setTimeout(() => {
       this.aiQuestion = '';
     }, 100);

@@ -8,10 +8,10 @@ import {
 
 const router = express.Router();
 
-// GET /api/analytics - Obtener estadísticas generales
+// GET /api/analytics - Obtener estadisticas generales
 router.get('/', getGeneralStats);
 
-// GET /api/analytics/by-date - Obtener estadísticas por fecha
+// GET /api/analytics/by-date - Obtener estadisticas por fecha
 router.get('/by-date', getStatsByDate);
 
 // GET /api/analytics/trends - Obtener tendencias de mensajes

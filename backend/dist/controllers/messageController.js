@@ -4,15 +4,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addReaction = exports.deleteMessage = exports.updateMessage = exports.createMessage = exports.getMessagesByChannel = void 0;
-const mongoose_1 = __importDefault(require("mongoose"));
 const Message_1 = __importDefault(require("../models/Message"));
 const Channel_1 = __importDefault(require("../models/Channel"));
-const User_1 = __importDefault(require("../models/User"));
-// Obtener mensajes de un canal
+const aiService_1 = __importDefault(require("../services/aiService"));
+// Obtener mensajes de un canal — solo si el usuario autenticado es miembro
 const getMessagesByChannel = async (req, res) => {
     try {
         const { channelId } = req.params;
         const { limit = 50, skip = 0 } = req.query;
+        const channel = await Channel_1.default.findOne({ _id: channelId, members: req.userId });
+        if (!channel) {
+            return res.status(404).json({ success: false, message: 'Canal no encontrado' });
+        }
         const messages = await Message_1.default.find({ channel: channelId })
             .populate('sender', 'username email avatar status')
             .sort({ createdAt: -1 })
@@ -38,60 +41,89 @@ exports.getMessagesByChannel = getMessagesByChannel;
 // Crear un nuevo mensaje
 const createMessage = async (req, res) => {
     try {
-        const { content, channel, sender, type = 'text' } = req.body;
-        // Verificar que el canal existe
-        const channelExists = await Channel_1.default.findById(channel);
+        const { content, channel, type = 'text' } = req.body;
+        if (!req.userId) {
+            return res.status(401).json({ success: false, message: 'No autenticado' });
+        }
+        // ← el canal debe existir Y el usuario autenticado debe ser miembro
+        const channelExists = await Channel_1.default.findOne({ _id: channel, members: req.userId });
         if (!channelExists) {
             return res.status(404).json({
                 success: false,
                 message: 'Canal no encontrado',
             });
         }
-        let senderId = sender;
-        const isValidSenderId = senderId && mongoose_1.default.Types.ObjectId.isValid(senderId.toString());
-        if (!isValidSenderId) {
-            const defaultUser = await User_1.default.findOne({ email: 'admin@slackboard.com' }) || await User_1.default.findOne();
-            if (!defaultUser) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Usuario no encontrado',
-                });
-            }
-            senderId = defaultUser._id;
-        }
-        // Verificar que el usuario existe
-        const userExists = await User_1.default.findById(senderId);
-        if (!userExists) {
-            return res.status(404).json({
-                success: false,
-                message: 'Usuario no encontrado',
-            });
-        }
         const message = await Message_1.default.create({
             content,
             channel,
-            sender: senderId,
+            sender: req.userId, // ← SIEMPRE el usuario autenticado (JWT), nunca lo que mande el body
             type,
         });
         const populatedMessage = await Message_1.default.findById(message._id)
             .populate('sender', 'username email avatar status');
-        // 🔥 INTEGRACIÓN SLACK: Enviar mensaje a Slack
-        try {
-            const slackService = require('../services/slackService').default;
-            if (slackService.isConfigured()) {
-                await slackService.sendMessage(channelExists.name, content, userExists.username);
-                console.log('✅ Mensaje sincronizado con Slack');
-            }
-        }
-        catch (slackError) {
-            console.error('⚠️ Error enviando a Slack:', slackError.message);
-            // No falla la petición si Slack falla
-        }
+        // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condición de carrera
         res.status(201).json({
             success: true,
             message: 'Mensaje enviado',
             data: populatedMessage,
         });
+        const senderUsername = populatedMessage?.sender?.username || 'Usuario de SlackBoard';
+        const senderAvatar = populatedMessage?.sender?.avatar || undefined;
+        // Todo lo que sigue corre en segundo plano, sin bloquear la respuesta
+        (async () => {
+            // 🔥 INTEGRACIÓN SLACK
+            try {
+                if (channelExists.slackChannelId) {
+                    const slackService = require('../services/slackService').default;
+                    if (slackService.isConfigured()) {
+                        await slackService.sendMessage(channelExists.name, content, senderUsername);
+                        console.log('✅ Mensaje sincronizado con Slack');
+                    }
+                }
+            }
+            catch (slackError) {
+                console.error('⚠️ Error enviando a Slack:', slackError.message);
+            }
+            // 🎮 INTEGRACIÓN DISCORD
+            try {
+                if (channelExists.discordChannelId) {
+                    const discordservice = require('../services/discordservice').default;
+                    if (discordservice.isConfigured()) {
+                        await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar);
+                        console.log('✅ Mensaje sincronizado con Discord');
+                    }
+                }
+            }
+            catch (discordError) {
+                console.error('⚠️ Error enviando a Discord:', discordError.message);
+            }
+            // 📱 INTEGRACIÓN WHATSAPP
+            try {
+                if (channelExists.whatsappPhone) {
+                    const whatsappService = require('../services/whatsappService').default;
+                    if (whatsappService.isConfigured()) {
+                        await whatsappService.sendTextMessage(channelExists.whatsappPhone, content);
+                        console.log('✅ Mensaje sincronizado con WhatsApp');
+                    }
+                }
+            }
+            catch (whatsappError) {
+                console.error('⚠️ Error enviando a WhatsApp:', whatsappError.message);
+            }
+            // 🤖 INTEGRACIÓN IA
+            try {
+                const io = req.app.get('io');
+                await aiService_1.default.checkAndRespond({
+                    text: content,
+                    channel: channelExists,
+                    io,
+                    senderId: req.userId,
+                });
+            }
+            catch (aiError) {
+                console.error('⚠️ Error disparando integración de IA:', aiError.message);
+            }
+        })();
     }
     catch (error) {
         res.status(500).json({
@@ -102,22 +134,26 @@ const createMessage = async (req, res) => {
     }
 };
 exports.createMessage = createMessage;
-// Editar un mensaje
+// Editar un mensaje — solo el autor puede editar su propio mensaje
 const updateMessage = async (req, res) => {
     try {
         const { id } = req.params;
         const { content } = req.body;
-        const message = await Message_1.default.findByIdAndUpdate(id, { content, isEdited: true }, { new: true }).populate('sender', 'username email avatar status');
-        if (!message) {
-            return res.status(404).json({
-                success: false,
-                message: 'Mensaje no encontrado',
-            });
+        const existing = await Message_1.default.findById(id);
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
         }
+        if (existing.sender.toString() !== req.userId) {
+            return res.status(403).json({ success: false, message: 'No podés editar un mensaje de otro usuario' });
+        }
+        existing.content = content;
+        existing.isEdited = true;
+        await existing.save();
+        const populated = await Message_1.default.findById(id).populate('sender', 'username email avatar status');
         res.json({
             success: true,
             message: 'Mensaje actualizado',
-            data: message,
+            data: populated,
         });
     }
     catch (error) {
@@ -129,16 +165,17 @@ const updateMessage = async (req, res) => {
     }
 };
 exports.updateMessage = updateMessage;
-// Eliminar un mensaje
+// Eliminar un mensaje — solo el autor puede eliminar su propio mensaje
 const deleteMessage = async (req, res) => {
     try {
-        const message = await Message_1.default.findByIdAndDelete(req.params.id);
-        if (!message) {
-            return res.status(404).json({
-                success: false,
-                message: 'Mensaje no encontrado',
-            });
+        const existing = await Message_1.default.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
         }
+        if (existing.sender.toString() !== req.userId) {
+            return res.status(403).json({ success: false, message: 'No podés eliminar un mensaje de otro usuario' });
+        }
+        await Message_1.default.findByIdAndDelete(req.params.id);
         res.json({
             success: true,
             message: 'Mensaje eliminado',
@@ -153,11 +190,12 @@ const deleteMessage = async (req, res) => {
     }
 };
 exports.deleteMessage = deleteMessage;
-// Agregar reacción a un mensaje
+// Agregar/quitar reacción a un mensaje
 const addReaction = async (req, res) => {
     try {
         const { messageId } = req.params;
-        const { emoji, userId } = req.body;
+        const { emoji } = req.body;
+        const userId = req.userId;
         const message = await Message_1.default.findById(messageId);
         if (!message) {
             return res.status(404).json({
@@ -168,21 +206,19 @@ const addReaction = async (req, res) => {
         // Buscar si ya existe esa reacción
         const existingReaction = message.reactions.find((r) => r.emoji === emoji);
         if (existingReaction) {
-            // Si el usuario ya reaccionó, quitar su reacción
-            if (existingReaction.users.includes(userId)) {
+            const alreadyReacted = existingReaction.users.some((u) => u.toString() === userId);
+            if (alreadyReacted) {
+                // Ya había reaccionado: quitar su reacción
                 existingReaction.users = existingReaction.users.filter((id) => id.toString() !== userId);
-                // Si no quedan usuarios, eliminar la reacción
                 if (existingReaction.users.length === 0) {
                     message.reactions = message.reactions.filter((r) => r.emoji !== emoji);
                 }
             }
             else {
-                // Agregar usuario a la reacción existente
                 existingReaction.users.push(userId);
             }
         }
         else {
-            // Crear nueva reacción
             message.reactions.push({ emoji, users: [userId] });
         }
         await message.save();

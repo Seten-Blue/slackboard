@@ -6,6 +6,7 @@ import {
   Message as DiscordMessage,
   TextChannel,
   DMChannel,
+  Webhook,
 } from 'discord.js';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -35,7 +36,7 @@ class discordService {
     this.guildIdFilter = (process.env.DISCORD_GUILD_ID || '').trim();
 
     if (!this.token) {
-      console.warn('⚠️  DISCORD_BOT_TOKEN no configurado. La integración con Discord no funcionará.');
+      console.warn('⚠️  DISCORD_BOT_TOKEN no configurado. La integracion con Discord no funcionara.');
     }
   }
 
@@ -49,9 +50,9 @@ class discordService {
   }
 
   /**
-   * Se llama UNA vez desde index.ts (después de crear `io`), a diferencia de
-   * Slack, que recibe eventos por webhook HTTP. Discord usa una conexión
-   * persistente por WebSocket (gateway), así que el bot debe "loguearse" al
+   * Se llama UNA vez desde index.ts (despues de crear `io`), a diferencia de
+   * Slack, que recibe eventos por webhook HTTP. Discord usa una conexion
+   * persistente por WebSocket (gateway), asi que el bot debe "loguearse" al
    * arrancar el servidor y se queda escuchando en segundo plano.
    */
   async connect(io: Server): Promise<void> {
@@ -62,7 +63,7 @@ class discordService {
       intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent, // privileged: debe activarse en el Developer Portal (pestaña Bot)
+        GatewayIntentBits.MessageContent, // privileged: debe activarse en el Developer Portal (pestana Bot)
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.DirectMessages,
       ],
@@ -82,7 +83,7 @@ class discordService {
 
     this.client.on('messageUpdate', (_old, newMessage) =>
       this.handleMessageUpdate(newMessage as DiscordMessage).catch((err) =>
-        console.error('❌ Error procesando edición de Discord:', err.message)
+        console.error('❌ Error procesando edicion de Discord:', err.message)
       )
     );
 
@@ -94,13 +95,13 @@ class discordService {
 
     this.client.on('messageReactionAdd', (reaction, user) =>
       this.handleReaction(reaction, user, 'add').catch((err) =>
-        console.error('❌ Error procesando reacción de Discord:', err.message)
+        console.error('❌ Error procesando reaccion de Discord:', err.message)
       )
     );
 
     this.client.on('messageReactionRemove', (reaction, user) =>
       this.handleReaction(reaction, user, 'remove').catch((err) =>
-        console.error('❌ Error procesando remoción de reacción de Discord:', err.message)
+        console.error('❌ Error procesando remocion de reaccion de Discord:', err.message)
       )
     );
 
@@ -210,8 +211,8 @@ class discordService {
 
   // ============ EVENTOS ENTRANTES ============
   private async handleMessageCreate(message: DiscordMessage) {
-    // Ignora únicamente los mensajes que el propio bot envió (para no hacer loop);
-    // SÍ acepta mensajes de otros bots/webhooks si eso es "cualquier comunicación".
+    // Ignora unicamente los mensajes que el propio bot envio (para no hacer loop);
+    // SÍ acepta mensajes de otros bots/webhooks si eso es "cualquier comunicacion".
     if (message.author.id === this.client?.user?.id) return;
     if (!this.guildAllowed(message.guildId)) return;
 
@@ -237,7 +238,7 @@ class discordService {
       sender: user._id,
       type: attachments.length ? 'file' : 'text',
       attachments,
-      // ← usado para poder ubicar este mensaje si luego llega su edición/borrado/reacción
+      // ← usado para poder ubicar este mensaje si luego llega su edicion/borrado/reaccion
       discordMessageId: message.id,
     });
 
@@ -258,7 +259,7 @@ class discordService {
         await aiService.checkAndRespond({ text: content, channel: channelDoc, io: this.io });
       }
     } catch (aiError: any) {
-      console.error('⚠️ Error disparando integración de IA desde Discord:', aiError.message);
+      console.error('⚠️ Error disparando integracion de IA desde Discord:', aiError.message);
     }
   }
 
@@ -305,7 +306,7 @@ class discordService {
     if (!existing) return;
 
     // Tus reacciones son {emoji, users: ObjectId[]} de TU User, no del id de
-    // Discord directo, así que primero hay que resolver/crear el User.
+    // Discord directo, asi que primero hay que resolver/crear el User.
     const mongoUser = await this.resolveOrCreateDiscordUser(discordUser);
     const emoji = reaction.emoji.name || reaction.emoji.toString();
 
@@ -338,9 +339,46 @@ class discordService {
   }
 
   // ============ SALIDA: SlackBoard -> Discord ============
-  // ← CAMBIO: ahora devuelve el ID del mensaje que Discord creó, para poder
-  // editarlo/borrarlo/reaccionarlo más adelante desde SlackBoard.
-  async sendMessage(internalChannelId: string, text: string): Promise<string | null> {
+
+  private async getOrCreateWebhook(channelDoc: any): Promise<Webhook | null> {
+    if (!channelDoc.discordChannelId) return null;
+
+    if (channelDoc.discordWebhookId && channelDoc.discordWebhookToken) {
+      try {
+        const webhook = await this.getClient().fetchWebhook(channelDoc.discordWebhookId, channelDoc.discordWebhookToken);
+        if (webhook) return webhook;
+      } catch {
+        channelDoc.discordWebhookId = null;
+        channelDoc.discordWebhookToken = null;
+      }
+    }
+
+    try {
+      const discordChannel = await this.getClient().channels.fetch(channelDoc.discordChannelId);
+      if (!discordChannel || !discordChannel.isTextBased()) return null;
+
+      const webhook = await (discordChannel as TextChannel).createWebhook({
+        name: 'SlackBoard',
+        reason: 'Para enviar mensajes con el nombre real del usuario',
+      });
+
+      channelDoc.discordWebhookId = webhook.id;
+      channelDoc.discordWebhookToken = webhook.token!;
+      await channelDoc.save();
+
+      return webhook;
+    } catch (err: any) {
+      console.warn('⚠️ No se pudo crear webhook de Discord:', err.message);
+      return null;
+    }
+  }
+
+  async sendMessage(
+    internalChannelId: string,
+    text: string,
+    senderUsername?: string,
+    senderAvatar?: string,
+  ): Promise<string | null> {
     if (!this.isConfigured()) {
       console.log('Discord no configurado, mensaje solo local:', { internalChannelId, text });
       return null;
@@ -348,7 +386,18 @@ class discordService {
 
     const channelDoc: any = await Channel.findById(internalChannelId);
     if (!channelDoc?.discordChannelId) {
-      throw new Error('Este canal no está vinculado con un canal de Discord.');
+      throw new Error('Este canal no esta vinculado con un canal de Discord.');
+    }
+
+    const webhook = senderUsername ? await this.getOrCreateWebhook(channelDoc) : null;
+
+    if (webhook) {
+      const sent = await webhook.send({
+        content: text,
+        username: senderUsername,
+        avatarURL: senderAvatar || undefined,
+      });
+      return sent.id;
     }
 
     const discordChannel = await this.getClient().channels.fetch(channelDoc.discordChannelId);

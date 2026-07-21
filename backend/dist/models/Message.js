@@ -69,6 +69,30 @@ const MessageSchema = new mongoose_1.Schema({
             ],
         },
     ],
+    // ← NUEVO: URLs de adjuntos/imágenes (usado por Discord, pero sirve
+    // igual para cualquier plataforma que mande archivos).
+    attachments: {
+        type: [String],
+        default: [],
+    },
+    // ← NUEVO: id del mensaje original en Discord. Permite encontrar este
+    // mensaje cuando llega su edición, borrado o una reacción desde Discord.
+    discordMessageId: {
+        type: String,
+        default: null,
+        index: true,
+    },
+    whatsappMessageId: {
+        type: String,
+        default: null,
+        index: true,
+    },
+    // ← NUEVO: true si este mensaje se originó en SlackBoard y el bot lo mandó
+    // hacia una plataforma externa (nos dice si podemos editarlo/borrarlo allá)
+    sentViaBot: {
+        type: Boolean,
+        default: false,
+    },
 }, {
     timestamps: true,
 });

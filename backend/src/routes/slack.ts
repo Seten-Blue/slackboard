@@ -17,15 +17,15 @@ const normalizeChannelName = (name: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-');
 
-// ← CORREGIDO: matching por nombre normalizado en vez de comparación exacta
+// ← CORREGIDO: matching por nombre normalizado en vez de comparacion exacta
 const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?: string) => {
   const fallbackName = channelName || `slack-${slackChannelId}`;
   const normalizedIncoming = normalizeChannelName(fallbackName);
 
-  // 1. Buscar primero por slackChannelId (la forma más confiable una vez vinculado)
+  // 1. Buscar primero por slackChannelId (la forma mas confiable una vez vinculado)
   let channel: any = await Channel.findOne({ slackChannelId });
 
-  // 2. Si no hay vínculo aún, buscar por nombre normalizado entre todos los canales
+  // 2. Si no hay vinculo aun, buscar por nombre normalizado entre todos los canales
   if (!channel) {
     const allChannels = await Channel.find({});
     const match = allChannels.find(
@@ -36,7 +36,7 @@ const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?:
     }
   }
 
-  // 3. Si lo encontramos por nombre, vincularlo con su slackChannelId para la próxima vez
+  // 3. Si lo encontramos por nombre, vincularlo con su slackChannelId para la proxima vez
   if (channel) {
     if (!channel.slackChannelId) {
       channel.slackChannelId = slackChannelId;
@@ -46,7 +46,7 @@ const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?:
     return channel;
   }
 
-  // 4. Si de verdad no existe en ningún lado, ahí sí se crea uno nuevo
+  // 4. Si de verdad no existe en ningun lado, ahi si se crea uno nuevo
   let adminUser = await User.findOne({ email: 'admin@slackboard.com' }) || await User.findOne();
   if (!adminUser) {
     throw new Error('No existe un usuario admin para crear el canal sincronizado desde Slack');
@@ -66,16 +66,16 @@ const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?:
   return channel;
 };
 
-// Estado de la integración
+// Estado de la integracion
 router.get('/status', (req: Request, res: Response) => {
   const configured = slackService.isConfigured();
   res.json({
     success: true,
     configured: configured,
     message: configured 
-      ? 'Slack está configurado y funcionando' 
-      : 'Slack no está configurado. Usa un Bot User OAuth Token (xoxb-...) y, para recibir mensajes, configura SLACK_SIGNING_SECRET y un endpoint público.',
-    token: configured ? 'Bot token válido' : 'Token no válido o no encontrado'
+      ? 'Slack esta configurado y funcionando' 
+      : 'Slack no esta configurado. Usa un Bot User OAuth Token (xoxb-...) y, para recibir mensajes, configura SLACK_SIGNING_SECRET y un endpoint publico.',
+    token: configured ? 'Bot token valido' : 'Token no valido o no encontrado'
   });
 });
 
@@ -84,7 +84,7 @@ router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Respons
     if (!slackService.isConfigured()) {
       return res.status(400).json({
         success: false,
-        message: 'Slack no está configurado. Verifica SLACK_BOT_TOKEN en .env'
+        message: 'Slack no esta configurado. Verifica SLACK_BOT_TOKEN en .env'
       });
     }
 
@@ -132,7 +132,7 @@ router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Respons
           channel.slackChannelId = slackChannel.id;
           console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannel.id})`);
         }
-        // ← NUEVO: agrega como miembro a quien hizo el sync, si todavía no lo era
+        // ← NUEVO: agrega como miembro a quien hizo el sync, si todavia no lo era
         const alreadyMember = channel.members.some((m: any) => m.toString() === req.userId);
         if (!alreadyMember && req.userId) {
           channel.members.push(req.userId);
@@ -175,7 +175,7 @@ router.post('/send-message', async (req: Request, res: Response) => {
     if (!slackService.isConfigured()) {
       return res.status(400).json({
         success: false,
-        message: 'Slack no está configurado'
+        message: 'Slack no esta configurado'
       });
     }
 
@@ -212,7 +212,7 @@ router.post('/events', async (req: Request, res: Response) => {
 
     const { type, challenge, event } = req.body;
 
-    // Verificar que la petición realmente venga de Slack
+    // Verificar que la peticion realmente venga de Slack
     const signature = req.headers['x-slack-signature'] as string;
     const timestamp = req.headers['x-slack-request-timestamp'] as string;
     const rawBody = (req as any).rawBody || '';
@@ -220,16 +220,16 @@ router.post('/events', async (req: Request, res: Response) => {
     if (slackService.isSignatureVerificationEnabled()) {
       const isValid = slackService.verifySignature(rawBody, timestamp, signature);
       if (!isValid) {
-        console.warn('⚠️  Firma de Slack inválida, petición rechazada');
-        return res.status(401).send('Firma inválida');
+        console.warn('⚠️  Firma de Slack invalida, peticion rechazada');
+        return res.status(401).send('Firma invalida');
       }
     } else if (!signature || !timestamp) {
-      console.warn('⚠️  No se recibió firma de Slack; se procesará el evento aunque la verificación esté deshabilitada');
+      console.warn('⚠️  No se recibio firma de Slack; se procesara el evento aunque la verificacion este deshabilitada');
     }
 
-    // Responder al challenge de verificación de URL
+    // Responder al challenge de verificacion de URL
     if (type === 'url_verification') {
-      console.log('✅ Verificación de URL - Challenge:', challenge);
+      console.log('✅ Verificacion de URL - Challenge:', challenge);
       return res.status(200).json({ challenge });
     }
 
@@ -269,10 +269,10 @@ router.post('/events', async (req: Request, res: Response) => {
                 });
               }
             } else {
-              console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard, no se hace nada');
+              console.log('ℹ️  El canal ya tenia ese nombre en SlackBoard, no se hace nada');
             }
           } else {
-            console.warn(`⚠️  Se recibió channel_rename para un canal no vinculado: ${slackChannelId}`);
+            console.warn(`⚠️  Se recibio channel_rename para un canal no vinculado: ${slackChannelId}`);
           }
         }
 
@@ -281,7 +281,7 @@ router.post('/events', async (req: Request, res: Response) => {
       
       const channelType = (event.channel_type || 'channel').toString();
 
-      // Manejar mensaje de canal público, privado o DM sin depender de un payload exacto
+      // Manejar mensaje de canal publico, privado o DM sin depender de un payload exacto
       if (event.type === 'message' && ['channel', 'group', 'im'].includes(channelType)) {
         console.log('💬 Procesando mensaje de Slack');
 
@@ -317,7 +317,7 @@ router.post('/events', async (req: Request, res: Response) => {
             });
             channelName = channelInfo.channel?.name;
           } catch (channelInfoError: any) {
-            console.warn('⚠️  No se pudo obtener información del canal de Slack:', channelInfoError.message);
+            console.warn('⚠️  No se pudo obtener informacion del canal de Slack:', channelInfoError.message);
           }
 
           const channel: any = await resolveOrCreateSlackChannel(event.channel, channelName);
@@ -351,10 +351,10 @@ router.post('/events', async (req: Request, res: Response) => {
                 io,
               });
             } catch (aiError: any) {
-              console.error('⚠️ Error disparando integración de IA desde Slack:', aiError.message);
+              console.error('⚠️ Error disparando integracion de IA desde Slack:', aiError.message);
             }
           } else {
-            // ← NUEVO: ya no se pierde ningún mensaje en silencio
+            // ← NUEVO: ya no se pierde ningun mensaje en silencio
             console.warn(`⚠️  Mensaje de Slack no guardado — channel encontrado: ${!!channel}, user encontrado: ${!!user}`);
           }
         } catch (channelError: any) {
@@ -375,10 +375,10 @@ router.post('/events', async (req: Request, res: Response) => {
 });
 
 
-// ===== OAuth por usuario (vinculación real de cuenta) — mismo patrón que Discord =====
+// ===== OAuth por usuario (vinculacion real de cuenta) — mismo patron que Discord =====
 router.get('/oauth/status', requireAuth, getSlackOAuthStatus);
 router.get('/oauth/start', requireAuth, startSlackOAuth);
-router.get('/oauth/callback', slackOAuthCallback); // público: Slack redirige acá sin nuestro header Authorization
+router.get('/oauth/callback', slackOAuthCallback); // publico: Slack redirige aca sin nuestro header Authorization
 router.post('/oauth/unlink-workspace', requireAuth, unlinkSlackWorkspace);
 router.post('/oauth/sync-workspace', requireAuth, syncMySlackWorkspace);
 

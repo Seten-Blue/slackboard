@@ -33,11 +33,11 @@ export class ResetPasswordComponent implements OnInit {
 
   submit(): void {
     if (!this.newPassword.trim() || this.newPassword.length < 6) {
-      this.errorMsg = 'La contraseña debe tener al menos 6 caracteres.';
+      this.errorMsg = 'La contrasena debe tener al menos 6 caracteres.';
       return;
     }
     if (this.newPassword !== this.confirmPassword) {
-      this.errorMsg = 'Las contraseñas no coinciden.';
+      this.errorMsg = 'Las contrasenas no coinciden.';
       return;
     }
 
@@ -52,7 +52,7 @@ export class ResetPasswordComponent implements OnInit {
       },
       error: (err: any) => {
         this.loading = false;
-        this.errorMsg = err?.error?.message || 'Ocurrió un error. Intentá de nuevo.';
+        this.errorMsg = err?.error?.message || 'Ocurrio un error. Intenta de nuevo.';
       }
     });
   }

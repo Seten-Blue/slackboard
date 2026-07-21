@@ -2,16 +2,16 @@
   <!-- Header -->
   <div class="mb-8">
     <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard Analytics</h1>
-    <p class="text-gray-600">Estadísticas en tiempo real de tu workspace</p>
+    <p class="text-gray-600">Estadisticas en tiempo real de tu workspace</p>
   </div>
 
   <!-- Loading State -->
   <div *ngIf="loading" class="flex justify-center items-center h-64">
-    <div class="animate-pulse text-gray-500 text-xl">Cargando estadísticas...</div>
+    <div class="animate-pulse text-gray-500 text-xl">Cargando estadisticas...</div>
   </div>
 
   <div *ngIf="!loading && stats">
-    <!-- Tarjetas de estadísticas -->
+    <!-- Tarjetas de estadisticas -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <!-- Total Usuarios -->
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500 transform hover:scale-105 transition">
@@ -23,7 +23,7 @@
           <div class="text-4xl">👥</div>
         </div>
         <p class="text-green-600 text-sm mt-2">
-          {{ stats.overview.activeUsers }} en línea
+          {{ stats.overview.activeUsers }} en linea
         </p>
       </div>
 
@@ -70,7 +70,7 @@
       </div>
     </div>
 
-    <!-- Gráficas -->
+    <!-- Graficas -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Mensajes por Canal -->
       <div class="bg-white rounded-lg shadow-md p-6">
@@ -88,7 +88,7 @@
 
       <!-- Horas Pico -->
       <div class="bg-white rounded-lg shadow-md p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Horas Pico (Últimos 7 días)</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Horas Pico (Últimos 7 dias)</h3>
         <div class="h-64">
           <canvas 
             baseChart
@@ -103,7 +103,7 @@
 
     <!-- Top Usuarios -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">Usuarios Más Activos</h3>
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Usuarios Mas Activos</h3>
       <div class="space-y-4">
         <div 
           *ngFor="let user of stats.topUsers; let i = index"
@@ -135,14 +135,14 @@
     <div class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg shadow-md p-6 text-white">
       <h3 class="text-lg font-semibold mb-4 flex items-center">
         <span class="mr-2">🤖</span>
-        Pregúntale a la IA sobre tus datos
+        Preguntale a la IA sobre tus datos
       </h3>
       <div class="flex space-x-3">
         <input 
           type="text"
           [(ngModel)]="aiQuestion"
           (keyup.enter)="askAI()"
-          placeholder="Ej: ¿Cuál es el canal más activo?"
+          placeholder="Ej: ?Cual es el canal mas activo?"
           class="flex-1 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-white">
         <button 
           (click)="askAI()"

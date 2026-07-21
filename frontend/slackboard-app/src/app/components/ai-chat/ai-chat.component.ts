@@ -39,7 +39,7 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.chatService.triggerChannelsRefresh();
       },
       error: () => {
-        this.errorMsg = 'No se pudo conectar con Zork. Verifica que el backend esté corriendo.';
+        this.errorMsg = 'No se pudo conectar con Zork. Verifica que el backend este corriendo.';
         this.loading = false;
       }
     });

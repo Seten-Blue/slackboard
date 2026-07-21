@@ -20,6 +20,6 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     req.userId = decoded.userId;
     next();
   } catch {
-    return res.status(401).json({ success: false, message: 'Token inválido o expirado' });
+    return res.status(401).json({ success: false, message: 'Token invalido o expirado' });
   }
 }

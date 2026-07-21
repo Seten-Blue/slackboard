@@ -154,7 +154,7 @@
     </div>
   </div>
 
-  <!-- Panel lateral de edición de tarjeta -->
+  <!-- Panel lateral de edicion de tarjeta -->
   <div *ngIf="selectedCard" class="fixed inset-0 z-30 flex justify-end" (click)="closeCardPanel()">
     <div class="absolute inset-0 bg-ink-950/20"></div>
     <div class="relative w-full max-w-md h-full bg-white shadow-2xl p-6 overflow-y-auto" (click)="$event.stopPropagation()">
@@ -167,16 +167,16 @@
         [(ngModel)]="editedCardName"
         class="w-full text-lg font-display font-semibold text-ink-950 outline-none border-b border-transparent focus:border-signal/50 pb-1 mt-1 mb-5">
 
-      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Descripción</label>
+      <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Descripcion</label>
       <textarea
         [(ngModel)]="editedCardDesc"
         rows="5"
-        placeholder="Agrega una descripción más detallada…"
+        placeholder="Agrega una descripcion mas detallada…"
         class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg p-3 mt-1 mb-5 resize-none focus:border-signal/50 transition-colors"></textarea>
 
       <div class="flex items-center gap-3 mb-5">
         <div class="flex-1">
-          <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Fecha límite</label>
+          <label class="text-[11px] uppercase tracking-wider text-ink-950/40 font-semibold">Fecha limite</label>
           <input type="date" [(ngModel)]="editedCardDue"
                  class="w-full text-sm text-ink-950/80 outline-none border border-ink-950/10 rounded-lg px-3 py-2 mt-1 focus:border-signal/50 transition-colors">
         </div>

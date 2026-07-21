@@ -177,6 +177,44 @@ class SlackService {
     async refreshChannelMap() {
         await this.initializeChannelMap();
     }
+    // Hacer que el bot abandone un canal de Slack
+    async leaveChannel(channelId) {
+        try {
+            if (!this.isConfigured()) {
+                return null;
+            }
+            const result = await this.client.conversations.leave({
+                channel: channelId
+            });
+            console.log(`✅ Bot salió del canal ${channelId}`);
+            return result;
+        }
+        catch (error) {
+            console.error('❌ Error abandonando el canal en Slack:', error.message);
+            throw error;
+        }
+    }
+    // Renombrar un canal en Slack
+    async renameChannel(channelId, newName) {
+        try {
+            if (!this.isConfigured()) {
+                return null;
+            }
+            const normalizedName = this.normalizeChannelName(newName);
+            const result = await this.client.conversations.rename({
+                channel: channelId,
+                name: normalizedName
+            });
+            // Actualizar el mapa de canales
+            await this.refreshChannelMap();
+            console.log(`✅ Canal renombrado en Slack: ${normalizedName}`);
+            return result;
+        }
+        catch (error) {
+            console.error('❌ Error renombrando canal en Slack:', error.message);
+            throw error;
+        }
+    }
     // ← NUEVO: verifica que la petición realmente venga de Slack usando el Signing Secret
     verifySignature(rawBody, timestamp, signature) {
         if (!this.signingSecret) {

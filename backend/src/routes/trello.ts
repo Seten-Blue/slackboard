@@ -22,7 +22,7 @@ const router = express.Router();
 // solo vive en RAM el instante que tarda en reenviarse a Trello.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB máx por archivo
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max por archivo
 });
 
 // Tableros

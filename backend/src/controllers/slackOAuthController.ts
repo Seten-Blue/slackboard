@@ -32,7 +32,7 @@ export const startOAuth = async (req: AuthRequest, res: Response) => {
   if (!slackOAuthService.isConfigured()) {
     return res.status(400).json({
       success: false,
-      message: 'Slack OAuth no está configurado (faltan SLACK_CLIENT_ID / SLACK_CLIENT_SECRET / SLACK_OAUTH_REDIRECT_URI en .env).',
+      message: 'Slack OAuth no esta configurado (faltan SLACK_CLIENT_ID / SLACK_CLIENT_SECRET / SLACK_OAUTH_REDIRECT_URI en .env).',
     });
   }
 
@@ -55,7 +55,7 @@ export const oauthCallback = async (req: Request, res: Response) => {
   try {
     const decoded = jwt.verify(state, JWT_SECRET) as { userId: string; purpose: string };
     if (decoded.purpose !== 'slack-oauth') {
-      throw new Error('state inválido');
+      throw new Error('state invalido');
     }
 
     const tokenData = await slackOAuthService.exchangeCode(code);

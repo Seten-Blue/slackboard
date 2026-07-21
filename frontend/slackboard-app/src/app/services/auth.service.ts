@@ -3,11 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-interface AuthUser {
+export interface AuthUser {
   _id: string;
   email: string;
   username: string;
   avatar?: string;
+  nombre?: string;
+  apellido?: string;
+  telefono?: string;
+  idioma?: string;
 }
 
 interface AuthResponse {
@@ -15,6 +19,12 @@ interface AuthResponse {
   token: string;
   user: AuthUser;
   message?: string;
+}
+
+interface ProfileUpdateResponse {
+  success: boolean;
+  message: string;
+  user: AuthUser;
 }
 
 @Injectable({
@@ -48,8 +58,24 @@ export class AuthService {
     );
   }
 
-  register(email: string, username: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/auth/register`, { email, username, password }).pipe(
+  register(
+    email: string,
+    username: string,
+    password: string,
+    nombre?: string,
+    apellido?: string,
+    telefono?: string,
+    idioma?: string
+  ): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/auth/register`, {
+      email,
+      username,
+      password,
+      nombre,
+      apellido,
+      telefono,
+      idioma,
+    }).pipe(
       tap(response => this.setSession(response))
     );
   }
@@ -57,6 +83,35 @@ export class AuthService {
   loginWithGoogle(idToken: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiUrl}/auth/google`, { idToken }).pipe(
       tap(response => this.setSession(response))
+    );
+  }
+
+  updateProfile(data: {
+    username: string;
+    avatar?: string;
+    nombre?: string;
+    apellido?: string;
+    telefono?: string;
+    idioma?: string;
+  }): Observable<ProfileUpdateResponse> {
+    return this.http.put<ProfileUpdateResponse>(`${this.apiUrl}/auth/profile`, data).pipe(
+      tap(response => {
+        if (response.success && response.user) {
+          localStorage.setItem(this.USER_KEY, JSON.stringify(response.user));
+          this.currentUserSubject.next(response.user);
+        }
+      })
+    );
+  }
+
+  refreshUser(): Observable<any> {
+    return this.http.get<{ success: boolean; data: AuthUser }>(`${this.apiUrl}/auth/me`).pipe(
+      tap(response => {
+        if (response.success && response.data) {
+          localStorage.setItem(this.USER_KEY, JSON.stringify(response.data));
+          this.currentUserSubject.next(response.data);
+        }
+      })
     );
   }
 

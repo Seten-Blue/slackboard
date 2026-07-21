@@ -15,7 +15,7 @@ function signToken(userId: string): string {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, username, password, nombre, apellido, telefono, idioma } = req.body;
 
     if (!email || !username || !password) {
       return res.status(400).json({ success: false, message: 'Faltan campos requeridos' });
@@ -26,14 +26,32 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Ya existe una cuenta con ese email' });
     }
 
-    const user: any = await User.create({ email, username, password, status: 'online' });
+    const user: any = await User.create({
+      email,
+      username,
+      password,
+      nombre: nombre || null,
+      apellido: apellido || null,
+      telefono: telefono || null,
+      idioma: idioma || null,
+      status: 'online',
+    });
     const token = signToken(user._id.toString());
 
     res.status(201).json({
       success: true,
       message: 'Cuenta creada exitosamente',
       token,
-      user: { _id: user._id, email: user.email, username: user.username, avatar: user.avatar },
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        telefono: user.telefono,
+        idioma: user.idioma,
+      },
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al crear la cuenta', error: error.message });
@@ -50,7 +68,7 @@ export const login = async (req: Request, res: Response) => {
 
     const user: any = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+      return res.status(401).json({ success: false, message: 'Credenciales invalidas' });
     }
 
     user.status = 'online';
@@ -62,10 +80,85 @@ export const login = async (req: Request, res: Response) => {
       success: true,
       message: 'Ingreso exitoso',
       token,
-      user: { _id: user._id, email: user.email, username: user.username, avatar: user.avatar },
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        telefono: user.telefono,
+        idioma: user.idioma,
+      },
     });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: 'Error al iniciar sesión', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al iniciar sesion', error: error.message });
+  }
+};
+
+export const updateProfile = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, avatar, nombre, apellido, telefono, idioma } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+
+    if (!username || !username.trim()) {
+      return res.status(400).json({ success: false, message: 'El nombre de usuario es requerido' });
+    }
+
+    const trimmedUsername = username.trim();
+
+    if (trimmedUsername.length < 2 || trimmedUsername.length > 30) {
+      return res.status(400).json({ success: false, message: 'El nombre de usuario debe tener entre 2 y 30 caracteres' });
+    }
+
+    const existingUser = await User.findOne({ username: trimmedUsername, _id: { $ne: userId } });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'Ese nombre de usuario ya esta en uso' });
+    }
+
+    const updateData: any = { username: trimmedUsername };
+    if (avatar !== undefined) {
+      updateData.avatar = avatar || null;
+    }
+    if (nombre !== undefined) {
+      updateData.nombre = nombre || null;
+    }
+    if (apellido !== undefined) {
+      updateData.apellido = apellido || null;
+    }
+    if (telefono !== undefined) {
+      updateData.telefono = telefono || null;
+    }
+    if (idioma !== undefined) {
+      updateData.idioma = idioma || null;
+    }
+
+    const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Perfil actualizado',
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        telefono: user.telefono,
+        idioma: user.idioma,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error actualizando perfil:', error.message);
+    res.status(500).json({ success: false, message: 'Error al actualizar el perfil', error: error.message });
   }
 };
 
@@ -92,7 +185,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     const genericResponse = {
       success: true,
-      message: 'Si ese email tiene una cuenta, te enviamos un link para restablecer la contraseña.',
+      message: 'Si ese email tiene una cuenta, te enviamos un link para restablecer la contrasena.',
     };
 
     if (!user) {
@@ -111,7 +204,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     try {
       await emailService.sendPasswordResetEmail(email, resetLink);
     } catch (emailError: any) {
-      console.error('⚠️  Error enviando el correo de recuperación:', emailError.message);
+      console.error('⚠️  Error enviando el correo de recuperacion:', emailError.message);
     }
 
     res.json(genericResponse);
@@ -137,7 +230,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: 'El link es inválido o ya expiró. Solicitá uno nuevo.' });
+      return res.status(400).json({ success: false, message: 'El link es invalido o ya expiro. Solicita uno nuevo.' });
     }
 
     user.password = newPassword;
@@ -145,9 +238,9 @@ export const resetPassword = async (req: Request, res: Response) => {
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    res.json({ success: true, message: 'Contraseña actualizada. Ya podés ingresar con la nueva.' });
+    res.json({ success: true, message: 'Contrasena actualizada. Ya podes ingresar con la nueva.' });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: 'Error al restablecer la contraseña', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al restablecer la contrasena', error: error.message });
   }
 };
 
@@ -165,7 +258,7 @@ export const googleAuth = async (req: Request, res: Response) => {
 
     const payload = ticket.getPayload();
     if (!payload?.email) {
-      return res.status(401).json({ success: false, message: 'Token de Google inválido' });
+      return res.status(401).json({ success: false, message: 'Token de Google invalido' });
     }
 
     let user: any = await User.findOne({ email: payload.email });
@@ -177,12 +270,36 @@ export const googleAuth = async (req: Request, res: Response) => {
         password: 'google_' + crypto.randomBytes(16).toString('hex'),
         avatar: payload.picture,
         googleId: payload.sub,
+        nombre: payload.given_name || null,
+        apellido: payload.family_name || null,
+        idioma: payload.locale || null,
         status: 'online',
       });
-    } else if (!user.googleId) {
-      user.googleId = payload.sub;
-      if (payload.picture && !user.avatar) user.avatar = payload.picture;
-      await user.save();
+    } else {
+      let needsSave = false;
+      if (!user.googleId) {
+        user.googleId = payload.sub;
+        needsSave = true;
+      }
+      if (payload.picture && !user.avatar) {
+        user.avatar = payload.picture;
+        needsSave = true;
+      }
+      if (payload.given_name && !user.nombre) {
+        user.nombre = payload.given_name;
+        needsSave = true;
+      }
+      if (payload.family_name && !user.apellido) {
+        user.apellido = payload.family_name;
+        needsSave = true;
+      }
+      if (payload.locale && !user.idioma) {
+        user.idioma = payload.locale;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await user.save();
+      }
     }
 
     const token = signToken(user._id.toString());
@@ -191,10 +308,19 @@ export const googleAuth = async (req: Request, res: Response) => {
       success: true,
       message: 'Ingreso con Google exitoso',
       token,
-      user: { _id: user._id, email: user.email, username: user.username, avatar: user.avatar },
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        telefono: user.telefono,
+        idioma: user.idioma,
+      },
     });
   } catch (error: any) {
-    console.error('❌ Error verificando token de Google:', error.message);
+    console.error('Error verificando token de Google:', error.message);
     res.status(401).json({ success: false, message: 'No se pudo verificar el token de Google' });
   }
 };

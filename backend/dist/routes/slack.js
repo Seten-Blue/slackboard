@@ -8,19 +8,39 @@ const Channel_1 = __importDefault(require("../models/Channel"));
 const Message_1 = __importDefault(require("../models/Message"));
 const User_1 = __importDefault(require("../models/User"));
 const slackService_1 = __importDefault(require("../services/slackService"));
+const aiService_1 = __importDefault(require("../services/aiService"));
+const auth_1 = require("../middleware/auth");
+const slackOAuthController_1 = require("../controllers/slackOAuthController");
 const router = express_1.default.Router();
+// ← NUEVO: normaliza nombres para comparar "Los nuevos" con "los-nuevos" como el mismo canal
+const normalizeChannelName = (name) => (name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+// ← CORREGIDO: matching por nombre normalizado en vez de comparación exacta
 const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
     const fallbackName = channelName || `slack-${slackChannelId}`;
-    let channel = await Channel_1.default.findOne({
-        $or: [{ slackChannelId }, { name: fallbackName }]
-    });
+    const normalizedIncoming = normalizeChannelName(fallbackName);
+    // 1. Buscar primero por slackChannelId (la forma más confiable una vez vinculado)
+    let channel = await Channel_1.default.findOne({ slackChannelId });
+    // 2. Si no hay vínculo aún, buscar por nombre normalizado entre todos los canales
+    if (!channel) {
+        const allChannels = await Channel_1.default.find({});
+        const match = allChannels.find((c) => normalizeChannelName(c.name) === normalizedIncoming);
+        if (match) {
+            channel = match;
+        }
+    }
+    // 3. Si lo encontramos por nombre, vincularlo con su slackChannelId para la próxima vez
     if (channel) {
         if (!channel.slackChannelId) {
             channel.slackChannelId = slackChannelId;
             await channel.save();
+            console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannelId})`);
         }
         return channel;
     }
+    // 4. Si de verdad no existe en ningún lado, ahí sí se crea uno nuevo
     let adminUser = await User_1.default.findOne({ email: 'admin@slackboard.com' }) || await User_1.default.findOne();
     if (!adminUser) {
         throw new Error('No existe un usuario admin para crear el canal sincronizado desde Slack');
@@ -33,6 +53,7 @@ const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
         createdBy: adminUser._id,
         slackChannelId
     });
+    console.log(`➕ Canal nuevo creado desde Slack: ${fallbackName} (${slackChannelId})`);
     return channel;
 };
 // Estado de la integración
@@ -48,7 +69,7 @@ router.get('/status', (req, res) => {
     });
 });
 // Sincronizar canales de Slack con la base de datos
-router.post('/sync-channels', async (req, res) => {
+router.post('/sync-channels', auth_1.requireAuth, async (req, res) => {
     try {
         if (!slackService_1.default.isConfigured()) {
             return res.status(400).json({
@@ -85,12 +106,23 @@ router.post('/sync-channels', async (req, res) => {
                     name: slackChannel.name,
                     description: slackChannel.purpose?.value || '',
                     isPrivate: slackChannel.is_private || false,
-                    members: [adminUser._id],
-                    createdBy: adminUser._id
+                    members: [adminUser._id, req.userId],
+                    createdBy: adminUser._id,
+                    slackChannelId: slackChannel.id
                 });
             }
             else {
                 console.log(`✅ Canal ya existe: ${slackChannel.name}`);
+                if (!channel.slackChannelId) {
+                    channel.slackChannelId = slackChannel.id;
+                    console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannel.id})`);
+                }
+                // ← NUEVO: agrega como miembro a quien hizo el sync, si todavía no lo era
+                const alreadyMember = channel.members.some((m) => m.toString() === req.userId);
+                if (!alreadyMember && req.userId) {
+                    channel.members.push(req.userId);
+                }
+                await channel.save();
             }
             syncedChannels.push(channel);
         }
@@ -151,7 +183,7 @@ router.post('/events', async (req, res) => {
     try {
         console.log('📨 Recibido evento de Slack:', JSON.stringify(req.body, null, 2));
         const { type, challenge, event } = req.body;
-        // ← NUEVO: Verificar que la petición realmente venga de Slack
+        // Verificar que la petición realmente venga de Slack
         const signature = req.headers['x-slack-signature'];
         const timestamp = req.headers['x-slack-request-timestamp'];
         const rawBody = req.rawBody || '';
@@ -176,6 +208,37 @@ router.post('/events', async (req, res) => {
             // Ignorar mensajes del bot para evitar loops
             if (event.bot_id) {
                 console.log('⏭️  Ignorando mensaje del bot');
+                return res.status(200).send('OK');
+            }
+            // Manejar renombrado de canal hecho directamente en Slack
+            if (event.type === 'channel_rename' && event.channel) {
+                console.log('✏️  Canal renombrado en Slack:', event.channel);
+                const slackChannelId = event.channel.id;
+                const newName = event.channel.name;
+                if (slackChannelId && newName) {
+                    const channel = await Channel_1.default.findOne({ slackChannelId });
+                    if (channel) {
+                        if (channel.name !== newName) {
+                            channel.name = newName;
+                            await channel.save();
+                            console.log(`✅ Canal renombrado en SlackBoard: ${slackChannelId} -> ${newName}`);
+                            await slackService_1.default.refreshChannelMap();
+                            const io = req.app.get('io');
+                            if (io) {
+                                io.emit('channel-renamed', {
+                                    channelId: channel._id.toString(),
+                                    name: channel.name
+                                });
+                            }
+                        }
+                        else {
+                            console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard, no se hace nada');
+                        }
+                    }
+                    else {
+                        console.warn(`⚠️  Se recibió channel_rename para un canal no vinculado: ${slackChannelId}`);
+                    }
+                }
                 return res.status(200).send('OK');
             }
             const channelType = (event.channel_type || 'channel').toString();
@@ -230,6 +293,21 @@ router.post('/events', async (req, res) => {
                             });
                         }
                         console.log('✅ Mensaje guardado en MongoDB y emitido al frontend');
+                        try {
+                            const io = req.app.get('io');
+                            await aiService_1.default.checkAndRespond({
+                                text: event.text,
+                                channel,
+                                io,
+                            });
+                        }
+                        catch (aiError) {
+                            console.error('⚠️ Error disparando integración de IA desde Slack:', aiError.message);
+                        }
+                    }
+                    else {
+                        // ← NUEVO: ya no se pierde ningún mensaje en silencio
+                        console.warn(`⚠️  Mensaje de Slack no guardado — channel encontrado: ${!!channel}, user encontrado: ${!!user}`);
                     }
                 }
                 catch (channelError) {
@@ -247,4 +325,10 @@ router.post('/events', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// ===== OAuth por usuario (vinculación real de cuenta) — mismo patrón que Discord =====
+router.get('/oauth/status', auth_1.requireAuth, slackOAuthController_1.getOAuthStatus);
+router.get('/oauth/start', auth_1.requireAuth, slackOAuthController_1.startOAuth);
+router.get('/oauth/callback', slackOAuthController_1.oauthCallback); // público: Slack redirige acá sin nuestro header Authorization
+router.post('/oauth/unlink-workspace', auth_1.requireAuth, slackOAuthController_1.unlinkWorkspace);
+router.post('/oauth/sync-workspace', auth_1.requireAuth, slackOAuthController_1.syncMyWorkspace);
 exports.default = router;

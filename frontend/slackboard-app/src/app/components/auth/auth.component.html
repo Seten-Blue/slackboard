@@ -8,14 +8,14 @@
         <span class="font-display font-bold text-white text-lg">S</span>
       </div>
       <h1 class="font-display font-semibold text-xl text-white">
-        {{ mode === 'login' ? 'Ingresá a SlackBoard' : 'Creá tu cuenta' }}
+        {{ mode === 'login' ? 'Ingresa a SlackBoard' : 'Crea tu cuenta' }}
       </h1>
       <p class="text-sm text-white/40 mt-1.5 flex items-center justify-center gap-1.5">
         <span class="relative flex h-1.5 w-1.5">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pulse opacity-75"></span>
           <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-pulse"></span>
         </span>
-        {{ mode === 'login' ? 'Bienvenido de nuevo' : 'Empezá a usar SlackBoard en segundos' }}
+        {{ mode === 'login' ? 'Bienvenido de nuevo' : 'Empeza a usar SlackBoard en segundos' }}
       </p>
     </div>
 
@@ -38,6 +38,28 @@
                class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors" />
       </div>
 
+      <div *ngIf="mode === 'register'" class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Nombre</label>
+          <input type="text" [(ngModel)]="nombre" name="nombre"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
+                 placeholder="Tu nombre" />
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Apellido</label>
+          <input type="text" [(ngModel)]="apellido" name="apellido"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
+                 placeholder="Tu apellido" />
+        </div>
+      </div>
+
+      <div *ngIf="mode === 'register'">
+        <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Telefono (opcional)</label>
+        <input type="tel" [(ngModel)]="telefono" name="telefono"
+               class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
+               placeholder="+54 11 1234-5678" />
+      </div>
+
       <div>
         <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Email</label>
         <input type="email" [(ngModel)]="email" name="email"
@@ -46,9 +68,9 @@
 
       <div>
         <div class="flex items-center justify-between">
-          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Contraseña</label>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Contrasena</label>
           <a *ngIf="mode === 'login'" routerLink="/forgot-password" class="text-[11px] text-signal hover:underline">
-            ¿Olvidaste tu contraseña?
+            ?Olvidaste tu contrasena?
           </a>
         </div>
         <input type="password" [(ngModel)]="password" name="password"
@@ -62,10 +84,10 @@
     </form>
 
     <p class="text-center text-sm text-white/40 mt-6">
-      {{ mode === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?' }}
+      {{ mode === 'login' ? '?No tenes cuenta?' : '?Ya tenes cuenta?' }}
       <button (click)="toggleMode()" class="text-signal font-medium hover:underline">
-        {{ mode === 'login' ? 'Creá una' : 'Ingresá' }}
+        {{ mode === 'login' ? 'Crea una' : 'Ingresa' }}
       </button>
     </p>
   </div>
-</div>w
+</div>

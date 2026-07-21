@@ -63,7 +63,32 @@ const ChannelSchema = new mongoose_1.Schema({
     slackChannelId: {
         type: String,
         default: null,
-        index: true, // ← para buscar rápido cuando llega un evento
+        index: true,
+    },
+    discordChannelId: {
+        type: String,
+        default: null,
+        index: true,
+    },
+    discordWebhookId: { type: String, default: null },
+    discordWebhookToken: { type: String, default: null },
+    slackTeamId: { type: String, default: null, index: true },
+    whatsappPhone: { type: String, default: null, index: true },
+    displayName: { type: String, default: null },
+    platform: {
+        type: String,
+        enum: ['slack', 'whatsapp', 'discord', 'skype', 'teams', 'other'],
+        default: 'slack',
+        index: true,
+    },
+    aiEnabled: {
+        type: Boolean,
+        default: true,
+    },
+    isAIChannel: {
+        type: Boolean,
+        default: false,
+        index: true,
     },
 }, {
     timestamps: true,

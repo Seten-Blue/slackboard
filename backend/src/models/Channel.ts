@@ -10,6 +10,8 @@ export interface IChannel extends Document {
   createdBy: mongoose.Types.ObjectId;
   slackChannelId?: string;
   discordChannelId?: string;
+  discordWebhookId?: string;
+  discordWebhookToken?: string;
   slackTeamId?: string;
   whatsappPhone?: string;
   displayName?: string;
@@ -57,6 +59,8 @@ const ChannelSchema: Schema = new Schema(
       default: null,
       index: true,
     },
+    discordWebhookId: { type: String, default: null },
+    discordWebhookToken: { type: String, default: null },
     slackTeamId: { type: String, default: null, index: true },
     whatsappPhone: { type: String, default: null, index: true },
     displayName: { type: String, default: null },

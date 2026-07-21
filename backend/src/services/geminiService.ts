@@ -14,23 +14,23 @@ interface GeminiReply {
 }
 
 const SYSTEM_PROMPT = `Sos Zork, un asistente conversacional dentro de un chat estilo Slack.
-Respondé siempre en el mismo idioma del usuario, con ortografía y gramática correctas.
-Tu tono es cálido, cercano y con buena onda, como un compañero de equipo copado, no como un
-manual técnico. Podés usar alguna expresión coloquial cuando quede natural, mostrar interés
+Responde siempre en el mismo idioma del usuario, con ortografia y gramatica correctas.
+Tu tono es calido, cercano y con buena onda, como un companero de equipo copado, no como un
+manual tecnico. Podes usar alguna expresion coloquial cuando quede natural, mostrar interes
 genuino y cerrar con una pregunta o gesto amable cuando tenga sentido.
-Escribí en texto plano: NO uses markdown, NO uses asteriscos, NO uses numerales (#),
-NO uses negritas ni cursivas, NO uses viñetas con "*" o "-". Si necesitás enumerar algo,
-usá oraciones normales o números seguidos de un punto (1. 2. 3.).
-Sé claro y directo respondiendo lo que se te pregunta, pero sin sonar frío ni robótico.`;
+Escribi en texto plano: NO uses markdown, NO uses asteriscos, NO uses numerales (#),
+NO uses negritas ni cursivas, NO uses vinetas con "*" o "-". Si necesitas enumerar algo,
+usa oraciones normales o numeros seguidos de un punto (1. 2. 3.).
+Se claro y directo respondiendo lo que se te pregunta, pero sin sonar frio ni robotico.`;
 
-// Se agotó la cuota gratuita de TODOS los modelos de la cascada por hoy
+// Se agoto la cuota gratuita de TODOS los modelos de la cascada por hoy
 export class QuotaExceededError extends Error {
   constructor() {
     super('QUOTA_EXCEEDED');
   }
 }
 
-// Orden de intento: el más generoso en cuota primero, cayendo a los demás si se agota
+// Orden de intento: el mas generoso en cuota primero, cayendo a los demas si se agota
 const MODEL_CASCADE = [
   'gemini-2.5-flash-lite',
   'gemini-2.5-flash',
@@ -57,7 +57,7 @@ class GeminiService {
     this.apiKey = (process.env.GEMINI_API_KEY || '').trim();
 
     if (!this.apiKey) {
-      console.warn('⚠️  GEMINI_API_KEY no configurado. La integración con IA no funcionará.');
+      console.warn('⚠️  GEMINI_API_KEY no configurado. La integracion con IA no funcionara.');
       return;
     }
 
@@ -84,7 +84,7 @@ class GeminiService {
 
   async generateReply(userMessage: string, history: HistoryTurn[] = []): Promise<GeminiReply> {
     if (!this.ai) {
-      throw new Error('Gemini no está configurado. Verifica GEMINI_API_KEY en .env');
+      throw new Error('Gemini no esta configurado. Verifica GEMINI_API_KEY en .env');
     }
 
     const contents = [
@@ -118,7 +118,7 @@ class GeminiService {
         const isModelError = status === 404 || status === 400;
 
         if (isQuotaError || isModelError) {
-          console.warn(`⏳ "${model}" no disponible (${isQuotaError ? 'cuota agotada' : 'modelo no válido'}). Probando el siguiente...`);
+          console.warn(`⏳ "${model}" no disponible (${isQuotaError ? 'cuota agotada' : 'modelo no valido'}). Probando el siguiente...`);
           this.modelIndex = i + 1;
           continue;
         }
@@ -128,7 +128,7 @@ class GeminiService {
       }
     }
 
-    console.error('❌ Se agotó la cuota de todos los modelos gratuitos de Gemini por hoy');
+    console.error('❌ Se agoto la cuota de todos los modelos gratuitos de Gemini por hoy');
     throw new QuotaExceededError();
   }
 }

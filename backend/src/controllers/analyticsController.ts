@@ -4,7 +4,7 @@ import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
 
-// Obtener estadísticas generales
+// Obtener estadisticas generales
 export const getGeneralStats = async (req: Request, res: Response) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -50,7 +50,7 @@ export const getGeneralStats = async (req: Request, res: Response) => {
       { $limit: 10 },
     ]);
 
-    // Usuarios más activos
+    // Usuarios mas activos
     const topUsers = await Message.aggregate([
       {
         $group: {
@@ -81,7 +81,7 @@ export const getGeneralStats = async (req: Request, res: Response) => {
       { $limit: 5 },
     ]);
 
-    // Horas pico (últimos 7 días)
+    // Horas pico (ultimos 7 dias)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -125,13 +125,13 @@ export const getGeneralStats = async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas',
+      message: 'Error al obtener estadisticas',
       error: error.message,
     });
   }
 };
 
-// Obtener estadísticas por fecha
+// Obtener estadisticas por fecha
 export const getStatsByDate = async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
@@ -154,13 +154,13 @@ export const getStatsByDate = async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas por fecha',
+      message: 'Error al obtener estadisticas por fecha',
       error: error.message,
     });
   }
 };
 
-// Obtener tendencias de mensajes (últimos 30 días)
+// Obtener tendencias de mensajes (ultimos 30 dias)
 export const getMessageTrends = async (req: Request, res: Response) => {
   try {
     const thirtyDaysAgo = new Date();

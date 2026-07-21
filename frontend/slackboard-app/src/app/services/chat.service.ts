@@ -21,7 +21,7 @@ export class ChatService {
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 
-  // 🔹 Nuevo método para subir archivos
+  // 🔹 Nuevo metodo para subir archivos
   uploadAttachment(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
@@ -68,7 +68,7 @@ export class ChatService {
     const url = supported[platform];
     if (!url) {
       return new Observable(observer => {
-        observer.error({ error: { message: `Sincronización aún no disponible para "${platform}".` } });
+        observer.error({ error: { message: `Sincronizacion aun no disponible para "${platform}".` } });
       });
     }
 

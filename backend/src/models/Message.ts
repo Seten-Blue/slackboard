@@ -54,14 +54,14 @@ const MessageSchema: Schema = new Schema(
         ],
       },
     ],
-    // ← NUEVO: URLs de adjuntos/imágenes (usado por Discord, pero sirve
+    // ← NUEVO: URLs de adjuntos/imagenes (usado por Discord, pero sirve
     // igual para cualquier plataforma que mande archivos).
     attachments: {
       type: [String],
       default: [],
     },
     // ← NUEVO: id del mensaje original en Discord. Permite encontrar este
-    // mensaje cuando llega su edición, borrado o una reacción desde Discord.
+    // mensaje cuando llega su edicion, borrado o una reaccion desde Discord.
     discordMessageId: {
       type: String,
       default: null,
@@ -73,8 +73,8 @@ const MessageSchema: Schema = new Schema(
       default: null,
       index: true,
     },
-    // ← NUEVO: true si este mensaje se originó en SlackBoard y el bot lo mandó
-    // hacia una plataforma externa (nos dice si podemos editarlo/borrarlo allá)
+    // ← NUEVO: true si este mensaje se origino en SlackBoard y el bot lo mando
+    // hacia una plataforma externa (nos dice si podemos editarlo/borrarlo alla)
     sentViaBot: {
       type: Boolean,
       default: false,
@@ -85,7 +85,7 @@ const MessageSchema: Schema = new Schema(
   }
 );
 
-// Índice para búsquedas más rápidas
+// Índice para busquedas mas rapidas
 MessageSchema.index({ channel: 1, createdAt: -1 });
 
 export default mongoose.model<IMessage>('Message', MessageSchema);

@@ -2,7 +2,7 @@
 // DESIGN TOKENS
 // Paleta sobria: fondo casi-negro azulado, un solo acento
 // (violeta → cian) reservado para estados activos y el switcher.
-// Los colores de plataforma sólo aparecen en su propio icono.
+// Los colores de plataforma solo aparecen en su propio icono.
 // ============================================================
 :host {
   display: block;
@@ -169,7 +169,7 @@
 }
 .menu__head:hover { background: var(--surface-hover); }
 
-// variante para ítems planos sin desplegable (ej: Trello), usados como <a>
+// variante para items planos sin desplegable (ej: Trello), usados como <a>
 .menu__head--link {
   text-decoration: none;
   box-sizing: border-box;
@@ -258,7 +258,7 @@
 }
 
 // ============ SWITCHER DE PLATAFORMA ============
-// Elemento "firma" del sidebar: acá sí vale la pena el detalle extra.
+// Elemento "firma" del sidebar: aca si vale la pena el detalle extra.
 .switcher {
   position: relative;
   display: flex;

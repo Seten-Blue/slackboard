@@ -73,7 +73,7 @@ class DiscordOAuthService {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Discord rechazó el intercambio de código: ${text}`);
+      throw new Error(`Discord rechazo el intercambio de codigo: ${text}`);
     }
 
     return response.json();

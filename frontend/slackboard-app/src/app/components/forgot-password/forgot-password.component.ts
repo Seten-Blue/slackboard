@@ -16,7 +16,7 @@ export class ForgotPasswordComponent {
 
   submit(): void {
     if (!this.email.trim()) {
-      this.errorMsg = 'Ingresá tu email.';
+      this.errorMsg = 'Ingresa tu email.';
       return;
     }
 
@@ -30,7 +30,7 @@ export class ForgotPasswordComponent {
       },
       error: (err: any) => {
         this.loading = false;
-        this.errorMsg = err?.error?.message || 'Ocurrió un error. Intentá de nuevo.';
+        this.errorMsg = err?.error?.message || 'Ocurrio un error. Intenta de nuevo.';
       }
     });
   }

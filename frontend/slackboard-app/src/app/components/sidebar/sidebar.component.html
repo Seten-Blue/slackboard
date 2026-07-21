@@ -1,6 +1,6 @@
 <aside class="sidebar" (click)="closePlatformDropdown()">
 
-  <!-- Glow decorativo (único, sutil, detrás de la marca) -->
+  <!-- Glow decorativo (unico, sutil, detras de la marca) -->
   <div class="sidebar__glow" aria-hidden="true"></div>
 
   <!-- Header / marca -->
@@ -19,7 +19,7 @@
   </div>
 </div>
 
-  <!-- Navegación -->
+  <!-- Navegacion -->
   <nav class="sidebar__nav">
 
     <!-- ============ DASHBOARD ============ -->
@@ -211,7 +211,7 @@
 
             <p *ngIf="loading" class="channels__empty">Cargando canales…</p>
             <p *ngIf="!loading && filteredChannels.length === 0" class="channels__empty">
-              Sin canales en {{ selectedPlatform.name }} todavía
+              Sin canales en {{ selectedPlatform.name }} todavia
             </p>
           </div>
 
@@ -294,16 +294,16 @@
   </nav>
 
   <!-- Footer / usuario -->
-  <div class="sidebar__footer">
+  <div class="sidebar__footer" routerLink="/profile" style="cursor: pointer;">
     <div class="footer__avatar">
-      A
+      {{ ((authService.currentUser?.nombre || authService.currentUser?.username || 'U')[0]) | uppercase }}
       <span class="footer__avatar-dot"></span>
     </div>
     <div class="footer__info">
       <p class="footer__name">
-  {{ authService.currentUser?.username || 'Usuario' }}
-</p>
-      <p class="footer__state">En línea</p>
+        {{ (authService.currentUser?.nombre || '') + ' ' + (authService.currentUser?.apellido || '') || authService.currentUser?.username || 'Usuario' }}
+      </p>
+      <p class="footer__state">En linea</p>
     </div>
   </div>
 

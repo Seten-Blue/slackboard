@@ -29,7 +29,7 @@ export const startOAuth = async (req: AuthRequest, res: Response) => {
   if (!discordOAuthService.isConfigured()) {
     return res.status(400).json({
       success: false,
-      message: 'Discord OAuth no está configurado (faltan DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET / DISCORD_OAUTH_REDIRECT_URI en .env).',
+      message: 'Discord OAuth no esta configurado (faltan DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET / DISCORD_OAUTH_REDIRECT_URI en .env).',
     });
   }
 
@@ -52,7 +52,7 @@ export const oauthCallback = async (req: Request, res: Response) => {
   try {
     const decoded = jwt.verify(state, JWT_SECRET) as { userId: string; purpose: string };
     if (decoded.purpose !== 'discord-oauth') {
-      throw new Error('state inválido');
+      throw new Error('state invalido');
     }
 
     const tokenData = await discordOAuthService.exchangeCode(code);
@@ -91,7 +91,7 @@ export const oauthCallback = async (req: Request, res: Response) => {
 async function getValidAccessToken(userId: string): Promise<string> {
   const user: any = await User.findById(userId);
   if (!user?.discordAccessToken) {
-    throw new Error('Este usuario no vinculó su cuenta de Discord todavía.');
+    throw new Error('Este usuario no vinculo su cuenta de Discord todavia.');
   }
 
   const isExpired = !user.discordTokenExpiresAt || new Date(user.discordTokenExpiresAt).getTime() < Date.now() + 60_000;
@@ -137,7 +137,7 @@ export const syncMyGuild = async (req: AuthRequest, res: Response) => {
     if (!discordservice.isBotInGuild(guildId)) {
       return res.status(400).json({
         success: false,
-        message: 'El bot todavía no está en ese servidor. Invitalo primero.',
+        message: 'El bot todavia no esta en ese servidor. Invitalo primero.',
       });
     }
 
