@@ -20,11 +20,12 @@ export const getBoards = async (req: Request, res: Response) => {
 export const getBoardContents = async (req: Request, res: Response) => {
   try {
     const { boardId } = req.params;
-    const [lists, cards] = await Promise.all([
+    const [lists, cards, members] = await Promise.all([
       trelloService.getLists(boardId),
       trelloService.getCardsByBoard(boardId),
+      trelloService.getBoardMembers(boardId),
     ]);
-    res.json({ success: true, data: { lists, cards } });
+    res.json({ success: true, data: { lists, cards, members } });
   } catch (error: any) {
     console.error('❌ Error obteniendo contenido del tablero:', error.message);
     res.status(500).json({ success: false, message: 'Error al obtener el tablero', error: error.message });

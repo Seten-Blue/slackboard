@@ -69,8 +69,11 @@ class TrelloService {
   // ---------- Tarjetas ----------
 
   async getCardsByBoard(boardId: string): Promise<any[]> {
-    // ← CAMBIO: se agrego 'badges' para traer contador de adjuntos/comentarios/checklist sin llamadas extra
-    return this.request(`/boards/${boardId}/cards?fields=id,name,desc,idList,pos,due,dueComplete,labels,closed,badges`);
+    return this.request(`/boards/${boardId}/cards?fields=id,name,desc,idList,pos,due,dueComplete,labels,closed,badges,cover,members,idMembers,shortUrl&checklists=all&member_fields=id,fullName,avatarHash,username`);
+  }
+
+  async getBoardMembers(boardId: string): Promise<any[]> {
+    return this.request(`/boards/${boardId}/members?fields=id,fullName,avatarHash,username`);
   }
 
   async createCard(listId: string, name: string, desc?: string): Promise<any> {
