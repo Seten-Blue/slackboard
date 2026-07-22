@@ -27,7 +27,7 @@
             <button type="button"
                     (click)="openEmojiPicker(i, $event)"
                     class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border border-ink-950/10 bg-ink-950/[0.02] hover:bg-signal/5 hover:border-signal/30 transition-all text-lg cursor-pointer"
-                    [ngClass]="{'text-ink-950/30': !option.emoji, 'text-lg': !!option.emoji}">
+                    [ngClass]="option.emoji ? '' : 'text-ink-950/30'">
               <span>{{ option.emoji }}</span>
               <span *ngIf="!option.emoji">😀</span>
             </button>
