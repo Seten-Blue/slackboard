@@ -20,14 +20,20 @@ export class AppComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.socketService.connect();
     this.updateChrome();
 
     this.router.events
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe(() => this.updateChrome());
 
-    this.authService.currentUser$.subscribe(() => this.updateChrome());
+    this.authService.currentUser$.subscribe((user) => {
+      this.updateChrome();
+      if (user) {
+        this.socketService.connect();
+      } else {
+        this.socketService.disconnect();
+      }
+    });
   }
 
   logout() {

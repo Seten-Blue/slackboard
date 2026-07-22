@@ -11,6 +11,7 @@ import { Subscription } from 'rxjs';
 export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked, OnChanges {
   @Input() channel: any;
   @ViewChild('messageContainer') messageContainer!: ElementRef;
+  @ViewChild('messageInput') messageInput!: ElementRef;
 
   messages: any[] = [];
   newMessage = '';
@@ -19,11 +20,36 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   typingTimeout: any;
   currentUser: any;
 
- private subscriptions: Subscription[] = [];
+  private subscriptions: Subscription[] = [];
   private shouldScrollToBottom = false;
 
   selectedFile: File | null = null;
   uploadingFile = false;
+
+  showEmojiPicker = false;
+
+  readonly emojiCategories = [
+    {
+      label: 'Frecuentes',
+      emojis: ['😀', '😂', '😍', '🥰', '😎', '🤔', '😅', '👍', '❤️', '🔥', '✨', '🎉', '👏', '💪', '🙌', '💯']
+    },
+    {
+      label: 'Caras',
+      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🫢', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑']
+    },
+    {
+      label: 'Manos',
+      emojis: ['👍', '👎', '👏', '🙌', '🤝', '💪', '🫶', '✌️', '🤘', '🤙', '👋', '✋', '🖐️', '👌', '🤌', '🫳', '🫴', '🙏']
+    },
+    {
+      label: 'Objetos',
+      emojis: ['📎', '📁', '📂', '📝', '✏️', '🖊️', '📌', '🔗', '📊', '📈', '🗓️', '⏰', '💻', '🖥️', '📱', '📧']
+    },
+    {
+      label: 'Actividad',
+      emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '⭐', '🌟', '💫', '✅', '❌', '⚠️', '🚀', '💡', '🤖', '🎯']
+    }
+  ];
 
   constructor(
     private chatService: ChatService,
@@ -52,6 +78,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   ngOnChanges() {
     if (this.channel) {
+      this.showEmojiPicker = false;
       this.loadMessages();
       this.socketService.joinChannel(this.channel._id);
     }
@@ -81,7 +108,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    // ← NUEVO: alguien edito un mensaje desde una plataforma externa (Discord por ahora)
     const updatedSub = this.socketService.onMessageUpdated().subscribe((data: any) => {
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
@@ -93,12 +119,10 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    // ← NUEVO: alguien borro un mensaje desde una plataforma externa
     const deletedSub = this.socketService.onMessageDeleted().subscribe((data: any) => {
       this.messages = this.messages.filter(m => m._id !== data.messageId);
     });
 
-    // ← NUEVO: se agrego/quito una reaccion desde una plataforma externa
     const reactionSub = this.socketService.onMessageReaction().subscribe((data: any) => {
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
@@ -136,7 +160,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
     const proceed = (attachments: string[]) => {
       const messageData = {
-        content: this.newMessage.trim() || (attachments.length ? '📎 Adjunto' : ''),
+        content: this.newMessage.trim() || (attachments.length ? 'Adjunto' : ''),
         channel: this.channel._id,
         type: attachments.length ? 'file' : 'text',
         attachments
@@ -178,6 +202,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       proceed([]);
     }
   }
+
   onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -203,8 +228,57 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.selectedFile = null;
   }
 
+  toggleEmojiPicker() {
+    this.showEmojiPicker = !this.showEmojiPicker;
+  }
+
+  insertEmoji(emoji: string) {
+    this.newMessage += emoji;
+    this.showEmojiPicker = false;
+    if (this.messageInput) {
+      this.messageInput.nativeElement.focus();
+    }
+  }
+
+  onEmojiPickerClick(event: Event) {
+    event.stopPropagation();
+  }
+
+  downloadFile(url: string, event: Event) {
+    event.preventDefault();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   isImageUrl(url: string): boolean {
     return /\.(png|jpe?g|gif|webp|svg)$/i.test(url || '');
+  }
+
+  getFileName(url: string): string {
+    try {
+      const parts = url.split('/');
+      const last = parts[parts.length - 1].split('?')[0];
+      return decodeURIComponent(last) || 'archivo';
+    } catch {
+      return 'archivo';
+    }
+  }
+
+  getFileIcon(url: string): string {
+    if (/\.pdf$/i.test(url)) return '📄';
+    if (/\.(doc|docx)$/i.test(url)) return '📝';
+    if (/\.(xls|xlsx|csv)$/i.test(url)) return '📊';
+    if (/\.(zip|rar|tar|gz)$/i.test(url)) return '📦';
+    if (/\.(mp4|webm|avi|mov)$/i.test(url)) return '🎬';
+    if (/\.(mp3|wav|ogg|m4a)$/i.test(url)) return '🎵';
+    if (/\.(png|jpe?g|gif|webp|svg)$/i.test(url)) return '🖼️';
+    return '📎';
   }
 
   addReaction(messageId: string, emoji: string) {
@@ -221,7 +295,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     });
   }
 
-  // ← NUEVO: agrupa mensajes consecutivos del mismo usuario (misma logica que Discord/Linear)
   shouldGroupWithPrevious(index: number): boolean {
     if (index === 0) return false;
     const current = this.messages[index];
@@ -231,7 +304,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
     const currentTime = new Date(current.createdAt).getTime();
     const previousTime = new Date(previous.createdAt).getTime();
-    return (currentTime - previousTime) < 5 * 60 * 1000; // 5 minutos
+    return (currentTime - previousTime) < 5 * 60 * 1000;
   }
 
   formatTime(timestamp: string): string {

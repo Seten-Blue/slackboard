@@ -1,4 +1,4 @@
-<div class="flex flex-col h-full min-h-0 bg-paper">
+<div class="flex flex-col h-full min-h-0 bg-paper" (click)="showEmojiPicker = false">
   <!-- Área de mensajes con scroll -->
   <div #messageContainer class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-1">
     <!-- Estado de carga -->
@@ -54,13 +54,30 @@
 
         <p class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
 
-        <div *ngIf="message.attachments?.length" class="mt-2 space-y-1.5">
+        <!-- Adjuntos mejorados -->
+        <div *ngIf="message.attachments?.length" class="mt-2 space-y-2">
           <div *ngFor="let url of message.attachments">
-            <img *ngIf="isImageUrl(url)" [src]="url" class="max-w-xs rounded-lg border border-ink-950/10">
-            <a *ngIf="!isImageUrl(url)" [href]="url" target="_blank"
-               class="inline-flex items-center gap-1.5 px-3 py-2 bg-ink-950/[0.04] rounded-lg text-sm text-ink-950/70 hover:bg-ink-950/[0.08] transition-colors">
-              📎 Descargar archivo
-            </a>
+            <!-- Imagen -->
+            <div *ngIf="isImageUrl(url)" class="relative group/attachment inline-block">
+              <img [src]="url" class="max-w-xs rounded-lg border border-ink-950/10 cursor-pointer hover:opacity-90 transition-opacity">
+              <a [href]="url" target="_blank" rel="noopener noreferrer"
+                 (click)="downloadFile(url, $event)"
+                 class="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-md text-white opacity-0 group-hover/attachment:opacity-100 transition-opacity"
+                 title="Descargar imagen">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </a>
+            </div>
+            <!-- Archivo no-imagen -->
+            <div *ngIf="!isImageUrl(url)"
+                 (click)="downloadFile(url, $event)"
+                 class="inline-flex items-center gap-3 px-3.5 py-2.5 bg-ink-950/[0.04] hover:bg-ink-950/[0.08] border border-ink-950/10 rounded-lg cursor-pointer transition-colors group/attachment">
+              <span class="text-xl flex-shrink-0">{{ getFileIcon(url) }}</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-ink-950/80 truncate">{{ getFileName(url) }}</p>
+                <p class="text-[11px] text-ink-950/40">Clic para descargar</p>
+              </div>
+              <svg class="w-4 h-4 text-ink-950/30 group-hover/attachment:text-ink-950/60 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
           </div>
         </div>
 
@@ -96,33 +113,60 @@
   <!-- Composer -->
   <div *ngIf="channel" class="flex-shrink-0 border-t border-ink-950/10 bg-white px-5 py-4">
     <div *ngIf="selectedFile" class="flex items-center gap-2 mb-2 px-3 py-2 bg-signal/5 border border-signal/20 rounded-lg text-sm">
-      <span class="text-ink-950/70 truncate flex-1">📎 {{ selectedFile.name }}</span>
+      <span class="text-ink-950/70 truncate flex-1">{{ getFileIcon('') }} {{ selectedFile.name }}</span>
       <button (click)="removeSelectedFile()" class="text-ink-950/40 hover:text-red-500 flex-shrink-0" title="Quitar archivo">✕</button>
+    </div>
+
+    <!-- Emoji Picker -->
+    <div *ngIf="showEmojiPicker" class="emoji-picker-container" (click)="onEmojiPickerClick($event)">
+      <div class="emoji-picker-tabs">
+        <button *ngFor="let cat of emojiCategories; let ci = index"
+                class="emoji-picker-tab"
+                [class.active]="false"
+                (click)="null">
+          {{ cat.label }}
+        </button>
+      </div>
+      <div class="emoji-picker-grid">
+        <ng-container *ngFor="let cat of emojiCategories">
+          <button *ngFor="let emoji of cat.emojis"
+                  (click)="insertEmoji(emoji)"
+                  class="emoji-picker-item"
+                  [title]="cat.label">
+            {{ emoji }}
+          </button>
+        </ng-container>
+      </div>
     </div>
 
     <div class="flex items-end gap-3">
       <input type="file" #fileInput (change)="onFileSelected($event)" class="hidden">
 
       <button
-        (click)="fileInput.click()"
+        (click)="fileInput.click(); $event.stopPropagation()"
         type="button"
         [disabled]="uploadingFile"
         class="w-11 h-11 flex-shrink-0 flex items-center justify-center text-ink-950/40 hover:text-ink-950/70 hover:bg-ink-950/5 rounded-xl transition-colors disabled:opacity-50"
         title="Adjuntar archivo">
-        📎
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
       </button>
 
       <div class="flex-1 relative">
         <textarea
+          #messageInput
           [(ngModel)]="newMessage"
           (keydown)="onKeyDown($event)"
           (input)="onTyping()"
+          (click)="$event.stopPropagation()"
           placeholder="Escribe un mensaje en #{{ channel.name }}"
           rows="1"
           class="w-full px-4 py-3 pr-11 bg-ink-950/[0.04] border border-transparent rounded-xl focus:outline-none focus:border-signal/50 focus:bg-white resize-none text-[15px] placeholder:text-ink-950/35 transition-colors"
           style="max-height: 120px; overflow-y: auto;"></textarea>
-        <button class="absolute right-3 bottom-3 text-ink-950/30 hover:text-ink-950/60 transition-colors" title="Agregar emoji">
-          😊
+        <button
+          (click)="toggleEmojiPicker(); $event.stopPropagation()"
+          class="absolute right-3 bottom-3 text-ink-950/30 hover:text-ink-950/60 transition-colors"
+          title="Agregar emoji">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </button>
       </div>
 

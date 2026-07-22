@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Channel from '../models/Channel';
 import geminiService from '../services/geminiService';
 import { ensureAIChannel } from '../services/aiService';
+import { AuthRequest } from '../middleware/auth';
 
 // Estado de la integracion de IA
 export const getAIStatus = async (req: Request, res: Response) => {
@@ -46,9 +47,19 @@ export const toggleAIForChannel = async (req: Request, res: Response) => {
 };
 
 // Fuerza la creacion (o devuelve si ya existe) del canal dedicado a la IA
-export const getOrCreateAIChannel = async (req: Request, res: Response) => {
+export const getOrCreateAIChannel = async (req: AuthRequest, res: Response) => {
   try {
     const channel = await ensureAIChannel();
+
+    // Agregar al usuario autenticado como miembro del canal de IA
+    if (req.userId) {
+      await Channel.findByIdAndUpdate(
+        channel._id,
+        { $addToSet: { members: req.userId } },
+        { new: true }
+      );
+    }
+
     res.json({
       success: true,
       data: channel,

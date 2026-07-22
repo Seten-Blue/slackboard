@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
-import { io, Socket } from 'socket.io-client';
+import { SocketService } from '../../services/socket.service';
+import { Subscription } from 'rxjs';
 
 interface AIMessage {
   _id?: string;
@@ -25,17 +26,21 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   thinking = false;
   errorMsg: string | null = null;
 
-  private socket!: Socket;
   private shouldScroll = false;
+  private subs: Subscription[] = [];
+  private thinkingTimeout: any;
 
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private socketService: SocketService
+  ) {}
 
   ngOnInit(): void {
     this.chatService.getOrCreateAIChannel().subscribe({
       next: (response: any) => {
         this.channel = response.data;
         this.loadMessages();
-        this.connectSocket();
+        this.joinSocket();
         this.chatService.triggerChannelsRefresh();
       },
       error: () => {
@@ -46,7 +51,8 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   ngOnDestroy(): void {
-    this.socket?.disconnect();
+    this.subs.forEach(s => s.unsubscribe());
+    if (this.thinkingTimeout) clearTimeout(this.thinkingTimeout);
   }
 
   ngAfterViewChecked(): void {
@@ -54,6 +60,22 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.scrollToBottom();
       this.shouldScroll = false;
     }
+  }
+
+  private joinSocket(): void {
+    this.socketService.joinChannel(this.channel._id);
+
+    const sub = this.socketService.onNewMessage().subscribe((data: any) => {
+      if (data.channelId === this.channel._id) {
+        this.addMessageIfNew(data.message);
+        this.thinking = false;
+        if (this.thinkingTimeout) {
+          clearTimeout(this.thinkingTimeout);
+          this.thinkingTimeout = null;
+        }
+      }
+    });
+    this.subs.push(sub);
   }
 
   private loadMessages(): void {
@@ -67,21 +89,6 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       error: () => {
         this.errorMsg = 'No se pudieron cargar los mensajes.';
         this.loading = false;
-      }
-    });
-  }
-
-  private connectSocket(): void {
-    this.socket = io('http://localhost:3000');
-
-    this.socket.on('connect', () => {
-      this.socket.emit('join-channel', this.channel._id);
-    });
-
-    this.socket.on('new-message', (data: any) => {
-      if (data.channelId === this.channel._id) {
-        this.addMessageIfNew(data.message);
-        this.thinking = false;
       }
     });
   }
@@ -114,10 +121,15 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.newMessage = '';
         this.sending = false;
         this.thinking = true;
+        if (this.thinkingTimeout) clearTimeout(this.thinkingTimeout);
+        this.thinkingTimeout = setTimeout(() => {
+          this.thinking = false;
+        }, 30000);
       },
       error: () => {
         this.errorMsg = 'No se pudo enviar el mensaje.';
         this.sending = false;
+        this.thinking = false;
       }
     });
   }
