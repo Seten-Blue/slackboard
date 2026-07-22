@@ -8,7 +8,7 @@ const Analytics_1 = __importDefault(require("../models/Analytics"));
 const Message_1 = __importDefault(require("../models/Message"));
 const Channel_1 = __importDefault(require("../models/Channel"));
 const User_1 = __importDefault(require("../models/User"));
-// Obtener estadísticas generales
+// Obtener estadisticas generales
 const getGeneralStats = async (req, res) => {
     try {
         const totalUsers = await User_1.default.countDocuments();
@@ -50,7 +50,7 @@ const getGeneralStats = async (req, res) => {
             { $sort: { count: -1 } },
             { $limit: 10 },
         ]);
-        // Usuarios más activos
+        // Usuarios mas activos
         const topUsers = await Message_1.default.aggregate([
             {
                 $group: {
@@ -80,7 +80,7 @@ const getGeneralStats = async (req, res) => {
             { $sort: { messageCount: -1 } },
             { $limit: 5 },
         ]);
-        // Horas pico (últimos 7 días)
+        // Horas pico (ultimos 7 dias)
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const peakHours = await Message_1.default.aggregate([
@@ -123,13 +123,13 @@ const getGeneralStats = async (req, res) => {
     catch (error) {
         res.status(500).json({
             success: false,
-            message: 'Error al obtener estadísticas',
+            message: 'Error al obtener estadisticas',
             error: error.message,
         });
     }
 };
 exports.getGeneralStats = getGeneralStats;
-// Obtener estadísticas por fecha
+// Obtener estadisticas por fecha
 const getStatsByDate = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -149,13 +149,13 @@ const getStatsByDate = async (req, res) => {
     catch (error) {
         res.status(500).json({
             success: false,
-            message: 'Error al obtener estadísticas por fecha',
+            message: 'Error al obtener estadisticas por fecha',
             error: error.message,
         });
     }
 };
 exports.getStatsByDate = getStatsByDate;
-// Obtener tendencias de mensajes (últimos 30 días)
+// Obtener tendencias de mensajes (ultimos 30 dias)
 const getMessageTrends = async (req, res) => {
     try {
         const thirtyDaysAgo = new Date();

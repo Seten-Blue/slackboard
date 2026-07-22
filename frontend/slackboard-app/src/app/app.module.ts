@@ -25,6 +25,7 @@ import { PollModalComponent } from './components/poll-modal/poll-modal.component
 import { PollRendererComponent } from './components/poll-renderer/poll-renderer.component';
 import { ThreadModalComponent } from './components/thread-modal/thread-modal.component';
 import { ThreadRendererComponent } from './components/thread-renderer/thread-renderer.component';
+import { ThreadPanelComponent } from './components/thread-panel/thread-panel.component';
 
 @NgModule({
   declarations: [
@@ -45,7 +46,8 @@ import { ThreadRendererComponent } from './components/thread-renderer/thread-ren
     PollModalComponent,
     PollRendererComponent,
     ThreadModalComponent,
-    ThreadRendererComponent
+    ThreadRendererComponent,
+    ThreadPanelComponent
   ],
   imports: [
     BrowserModule,

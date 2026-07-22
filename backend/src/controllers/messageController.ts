@@ -15,13 +15,13 @@ export const getMessagesByChannel = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Canal no encontrado' });
     }
 
-    const messages = await Message.find({ channel: channelId })
+    const messages = await Message.find({ channel: channelId, threadParent: null })
       .populate('sender', 'username email avatar status')
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .skip(Number(skip));
 
-    const total = await Message.countDocuments({ channel: channelId });
+    const total = await Message.countDocuments({ channel: channelId, threadParent: null });
 
     res.json({
       success: true,
@@ -99,7 +99,21 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
         if (channelExists.discordChannelId) {
           const discordservice = require('../services/discordservice').default;
           if (discordservice.isConfigured()) {
-            await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar, attachments);
+            if (pollData || threadData) {
+              const discordThreadId = await discordservice.sendStructuredMessage(
+                String(channelExists._id),
+                senderUsername,
+                senderAvatar,
+                pollData || null,
+                threadData || null,
+              );
+              // Guardar discordThreadId si se creó un thread en Discord
+              if (discordThreadId && threadData) {
+                await Message.findByIdAndUpdate(message._id, { discordThreadId });
+              }
+            } else {
+              await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar, attachments);
+            }
             console.log('✅ Mensaje sincronizado con Discord');
           }
         }
@@ -320,6 +334,125 @@ export const votePoll = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Error al votar',
+      error: error.message,
+    });
+  }
+};
+
+// POST /api/messages/:messageId/reply — crear respuesta a un hilo
+export const replyToThread = async (req: AuthRequest, res: Response) => {
+  try {
+    const { messageId } = req.params;
+    const { content, attachments = [] } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+
+    const parentMessage = await Message.findById(messageId);
+    if (!parentMessage) {
+      return res.status(404).json({ success: false, message: 'Mensaje padre no encontrado' });
+    }
+
+    if (parentMessage.type !== 'thread') {
+      return res.status(400).json({ success: false, message: 'El mensaje padre no es un hilo' });
+    }
+
+    const reply = await Message.create({
+      content,
+      channel: parentMessage.channel,
+      sender: req.userId,
+      type: 'text',
+      attachments: Array.isArray(attachments) ? attachments : [],
+      threadParent: parentMessage._id,
+    });
+
+    // Actualizar replyCount y agregar participante al padre
+    const threadData = (parentMessage.threadData as any) || {};
+    threadData.replyCount = (threadData.replyCount || 0) + 1;
+    if (!threadData.participants) threadData.participants = [];
+    if (!threadData.participants.includes(req.userId)) {
+      threadData.participants.push(req.userId);
+    }
+    parentMessage.threadData = threadData;
+    await parentMessage.save();
+
+    const populated = await Message.findById(reply._id)
+      .populate('sender', 'username email avatar status');
+
+    // Enviar respuesta al thread de Discord si existe
+    (async () => {
+      try {
+        const channelDoc = await Channel.findById(parentMessage.channel);
+        if (channelDoc?.discordChannelId) {
+          const discordservice = require('../services/discordservice').default;
+          if (discordservice.isConfigured() && parentMessage.discordThreadId) {
+            const senderUser = populated?.sender as any;
+            await discordservice.sendReplyToThread(
+              String(channelDoc._id),
+              parentMessage.discordThreadId,
+              content,
+              senderUser?.username || 'Usuario',
+              senderUser?.avatar || undefined,
+              attachments,
+            );
+          }
+        }
+      } catch (err: any) {
+        console.error('[Reply] Error enviando respuesta a Discord:', err.message);
+      }
+
+      // Emitir socket event para respuestas en tiempo real
+      try {
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`channel:${parentMessage.channel}`).emit('thread:reply', {
+            parentMessageId: parentMessage._id,
+            reply: populated,
+          });
+        }
+      } catch (_) {}
+    })();
+
+    res.status(201).json({ success: true, data: populated });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al responder',
+      error: error.message,
+    });
+  }
+};
+
+// GET /api/messages/thread/:messageId/replies — obtener respuestas de un hilo
+export const getThreadReplies = async (req: AuthRequest, res: Response) => {
+  try {
+    const { messageId } = req.params;
+    const { limit = 50, skip = 0 } = req.query;
+
+    const parentMessage = await Message.findById(messageId);
+    if (!parentMessage) {
+      return res.status(404).json({ success: false, message: 'Hilo no encontrado' });
+    }
+
+    const replies = await Message.find({ threadParent: messageId })
+      .populate('sender', 'username email avatar status')
+      .sort({ createdAt: 1 })
+      .limit(Number(limit))
+      .skip(Number(skip));
+
+    const total = await Message.countDocuments({ threadParent: messageId });
+
+    res.json({
+      success: true,
+      count: replies.length,
+      total,
+      data: replies,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener respuestas',
       error: error.message,
     });
   }

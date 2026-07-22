@@ -59,6 +59,26 @@ const UserSchema = new mongoose_1.Schema({
         type: String,
         default: null,
     },
+    nombre: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    apellido: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    telefono: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    idioma: {
+        type: String,
+        default: null,
+        trim: true,
+    },
     status: {
         type: String,
         enum: ['online', 'offline', 'away'],

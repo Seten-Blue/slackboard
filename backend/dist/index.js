@@ -68,10 +68,10 @@ mongoose_1.default.connect(MONGODB_URI)
     .catch((error) => {
     console.error('❌ Error conectando a MongoDB:', error);
 });
-// Rutas básicas
+// Rutas basicas
 app.get('/', (req, res) => {
     res.json({
-        message: '🚀 SlackBoard API está funcionando',
+        message: '🚀 SlackBoard API esta funcionando',
         version: '1.0.0',
         endpoints: {
             health: '/health',
@@ -111,7 +111,7 @@ io.on('connection', (socket) => {
     // Unirse a un canal
     socket.on('join-channel', (channelId) => {
         socket.join(channelId);
-        console.log(`Usuario ${socket.id} se unió al canal: ${channelId}`);
+        console.log(`Usuario ${socket.id} se unio al canal: ${channelId}`);
     });
     // Enviar mensaje
     socket.on('send-message', (data) => {
@@ -129,7 +129,7 @@ io.on('connection', (socket) => {
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
-        error: 'Algo salió mal!',
+        error: 'Algo salio mal!',
         message: err.message
     });
 });

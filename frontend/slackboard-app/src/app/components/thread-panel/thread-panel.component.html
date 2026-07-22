@@ -1,0 +1,76 @@
+<div class="thread-panel" *ngIf="isOpen">
+  <div class="panel-header">
+    <div class="panel-title">
+      <span class="panel-icon">💬</span>
+      <h3>Hilo de respuestas</h3>
+    </div>
+    <button (click)="onClose()" class="panel-close" title="Cerrar panel">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+      </svg>
+    </button>
+  </div>
+
+  <div class="panel-replies" #repliesContainer>
+    <div *ngIf="loading" class="loading-state">
+      <div class="flex items-center gap-2 text-ink-950/40 text-sm">
+        <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+        Cargando respuestas…
+      </div>
+    </div>
+
+    <div *ngIf="!loading && replies.length === 0" class="empty-state">
+      <div class="empty-icon">💬</div>
+      <p class="empty-title">Sin respuestas aún</p>
+      <p class="empty-sub">Sé el primero en responder en este hilo</p>
+    </div>
+
+    <div *ngFor="let reply of replies" class="reply-item">
+      <div class="reply-avatar">
+        <img [src]="reply.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
+             [alt]="reply.sender?.username" class="avatar-img">
+      </div>
+      <div class="reply-content">
+        <div class="reply-header">
+          <span class="reply-username">{{ reply.sender?.username || 'Usuario' }}</span>
+          <span class="reply-time">{{ formatTime(reply.createdAt) }}</span>
+          <span *ngIf="reply.isEdited" class="reply-edited">(editado)</span>
+        </div>
+        <p class="reply-text">{{ reply.content }}</p>
+        <div *ngIf="reply.attachments?.length" class="reply-attachments">
+          <div *ngFor="let url of reply.attachments" class="reply-attachment">
+            <a [href]="url" target="_blank" rel="noopener noreferrer" class="attachment-link">
+              📎 Adjunto
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-input">
+    <div class="input-wrapper">
+      <textarea
+        #replyInput
+        [(ngModel)]="newReply"
+        (keydown)="onKeyDown($event)"
+        placeholder="Escribe una respuesta..."
+        rows="1"
+        [disabled]="sending"
+        class="reply-textarea"
+        style="max-height: 80px; overflow-y: auto;"
+      ></textarea>
+      <button
+        (click)="sendReply()"
+        [disabled]="!newReply.trim() || sending"
+        class="send-btn"
+        title="Enviar respuesta">
+        <svg *ngIf="!sending" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+        <span *ngIf="sending" class="text-xs">…</span>
+      </button>
+    </div>
+    <p class="input-hint">Enter para enviar · Shift+Enter nueva línea</p>
+  </div>
+</div>

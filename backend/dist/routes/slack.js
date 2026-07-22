@@ -17,13 +17,13 @@ const normalizeChannelName = (name) => (name || '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-');
-// ← CORREGIDO: matching por nombre normalizado en vez de comparación exacta
+// ← CORREGIDO: matching por nombre normalizado en vez de comparacion exacta
 const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
     const fallbackName = channelName || `slack-${slackChannelId}`;
     const normalizedIncoming = normalizeChannelName(fallbackName);
-    // 1. Buscar primero por slackChannelId (la forma más confiable una vez vinculado)
+    // 1. Buscar primero por slackChannelId (la forma mas confiable una vez vinculado)
     let channel = await Channel_1.default.findOne({ slackChannelId });
-    // 2. Si no hay vínculo aún, buscar por nombre normalizado entre todos los canales
+    // 2. Si no hay vinculo aun, buscar por nombre normalizado entre todos los canales
     if (!channel) {
         const allChannels = await Channel_1.default.find({});
         const match = allChannels.find((c) => normalizeChannelName(c.name) === normalizedIncoming);
@@ -31,7 +31,7 @@ const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
             channel = match;
         }
     }
-    // 3. Si lo encontramos por nombre, vincularlo con su slackChannelId para la próxima vez
+    // 3. Si lo encontramos por nombre, vincularlo con su slackChannelId para la proxima vez
     if (channel) {
         if (!channel.slackChannelId) {
             channel.slackChannelId = slackChannelId;
@@ -40,7 +40,7 @@ const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
         }
         return channel;
     }
-    // 4. Si de verdad no existe en ningún lado, ahí sí se crea uno nuevo
+    // 4. Si de verdad no existe en ningun lado, ahi si se crea uno nuevo
     let adminUser = await User_1.default.findOne({ email: 'admin@slackboard.com' }) || await User_1.default.findOne();
     if (!adminUser) {
         throw new Error('No existe un usuario admin para crear el canal sincronizado desde Slack');
@@ -56,16 +56,16 @@ const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
     console.log(`➕ Canal nuevo creado desde Slack: ${fallbackName} (${slackChannelId})`);
     return channel;
 };
-// Estado de la integración
+// Estado de la integracion
 router.get('/status', (req, res) => {
     const configured = slackService_1.default.isConfigured();
     res.json({
         success: true,
         configured: configured,
         message: configured
-            ? 'Slack está configurado y funcionando'
-            : 'Slack no está configurado. Usa un Bot User OAuth Token (xoxb-...) y, para recibir mensajes, configura SLACK_SIGNING_SECRET y un endpoint público.',
-        token: configured ? 'Bot token válido' : 'Token no válido o no encontrado'
+            ? 'Slack esta configurado y funcionando'
+            : 'Slack no esta configurado. Usa un Bot User OAuth Token (xoxb-...) y, para recibir mensajes, configura SLACK_SIGNING_SECRET y un endpoint publico.',
+        token: configured ? 'Bot token valido' : 'Token no valido o no encontrado'
     });
 });
 // Sincronizar canales de Slack con la base de datos
@@ -74,7 +74,7 @@ router.post('/sync-channels', auth_1.requireAuth, async (req, res) => {
         if (!slackService_1.default.isConfigured()) {
             return res.status(400).json({
                 success: false,
-                message: 'Slack no está configurado. Verifica SLACK_BOT_TOKEN en .env'
+                message: 'Slack no esta configurado. Verifica SLACK_BOT_TOKEN en .env'
             });
         }
         console.log('🔄 Sincronizando canales de Slack...');
@@ -117,7 +117,7 @@ router.post('/sync-channels', auth_1.requireAuth, async (req, res) => {
                     channel.slackChannelId = slackChannel.id;
                     console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannel.id})`);
                 }
-                // ← NUEVO: agrega como miembro a quien hizo el sync, si todavía no lo era
+                // ← NUEVO: agrega como miembro a quien hizo el sync, si todavia no lo era
                 const alreadyMember = channel.members.some((m) => m.toString() === req.userId);
                 if (!alreadyMember && req.userId) {
                     channel.members.push(req.userId);
@@ -155,7 +155,7 @@ router.post('/send-message', async (req, res) => {
         if (!slackService_1.default.isConfigured()) {
             return res.status(400).json({
                 success: false,
-                message: 'Slack no está configurado'
+                message: 'Slack no esta configurado'
             });
         }
         console.log(`📤 Enviando mensaje a #${channelName}:`, text);
@@ -183,23 +183,23 @@ router.post('/events', async (req, res) => {
     try {
         console.log('📨 Recibido evento de Slack:', JSON.stringify(req.body, null, 2));
         const { type, challenge, event } = req.body;
-        // Verificar que la petición realmente venga de Slack
+        // Verificar que la peticion realmente venga de Slack
         const signature = req.headers['x-slack-signature'];
         const timestamp = req.headers['x-slack-request-timestamp'];
         const rawBody = req.rawBody || '';
         if (slackService_1.default.isSignatureVerificationEnabled()) {
             const isValid = slackService_1.default.verifySignature(rawBody, timestamp, signature);
             if (!isValid) {
-                console.warn('⚠️  Firma de Slack inválida, petición rechazada');
-                return res.status(401).send('Firma inválida');
+                console.warn('⚠️  Firma de Slack invalida, peticion rechazada');
+                return res.status(401).send('Firma invalida');
             }
         }
         else if (!signature || !timestamp) {
-            console.warn('⚠️  No se recibió firma de Slack; se procesará el evento aunque la verificación esté deshabilitada');
+            console.warn('⚠️  No se recibio firma de Slack; se procesara el evento aunque la verificacion este deshabilitada');
         }
-        // Responder al challenge de verificación de URL
+        // Responder al challenge de verificacion de URL
         if (type === 'url_verification') {
-            console.log('✅ Verificación de URL - Challenge:', challenge);
+            console.log('✅ Verificacion de URL - Challenge:', challenge);
             return res.status(200).json({ challenge });
         }
         // Manejar eventos de mensajes
@@ -232,17 +232,17 @@ router.post('/events', async (req, res) => {
                             }
                         }
                         else {
-                            console.log('ℹ️  El canal ya tenía ese nombre en SlackBoard, no se hace nada');
+                            console.log('ℹ️  El canal ya tenia ese nombre en SlackBoard, no se hace nada');
                         }
                     }
                     else {
-                        console.warn(`⚠️  Se recibió channel_rename para un canal no vinculado: ${slackChannelId}`);
+                        console.warn(`⚠️  Se recibio channel_rename para un canal no vinculado: ${slackChannelId}`);
                     }
                 }
                 return res.status(200).send('OK');
             }
             const channelType = (event.channel_type || 'channel').toString();
-            // Manejar mensaje de canal público, privado o DM sin depender de un payload exacto
+            // Manejar mensaje de canal publico, privado o DM sin depender de un payload exacto
             if (event.type === 'message' && ['channel', 'group', 'im'].includes(channelType)) {
                 console.log('💬 Procesando mensaje de Slack');
                 if (event.subtype) {
@@ -273,7 +273,7 @@ router.post('/events', async (req, res) => {
                         channelName = channelInfo.channel?.name;
                     }
                     catch (channelInfoError) {
-                        console.warn('⚠️  No se pudo obtener información del canal de Slack:', channelInfoError.message);
+                        console.warn('⚠️  No se pudo obtener informacion del canal de Slack:', channelInfoError.message);
                     }
                     const channel = await resolveOrCreateSlackChannel(event.channel, channelName);
                     if (channel && user) {
@@ -302,11 +302,11 @@ router.post('/events', async (req, res) => {
                             });
                         }
                         catch (aiError) {
-                            console.error('⚠️ Error disparando integración de IA desde Slack:', aiError.message);
+                            console.error('⚠️ Error disparando integracion de IA desde Slack:', aiError.message);
                         }
                     }
                     else {
-                        // ← NUEVO: ya no se pierde ningún mensaje en silencio
+                        // ← NUEVO: ya no se pierde ningun mensaje en silencio
                         console.warn(`⚠️  Mensaje de Slack no guardado — channel encontrado: ${!!channel}, user encontrado: ${!!user}`);
                     }
                 }
@@ -325,10 +325,10 @@ router.post('/events', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-// ===== OAuth por usuario (vinculación real de cuenta) — mismo patrón que Discord =====
+// ===== OAuth por usuario (vinculacion real de cuenta) — mismo patron que Discord =====
 router.get('/oauth/status', auth_1.requireAuth, slackOAuthController_1.getOAuthStatus);
 router.get('/oauth/start', auth_1.requireAuth, slackOAuthController_1.startOAuth);
-router.get('/oauth/callback', slackOAuthController_1.oauthCallback); // público: Slack redirige acá sin nuestro header Authorization
+router.get('/oauth/callback', slackOAuthController_1.oauthCallback); // publico: Slack redirige aca sin nuestro header Authorization
 router.post('/oauth/unlink-workspace', auth_1.requireAuth, slackOAuthController_1.unlinkWorkspace);
 router.post('/oauth/sync-workspace', auth_1.requireAuth, slackOAuthController_1.syncMyWorkspace);
 exports.default = router;

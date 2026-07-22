@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addReaction = exports.deleteMessage = exports.updateMessage = exports.createMessage = exports.getMessagesByChannel = void 0;
+exports.getThreadReplies = exports.replyToThread = exports.votePoll = exports.addReaction = exports.deleteMessage = exports.updateMessage = exports.createMessage = exports.getMessagesByChannel = void 0;
 const Message_1 = __importDefault(require("../models/Message"));
 const Channel_1 = __importDefault(require("../models/Channel"));
 const aiService_1 = __importDefault(require("../services/aiService"));
@@ -26,7 +26,7 @@ const getMessagesByChannel = async (req, res) => {
             success: true,
             count: messages.length,
             total,
-            data: messages.reverse(), // Ordenar de más antiguo a más reciente
+            data: messages.reverse(), // Ordenar de mas antiguo a mas reciente
         });
     }
     catch (error) {
@@ -41,7 +41,7 @@ exports.getMessagesByChannel = getMessagesByChannel;
 // Crear un nuevo mensaje
 const createMessage = async (req, res) => {
     try {
-        const { content, channel, type = 'text' } = req.body;
+        const { content, channel, type = 'text', attachments = [], pollData = null, threadData = null } = req.body;
         if (!req.userId) {
             return res.status(401).json({ success: false, message: 'No autenticado' });
         }
@@ -56,12 +56,15 @@ const createMessage = async (req, res) => {
         const message = await Message_1.default.create({
             content,
             channel,
-            sender: req.userId, // ← SIEMPRE el usuario autenticado (JWT), nunca lo que mande el body
+            sender: req.userId,
             type,
+            attachments: Array.isArray(attachments) ? attachments : [],
+            pollData: pollData || undefined,
+            threadData: threadData || undefined,
         });
         const populatedMessage = await Message_1.default.findById(message._id)
             .populate('sender', 'username email avatar status');
-        // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condición de carrera
+        // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condicion de carrera
         res.status(201).json({
             success: true,
             message: 'Mensaje enviado',
@@ -76,7 +79,7 @@ const createMessage = async (req, res) => {
                 if (channelExists.slackChannelId) {
                     const slackService = require('../services/slackService').default;
                     if (slackService.isConfigured()) {
-                        await slackService.sendMessage(channelExists.name, content, senderUsername);
+                        await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
                         console.log('✅ Mensaje sincronizado con Slack');
                     }
                 }
@@ -89,7 +92,16 @@ const createMessage = async (req, res) => {
                 if (channelExists.discordChannelId) {
                     const discordservice = require('../services/discordservice').default;
                     if (discordservice.isConfigured()) {
-                        await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar);
+                        if (pollData || threadData) {
+                            const discordThreadId = await discordservice.sendStructuredMessage(String(channelExists._id), senderUsername, senderAvatar, pollData || null, threadData || null);
+                            // Guardar discordThreadId si se creó un thread en Discord
+                            if (discordThreadId && threadData) {
+                                await Message_1.default.findByIdAndUpdate(message._id, { discordThreadId });
+                            }
+                        }
+                        else {
+                            await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar, attachments);
+                        }
                         console.log('✅ Mensaje sincronizado con Discord');
                     }
                 }
@@ -121,7 +133,7 @@ const createMessage = async (req, res) => {
                 });
             }
             catch (aiError) {
-                console.error('⚠️ Error disparando integración de IA:', aiError.message);
+                console.error('⚠️ Error disparando integracion de IA:', aiError.message);
             }
         })();
     }
@@ -144,7 +156,7 @@ const updateMessage = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
         }
         if (existing.sender.toString() !== req.userId) {
-            return res.status(403).json({ success: false, message: 'No podés editar un mensaje de otro usuario' });
+            return res.status(403).json({ success: false, message: 'No podes editar un mensaje de otro usuario' });
         }
         existing.content = content;
         existing.isEdited = true;
@@ -173,7 +185,7 @@ const deleteMessage = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
         }
         if (existing.sender.toString() !== req.userId) {
-            return res.status(403).json({ success: false, message: 'No podés eliminar un mensaje de otro usuario' });
+            return res.status(403).json({ success: false, message: 'No podes eliminar un mensaje de otro usuario' });
         }
         await Message_1.default.findByIdAndDelete(req.params.id);
         res.json({
@@ -190,7 +202,7 @@ const deleteMessage = async (req, res) => {
     }
 };
 exports.deleteMessage = deleteMessage;
-// Agregar/quitar reacción a un mensaje
+// Agregar/quitar reaccion a un mensaje
 const addReaction = async (req, res) => {
     try {
         const { messageId } = req.params;
@@ -203,12 +215,12 @@ const addReaction = async (req, res) => {
                 message: 'Mensaje no encontrado',
             });
         }
-        // Buscar si ya existe esa reacción
+        // Buscar si ya existe esa reaccion
         const existingReaction = message.reactions.find((r) => r.emoji === emoji);
         if (existingReaction) {
             const alreadyReacted = existingReaction.users.some((u) => u.toString() === userId);
             if (alreadyReacted) {
-                // Ya había reaccionado: quitar su reacción
+                // Ya habia reaccionado: quitar su reaccion
                 existingReaction.users = existingReaction.users.filter((id) => id.toString() !== userId);
                 if (existingReaction.users.length === 0) {
                     message.reactions = message.reactions.filter((r) => r.emoji !== emoji);
@@ -226,16 +238,181 @@ const addReaction = async (req, res) => {
             .populate('sender', 'username email avatar status');
         res.json({
             success: true,
-            message: 'Reacción actualizada',
+            message: 'Reaccion actualizada',
             data: updatedMessage,
         });
     }
     catch (error) {
         res.status(500).json({
             success: false,
-            message: 'Error al agregar reacción',
+            message: 'Error al agregar reaccion',
             error: error.message,
         });
     }
 };
 exports.addReaction = addReaction;
+// Votar en una encuesta
+const votePoll = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const { optionIndex } = req.body;
+        const userId = req.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'No autenticado' });
+        }
+        const message = await Message_1.default.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
+        }
+        if (message.type !== 'poll' || !message.pollData) {
+            return res.status(400).json({ success: false, message: 'Este mensaje no es una encuesta' });
+        }
+        if (message.pollData.expiresAt && new Date() > message.pollData.expiresAt) {
+            return res.status(400).json({ success: false, message: 'Esta encuesta ya expiro' });
+        }
+        if (optionIndex < 0 || optionIndex >= message.pollData.options.length) {
+            return res.status(400).json({ success: false, message: 'Opcion invalida' });
+        }
+        const pollData = message.pollData;
+        if (pollData.allowMultiple) {
+            const option = pollData.options[optionIndex];
+            const alreadyVoted = option.voters.some((v) => v.toString() === userId);
+            if (alreadyVoted) {
+                option.voters = option.voters.filter((v) => v.toString() !== userId);
+            }
+            else {
+                option.voters.push(userId);
+            }
+        }
+        else {
+            let hadVotedBefore = false;
+            for (const opt of pollData.options) {
+                const idx = opt.voters.findIndex((v) => v.toString() === userId);
+                if (idx !== -1) {
+                    opt.voters.splice(idx, 1);
+                    hadVotedBefore = true;
+                }
+            }
+            if (!hadVotedBefore || true) {
+                pollData.options[optionIndex].voters.push(userId);
+            }
+        }
+        message.markModified('pollData');
+        await message.save();
+        const populated = await Message_1.default.findById(messageId)
+            .populate('sender', 'username email avatar status');
+        res.json({ success: true, data: populated });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al votar',
+            error: error.message,
+        });
+    }
+};
+exports.votePoll = votePoll;
+// POST /api/messages/:messageId/reply — crear respuesta a un hilo
+const replyToThread = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const { content, attachments = [] } = req.body;
+        if (!req.userId) {
+            return res.status(401).json({ success: false, message: 'No autenticado' });
+        }
+        const parentMessage = await Message_1.default.findById(messageId);
+        if (!parentMessage) {
+            return res.status(404).json({ success: false, message: 'Mensaje padre no encontrado' });
+        }
+        if (parentMessage.type !== 'thread') {
+            return res.status(400).json({ success: false, message: 'El mensaje padre no es un hilo' });
+        }
+        const reply = await Message_1.default.create({
+            content,
+            channel: parentMessage.channel,
+            sender: req.userId,
+            type: 'text',
+            attachments: Array.isArray(attachments) ? attachments : [],
+            threadParent: parentMessage._id,
+        });
+        // Actualizar replyCount y agregar participante al padre
+        const threadData = parentMessage.threadData || {};
+        threadData.replyCount = (threadData.replyCount || 0) + 1;
+        if (!threadData.participants)
+            threadData.participants = [];
+        if (!threadData.participants.includes(req.userId)) {
+            threadData.participants.push(req.userId);
+        }
+        parentMessage.threadData = threadData;
+        await parentMessage.save();
+        const populated = await Message_1.default.findById(reply._id)
+            .populate('sender', 'username email avatar status');
+        // Enviar respuesta al thread de Discord si existe
+        (async () => {
+            try {
+                const channelDoc = await Channel_1.default.findById(parentMessage.channel);
+                if (channelDoc?.discordChannelId) {
+                    const discordservice = require('../services/discordservice').default;
+                    if (discordservice.isConfigured() && parentMessage.discordThreadId) {
+                        const senderUser = populated?.sender;
+                        await discordservice.sendReplyToThread(String(channelDoc._id), parentMessage.discordThreadId, content, senderUser?.username || 'Usuario', senderUser?.avatar || undefined, attachments);
+                    }
+                }
+            }
+            catch (err) {
+                console.error('[Reply] Error enviando respuesta a Discord:', err.message);
+            }
+            // Emitir socket event para respuestas en tiempo real
+            try {
+                const io = req.app.get('io');
+                if (io) {
+                    io.to(`channel:${parentMessage.channel}`).emit('thread:reply', {
+                        parentMessageId: parentMessage._id,
+                        reply: populated,
+                    });
+                }
+            }
+            catch (_) { }
+        })();
+        res.status(201).json({ success: true, data: populated });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al responder',
+            error: error.message,
+        });
+    }
+};
+exports.replyToThread = replyToThread;
+// GET /api/messages/thread/:messageId/replies — obtener respuestas de un hilo
+const getThreadReplies = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const { limit = 50, skip = 0 } = req.query;
+        const parentMessage = await Message_1.default.findById(messageId);
+        if (!parentMessage) {
+            return res.status(404).json({ success: false, message: 'Hilo no encontrado' });
+        }
+        const replies = await Message_1.default.find({ threadParent: messageId })
+            .populate('sender', 'username email avatar status')
+            .sort({ createdAt: 1 })
+            .limit(Number(limit))
+            .skip(Number(skip));
+        const total = await Message_1.default.countDocuments({ threadParent: messageId });
+        res.json({
+            success: true,
+            count: replies.length,
+            total,
+            data: replies,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener respuestas',
+            error: error.message,
+        });
+    }
+};
+exports.getThreadReplies = getThreadReplies;

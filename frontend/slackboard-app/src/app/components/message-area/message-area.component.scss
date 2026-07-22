@@ -5,6 +5,19 @@
   height: 100%;
 }
 
+.thread-layout {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
+.thread-panel-container {
+  width: 360px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(20, 17, 42, 0.1);
+}
+
 div::-webkit-scrollbar {
   width: 6px;
 }

@@ -6,6 +6,8 @@ import {
   deleteMessage,
   addReaction,
   votePoll,
+  replyToThread,
+  getThreadReplies,
 } from '../controllers/messageController';
 import { requireAuth } from '../middleware/auth';
 
@@ -21,6 +23,12 @@ router.get('/channel/:channelId', getMessagesByChannel);
 
 // POST /api/messages - Crear un nuevo mensaje
 router.post('/', createMessage);
+
+// GET /api/messages/thread/:messageId/replies - Obtener respuestas de un hilo
+router.get('/thread/:messageId/replies', getThreadReplies);
+
+// POST /api/messages/:messageId/reply - Responder a un hilo
+router.post('/:messageId/reply', replyToThread);
 
 // PUT /api/messages/:id - Actualizar un mensaje
 router.put('/:id', updateMessage);

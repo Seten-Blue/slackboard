@@ -107,6 +107,17 @@ export class ChatService {
     });
   }
 
+  replyToThread(messageId: string, content: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/messages/${messageId}/reply`, {
+      content,
+      sender: this.authService.currentUser?._id
+    });
+  }
+
+  getThreadReplies(messageId: string, limit = 50, skip = 0): Observable<any> {
+    return this.http.get(`${this.apiUrl}/messages/thread/${messageId}/replies?limit=${limit}&skip=${skip}`);
+  }
+
   setCurrentChannel(channel: any): void {
     this.currentChannelSubject.next(channel);
   }

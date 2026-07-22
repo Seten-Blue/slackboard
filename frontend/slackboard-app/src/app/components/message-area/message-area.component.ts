@@ -33,6 +33,10 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   showPollModal = false;
   showThreadModal = false;
 
+  // Thread panel state
+  showThreadPanel = false;
+  activeThreadId: string | null = null;
+
   readonly emojiCategories = [
     { label: 'Frecuentes', emojis: ['😀', '😂', '😍', '🥰', '😎', '🤔', '😅', '👍', '❤️', '🔥', '✨', '🎉', '👏', '💪', '🙌', '💯'] },
     { label: 'Caras', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🫢', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑'] },
@@ -362,6 +366,16 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       },
       error: () => alert('Error al crear el hilo')
     });
+  }
+
+  openThreadPanel(messageId: string) {
+    this.activeThreadId = messageId;
+    this.showThreadPanel = true;
+  }
+
+  closeThreadPanel() {
+    this.showThreadPanel = false;
+    this.activeThreadId = null;
   }
 
   onKeyDown(event: KeyboardEvent) {

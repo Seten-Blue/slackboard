@@ -84,7 +84,7 @@ const seedData = async () => {
             },
             {
                 name: 'marketing',
-                description: 'Estrategias y campañas de marketing',
+                description: 'Estrategias y campanas de marketing',
                 isPrivate: false,
                 members: [users[0]._id, users[3]._id, users[4]._id],
                 createdBy: users[0]._id,
@@ -101,25 +101,25 @@ const seedData = async () => {
         // Crear mensajes en el canal general
         const generalMessages = [
             {
-                content: '¡Bienvenidos a SlackBoard! 🚀',
+                content: '!Bienvenidos a SlackBoard! 🚀',
                 channel: channels[0]._id,
                 sender: users[0]._id,
                 type: 'text',
             },
             {
-                content: '¡Hola a todos! Muy emocionado de estar aquí',
+                content: '!Hola a todos! Muy emocionado de estar aqui',
                 channel: channels[0]._id,
                 sender: users[1]._id,
                 type: 'text',
             },
             {
-                content: '¿Alguien ha probado las nuevas funciones?',
+                content: '?Alguien ha probado las nuevas funciones?',
                 channel: channels[0]._id,
                 sender: users[2]._id,
                 type: 'text',
             },
             {
-                content: 'Sí, el dashboard se ve increíble 📊',
+                content: 'Si, el dashboard se ve increible 📊',
                 channel: channels[0]._id,
                 sender: users[3]._id,
                 type: 'text',
@@ -134,19 +134,19 @@ const seedData = async () => {
         // Crear mensajes en el canal desarrollo
         const devMessages = [
             {
-                content: 'Necesitamos revisar el código del módulo de analytics',
+                content: 'Necesitamos revisar el codigo del modulo de analytics',
                 channel: channels[1]._id,
                 sender: users[0]._id,
                 type: 'text',
             },
             {
-                content: 'Ya estoy trabajando en eso, debería estar listo hoy',
+                content: 'Ya estoy trabajando en eso, deberia estar listo hoy',
                 channel: channels[1]._id,
                 sender: users[1]._id,
                 type: 'text',
             },
             {
-                content: '¿Alguien puede ayudarme con la integración de Socket.IO?',
+                content: '?Alguien puede ayudarme con la integracion de Socket.IO?',
                 channel: channels[1]._id,
                 sender: users[2]._id,
                 type: 'text',
@@ -155,7 +155,7 @@ const seedData = async () => {
         // Crear mensajes en el canal marketing
         const marketingMessages = [
             {
-                content: 'Tenemos que planear la campaña de lanzamiento',
+                content: 'Tenemos que planear la campana de lanzamiento',
                 channel: channels[2]._id,
                 sender: users[3]._id,
                 type: 'text',
@@ -215,7 +215,7 @@ const seedData = async () => {
             ],
         });
         console.log('✅ Analytics creado');
-        console.log('\n🎉 ¡Datos de prueba creados exitosamente!\n');
+        console.log('\n🎉 !Datos de prueba creados exitosamente!\n');
         console.log('📊 Resumen:');
         console.log(`   - Usuarios: ${users.length}`);
         console.log(`   - Canales: ${channels.length}`);

@@ -14,6 +14,7 @@ export class SocketService {
   private messageDeleted$ = new Subject<any>();
   private messageReaction$ = new Subject<any>();
   private userTyping$ = new Subject<any>();
+  private threadReply$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
   private pendingJoins: string[] = [];
@@ -59,6 +60,7 @@ export class SocketService {
     this.socket.on('message-deleted', (data: any) => this.messageDeleted$.next(data));
     this.socket.on('message-reaction', (data: any) => this.messageReaction$.next(data));
     this.socket.on('user-typing', (data: any) => this.userTyping$.next(data));
+    this.socket.on('thread:reply', (data: any) => this.threadReply$.next(data));
   }
 
   private flushPendingJoins() {
@@ -109,6 +111,10 @@ export class SocketService {
 
   onUserTyping(): Observable<any> {
     return this.userTyping$.asObservable();
+  }
+
+  onThreadReply(): Observable<any> {
+    return this.threadReply$.asObservable();
   }
 
   onConnected(): Observable<any> {

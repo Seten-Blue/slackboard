@@ -1,4 +1,4 @@
-<div class="thread-card" *ngIf="message?.threadData">
+<div class="thread-card" *ngIf="message?.threadData" (click)="onOpenThread()">
   <div class="thread-header">
     <div class="thread-icon-wrap">
       <span class="thread-icon">💬</span>
@@ -12,6 +12,25 @@
     <p class="thread-message">{{ threadMessage }}</p>
   </div>
   <div class="thread-footer">
-    <span class="thread-badge">🧵 Hilo abierto</span>
+    <div class="thread-stats">
+      <span class="thread-badge" *ngIf="replyCount > 0">
+        💬 {{ replyCount }} {{ replyCount === 1 ? 'respuesta' : 'respuestas' }}
+      </span>
+      <span class="thread-badge" *ngIf="replyCount === 0">
+        🧵 Hilo abierto
+      </span>
+      <div class="thread-participants" *ngIf="participants.length > 0">
+        <div class="participant-avatars">
+          <img *ngFor="let p of participants.slice(0, 4)"
+               [src]="p?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
+               [alt]="p?.username"
+               class="participant-avatar">
+          <span *ngIf="participants.length > 4" class="participant-more">
+            +{{ participants.length - 4 }}
+          </span>
+        </div>
+      </div>
+    </div>
+    <span class="thread-open-hint">Click para abrir →</span>
   </div>
 </div>

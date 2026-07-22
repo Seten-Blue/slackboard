@@ -6,10 +6,12 @@
   padding: 14px 16px;
   max-width: 420px;
   margin-top: 4px;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: pointer;
 
   &:hover {
     border-left-color: #4f46e5;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
   }
 }
 
@@ -75,6 +77,15 @@
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid rgba(99, 102, 241, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.thread-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .thread-badge {
@@ -84,4 +95,47 @@
   background: rgba(99, 102, 241, 0.08);
   padding: 3px 10px;
   border-radius: 10px;
+}
+
+.thread-participants {
+  display: flex;
+  align-items: center;
+}
+
+.participant-avatars {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.participant-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-left: -6px;
+  object-fit: cover;
+
+  &:first-child {
+    margin-left: 0;
+  }
+}
+
+.participant-more {
+  font-size: 10px;
+  color: rgba(20, 17, 42, 0.5);
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.thread-open-hint {
+  font-size: 10px;
+  color: rgba(99, 102, 241, 0.5);
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s;
+
+  .thread-card:hover & {
+    opacity: 1;
+  }
 }

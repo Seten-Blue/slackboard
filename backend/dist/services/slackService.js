@@ -19,16 +19,16 @@ class SlackService {
         this.token = (process.env.SLACK_BOT_TOKEN || '').trim();
         this.signingSecret = (process.env.SLACK_SIGNING_SECRET || '').trim();
         if (!this.signingSecret) {
-            console.warn('⚠️  SLACK_SIGNING_SECRET no configurado. Los eventos entrantes no se verificarán (inseguro para producción).');
+            console.warn('⚠️  SLACK_SIGNING_SECRET no configurado. Los eventos entrantes no se verificaran (inseguro para produccion).');
         }
         if (!this.token) {
-            console.warn('⚠️  SLACK_BOT_TOKEN no configurado. La integración con Slack no funcionará.');
+            console.warn('⚠️  SLACK_BOT_TOKEN no configurado. La integracion con Slack no funcionara.');
             this.client = new web_api_1.WebClient();
             return;
         }
         this.client = new web_api_1.WebClient(this.token);
         if (!this.token.startsWith('xoxb-') || this.token === 'xoxb-your-bot-token-here') {
-            console.error('⚠️  Se detectó un token de Slack inválido o de ejemplo. Debe usar un Bot User OAuth Token real (xoxb-...) para enviar y recibir mensajes.');
+            console.error('⚠️  Se detecto un token de Slack invalido o de ejemplo. Debe usar un Bot User OAuth Token real (xoxb-...) para enviar y recibir mensajes.');
             return;
         }
         console.log('✅ Slack SDK inicializado');
@@ -54,7 +54,7 @@ class SlackService {
             console.error('Error obteniendo canales de Slack:', error.message);
         }
     }
-    async sendMessage(channelName, text, username) {
+    async sendMessage(channelName, text, username, attachments) {
         try {
             if (!this.isConfigured()) {
                 console.log('Slack no configurado, mensaje solo local:', { channelName, text });
@@ -68,12 +68,16 @@ class SlackService {
                 slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
             }
             if (!slackChannelId) {
-                throw new Error(`Canal "${channelName}" no encontrado en Slack. Créalo primero o invita al bot.`);
+                throw new Error(`Canal "${channelName}" no encontrado en Slack. Crealo primero o invita al bot.`);
             }
             try {
+                const senderPrefix = username ? `*${username}*: ` : '';
+                const attachmentSuffix = attachments && attachments.length > 0
+                    ? '\n' + attachments.map((url) => `📎 ${url}`).join('\n')
+                    : '';
                 const result = await this.client.chat.postMessage({
                     channel: slackChannelId,
-                    text: text,
+                    text: senderPrefix + text + attachmentSuffix,
                     username: username || 'SlackBoard Bot',
                     icon_emoji: ':robot_face:'
                 });
@@ -85,9 +89,13 @@ class SlackService {
                     console.log(`🔄 Bot no estaba en el canal ${channelName}. Intentando entrar...`);
                     try {
                         await this.client.conversations.join({ channel: slackChannelId });
+                        const senderPrefix = username ? `*${username}*: ` : '';
+                        const retryAttachmentSuffix = attachments && attachments.length > 0
+                            ? '\n' + attachments.map((url) => `📎 ${url}`).join('\n')
+                            : '';
                         const retryResult = await this.client.chat.postMessage({
                             channel: slackChannelId,
-                            text: text,
+                            text: senderPrefix + text + retryAttachmentSuffix,
                             username: username || 'SlackBoard Bot',
                             icon_emoji: ':robot_face:'
                         });
@@ -96,9 +104,9 @@ class SlackService {
                     }
                     catch (joinError) {
                         if (joinError?.data?.error === 'missing_scope') {
-                            throw new Error('El token de Slack no tiene el scope channels:join. Añádelo en OAuth & Permissions y vuelve a instalar la app.');
+                            throw new Error('El token de Slack no tiene el scope channels:join. Anadelo en OAuth & Permissions y vuelve a instalar la app.');
                         }
-                        throw new Error(`El bot no pudo entrar al canal ${channelName}. Invítalo manualmente desde Slack o verifica los permisos de la app.`);
+                        throw new Error(`El bot no pudo entrar al canal ${channelName}. Invitalo manualmente desde Slack o verifica los permisos de la app.`);
                     }
                 }
                 if (error?.data?.error === 'missing_scope') {
@@ -186,12 +194,43 @@ class SlackService {
             const result = await this.client.conversations.leave({
                 channel: channelId
             });
-            console.log(`✅ Bot salió del canal ${channelId}`);
+            console.log(`Bot salio del canal ${channelId}`);
             return result;
         }
         catch (error) {
-            console.error('❌ Error abandonando el canal en Slack:', error.message);
+            console.error('Error abandonando el canal en Slack:', error.message);
             throw error;
+        }
+    }
+    async createChannel(name, isPrivate = false) {
+        if (!this.isConfigured()) {
+            throw new Error('Slack no esta configurado');
+        }
+        const normalizedName = this.normalizeChannelName(name);
+        try {
+            const result = await this.client.conversations.create({
+                name: normalizedName,
+                is_private: isPrivate,
+            });
+            const channelId = result.channel?.id;
+            if (!channelId) {
+                throw new Error('No se obtuvo el ID del canal creado');
+            }
+            this.channelMap.set(normalizedName, channelId);
+            this.channelMap.set(name.toLowerCase(), channelId);
+            console.log(`Canal creado en Slack: ${normalizedName} -> ${channelId}`);
+            try {
+                await this.client.conversations.join({ channel: channelId });
+            }
+            catch (joinErr) {
+                console.warn('Advertencia: no se pudo unir el bot al canal creado:', joinErr.message);
+            }
+            return { channelId, name: normalizedName };
+        }
+        catch (error) {
+            const msg = error?.data?.error || error.message;
+            console.error('Error creando canal en Slack:', msg);
+            throw new Error(`Error creando canal en Slack: ${msg}`);
         }
     }
     // Renombrar un canal en Slack
@@ -215,16 +254,16 @@ class SlackService {
             throw error;
         }
     }
-    // ← NUEVO: verifica que la petición realmente venga de Slack usando el Signing Secret
+    // ← NUEVO: verifica que la peticion realmente venga de Slack usando el Signing Secret
     verifySignature(rawBody, timestamp, signature) {
         if (!this.signingSecret) {
-            console.warn('⚠️  SLACK_SIGNING_SECRET no configurado, se omite verificación de firma (inseguro, configúralo pronto).');
+            console.warn('⚠️  SLACK_SIGNING_SECRET no configurado, se omite verificacion de firma (inseguro, configuralo pronto).');
             return true; // no bloqueamos mientras no tengas el secret puesto
         }
         if (!timestamp || !signature || !rawBody) {
             return false;
         }
-        // Evitar replay attacks: rechazar timestamps de más de 5 minutos
+        // Evitar replay attacks: rechazar timestamps de mas de 5 minutos
         const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 60 * 5;
         if (Number(timestamp) < fiveMinutesAgo) {
             return false;

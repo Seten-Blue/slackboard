@@ -6,9 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const analyticsController_1 = require("../controllers/analyticsController");
 const router = express_1.default.Router();
-// GET /api/analytics - Obtener estadísticas generales
+// GET /api/analytics - Obtener estadisticas generales
 router.get('/', analyticsController_1.getGeneralStats);
-// GET /api/analytics/by-date - Obtener estadísticas por fecha
+// GET /api/analytics/by-date - Obtener estadisticas por fecha
 router.get('/by-date', analyticsController_1.getStatsByDate);
 // GET /api/analytics/trends - Obtener tendencias de mensajes
 router.get('/trends', analyticsController_1.getMessageTrends);

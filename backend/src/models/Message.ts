@@ -19,6 +19,10 @@ export interface IPollData {
 export interface IThreadData {
   title: string;
   initialMessage: string;
+  discordThreadId?: string;
+  replyCount: number;
+  isArchived: boolean;
+  participants: mongoose.Types.ObjectId[];
 }
 
 export interface IMessage extends Document {
@@ -34,7 +38,9 @@ export interface IMessage extends Document {
   attachments?: string[];
   pollData?: IPollData;
   threadData?: IThreadData;
+  threadParent?: mongoose.Types.ObjectId;
   discordMessageId?: string;
+  discordThreadId?: string;
   whatsappMessageId?: string;
   sentViaBot?: boolean;
   createdAt: Date;
@@ -93,9 +99,22 @@ const MessageSchema: Schema = new Schema(
       type: Schema.Types.Mixed,
       default: null,
     },
+    // ← NUEVO: ref al mensaje padre (para respuestas dentro de un thread)
+    threadParent: {
+      type: Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+      index: true,
+    },
     // ← NUEVO: id del mensaje original en Discord. Permite encontrar este
     // mensaje cuando llega su edicion, borrado o una reaccion desde Discord.
     discordMessageId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    // ← NUEVO: id del thread en Discord (solo en mensajes raíz de thread)
+    discordThreadId: {
       type: String,
       default: null,
       index: true,

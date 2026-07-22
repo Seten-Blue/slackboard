@@ -5,8 +5,8 @@ const CLIENT_ID = (process.env.DISCORD_CLIENT_ID || '').trim();
 const CLIENT_SECRET = (process.env.DISCORD_CLIENT_SECRET || '').trim();
 const REDIRECT_URI = (process.env.DISCORD_OAUTH_REDIRECT_URI || '').trim();
 
-// Ver canales, mandar mensajes, historial, reacciones, adjuntos, embeds
-const BOT_PERMISSIONS = '117824';
+// Ver canales, mandar mensajes, historial, reacciones, adjuntos, embeds, gestionar webhooks
+const BOT_PERMISSIONS = '536988768';
 
 interface DiscordTokenResponse {
   access_token: string;

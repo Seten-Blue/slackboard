@@ -1,4 +1,5 @@
-<div class="flex flex-col h-full min-h-0 bg-paper">
+<div class="thread-layout">
+<div class="flex flex-col h-full min-h-0 bg-paper flex-1 min-w-0">
   <!-- Área de mensajes con scroll -->
   <div #messageContainer class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-1">
     <div *ngIf="loading" class="flex justify-center items-center h-full">
@@ -59,7 +60,7 @@
 
         <!-- Thread message -->
         <div *ngIf="isThreadMessage(message)">
-          <app-thread-renderer [message]="message"></app-thread-renderer>
+          <app-thread-renderer [message]="message" (openThread)="openThreadPanel($event)"></app-thread-renderer>
         </div>
 
         <!-- Text message -->
@@ -216,6 +217,16 @@
       <span *ngIf="channel.members" class="font-mono">{{ channel.members.length }} miembros</span>
     </div>
   </div>
+</div>
+
+<!-- Thread Panel (lateral) — inside thread-layout -->
+<app-thread-panel
+  *ngIf="showThreadPanel"
+  [isOpen]="showThreadPanel"
+  [messageId]="activeThreadId"
+  (close)="closeThreadPanel()"
+  class="thread-panel-container"
+></app-thread-panel>
 </div>
 
 <!-- Poll Modal -->
