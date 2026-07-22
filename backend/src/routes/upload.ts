@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB
+  limits: { fileSize: 15 * 1024 * 1024 },
 });
 
 router.post('/', requireAuth, upload.single('file'), (req: Request, res: Response) => {
@@ -33,7 +33,13 @@ router.post('/', requireAuth, upload.single('file'), (req: Request, res: Respons
   const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
   const url = `${baseUrl}/uploads/${req.file.filename}`;
 
-  res.json({ success: true, url });
+  res.json({
+    success: true,
+    url,
+    originalName: req.file.originalname,
+    mimetype: req.file.mimetype,
+    size: req.file.size,
+  });
 });
 
 export default router;

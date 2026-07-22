@@ -16,24 +16,26 @@ export class SocketService {
   private userTyping$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
-  private listenersAttached = false;
+  private pendingJoins: string[] = [];
 
   constructor(private authService: AuthService) {}
 
   connect() {
-    if (this.socket?.connected) return;
+    if (this.socket) {
+      if (this.socket.connected) return;
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+    }
 
     const token = this.authService.token;
     const opts: any = {
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     };
     if (token) {
       opts.auth = { token };
-    }
-
-    if (this.socket) {
-      this.socket.removeAllListeners();
-      this.socket.disconnect();
     }
 
     this.socket = io(environment.socketUrl, opts);
@@ -41,7 +43,7 @@ export class SocketService {
     this.socket.on('connect', () => {
       console.log('✅ Conectado a Socket.IO');
       this.connected$.next();
-      this.attachListeners();
+      this.flushPendingJoins();
     });
 
     this.socket.on('disconnect', () => {
@@ -52,24 +54,28 @@ export class SocketService {
       console.error('⚠️ Error de conexion Socket.IO:', err.message);
     });
 
-    this.attachListeners();
-  }
-
-  private attachListeners() {
-    if (!this.socket || this.listenersAttached) return;
-
     this.socket.on('new-message', (data: any) => this.newMessage$.next(data));
     this.socket.on('message-updated', (data: any) => this.messageUpdated$.next(data));
     this.socket.on('message-deleted', (data: any) => this.messageDeleted$.next(data));
     this.socket.on('message-reaction', (data: any) => this.messageReaction$.next(data));
     this.socket.on('user-typing', (data: any) => this.userTyping$.next(data));
+  }
 
-    this.listenersAttached = true;
+  private flushPendingJoins() {
+    if (!this.socket?.connected) return;
+    const unique = [...new Set(this.pendingJoins)];
+    this.pendingJoins = [];
+    for (const channelId of unique) {
+      this.socket.emit('join-channel', channelId);
+    }
   }
 
   joinChannel(channelId: string) {
-    if (this.socket?.connected) {
+    if (!this.socket) return;
+    if (this.socket.connected) {
       this.socket.emit('join-channel', channelId);
+    } else {
+      this.pendingJoins.push(channelId);
     }
   }
 
@@ -114,7 +120,7 @@ export class SocketService {
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
-      this.listenersAttached = false;
+      this.pendingJoins = [];
     }
   }
 }

@@ -41,7 +41,7 @@ export const getMessagesByChannel = async (req: AuthRequest, res: Response) => {
 // Crear un nuevo mensaje
 export const createMessage = async (req: AuthRequest, res: Response) => {
   try {
-    const { content, channel, type = 'text' } = req.body;
+    const { content, channel, type = 'text', attachments = [] } = req.body;
 
     if (!req.userId) {
       return res.status(401).json({ success: false, message: 'No autenticado' });
@@ -59,8 +59,9 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
     const message = await Message.create({
       content,
       channel,
-      sender: req.userId, // ← SIEMPRE el usuario autenticado (JWT), nunca lo que mande el body
+      sender: req.userId,
       type,
+      attachments: Array.isArray(attachments) ? attachments : [],
     });
 
     const populatedMessage: any = await Message.findById(message._id)
@@ -83,7 +84,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
         if (channelExists.slackChannelId) {
           const slackService = require('../services/slackService').default;
           if (slackService.isConfigured()) {
-            await slackService.sendMessage(channelExists.name, content, senderUsername);
+            await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
             console.log('✅ Mensaje sincronizado con Slack');
           }
         }
@@ -96,7 +97,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
         if (channelExists.discordChannelId) {
           const discordservice = require('../services/discordservice').default;
           if (discordservice.isConfigured()) {
-            await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar);
+            await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar, attachments);
             console.log('✅ Mensaje sincronizado con Discord');
           }
         }

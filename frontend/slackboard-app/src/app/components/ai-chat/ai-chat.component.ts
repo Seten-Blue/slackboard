@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
-import { Subscription } from 'rxjs';
+import { Subscription, interval } from 'rxjs';
 
 interface AIMessage {
   _id?: string;
@@ -29,6 +29,8 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   private shouldScroll = false;
   private subs: Subscription[] = [];
   private thinkingTimeout: any;
+  private pollSub: Subscription | null = null;
+  private lastMessageCount = 0;
 
   constructor(
     private chatService: ChatService,
@@ -52,6 +54,7 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   ngOnDestroy(): void {
     this.subs.forEach(s => s.unsubscribe());
+    this.stopPolling();
     if (this.thinkingTimeout) clearTimeout(this.thinkingTimeout);
   }
 
@@ -68,11 +71,7 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     const sub = this.socketService.onNewMessage().subscribe((data: any) => {
       if (data.channelId === this.channel._id) {
         this.addMessageIfNew(data.message);
-        this.thinking = false;
-        if (this.thinkingTimeout) {
-          clearTimeout(this.thinkingTimeout);
-          this.thinkingTimeout = null;
-        }
+        this.onResponseReceived();
       }
     });
     this.subs.push(sub);
@@ -83,6 +82,7 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.chatService.getMessagesByChannel(this.channel._id).subscribe({
       next: (response: any) => {
         this.messages = response.data || [];
+        this.lastMessageCount = this.messages.length;
         this.loading = false;
         this.shouldScroll = true;
       },
@@ -98,7 +98,43 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
     this.messages.push(msg);
+    this.lastMessageCount = this.messages.length;
     this.shouldScroll = true;
+  }
+
+  private onResponseReceived(): void {
+    this.thinking = false;
+    this.stopPolling();
+    if (this.thinkingTimeout) {
+      clearTimeout(this.thinkingTimeout);
+      this.thinkingTimeout = null;
+    }
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+    this.lastMessageCount = this.messages.length;
+    this.pollSub = interval(3000).subscribe(() => {
+      if (!this.channel) return;
+      this.chatService.getMessagesByChannel(this.channel._id).subscribe({
+        next: (response: any) => {
+          const newMessages = response.data || [];
+          if (newMessages.length > this.lastMessageCount) {
+            for (const msg of newMessages) {
+              this.addMessageIfNew(msg);
+            }
+            this.onResponseReceived();
+          }
+        }
+      });
+    });
+  }
+
+  private stopPolling(): void {
+    if (this.pollSub) {
+      this.pollSub.unsubscribe();
+      this.pollSub = null;
+    }
   }
 
   isAIMessage(msg: AIMessage): boolean {
@@ -121,9 +157,13 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.newMessage = '';
         this.sending = false;
         this.thinking = true;
+
+        this.startPolling();
+
         if (this.thinkingTimeout) clearTimeout(this.thinkingTimeout);
         this.thinkingTimeout = setTimeout(() => {
           this.thinking = false;
+          this.stopPolling();
         }, 30000);
       },
       error: () => {

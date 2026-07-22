@@ -63,7 +63,7 @@ class SlackService {
     }
   }
 
-  async sendMessage(channelName: string, text: string, username?: string): Promise<any> {
+  async sendMessage(channelName: string, text: string, username?: string, attachments?: string[]): Promise<any> {
     try {
       if (!this.isConfigured()) {
         console.log('Slack no configurado, mensaje solo local:', { channelName, text });
@@ -85,9 +85,12 @@ class SlackService {
 
       try {
         const senderPrefix = username ? `*${username}*: ` : '';
+        const attachmentSuffix = attachments && attachments.length > 0
+          ? '\n' + attachments.map((url) => `📎 ${url}`).join('\n')
+          : '';
         const result = await this.client.chat.postMessage({
           channel: slackChannelId,
-          text: senderPrefix + text,
+          text: senderPrefix + text + attachmentSuffix,
           username: username || 'SlackBoard Bot',
           icon_emoji: ':robot_face:'
         });
@@ -101,9 +104,12 @@ class SlackService {
             await this.client.conversations.join({ channel: slackChannelId });
 
             const senderPrefix = username ? `*${username}*: ` : '';
+            const retryAttachmentSuffix = attachments && attachments.length > 0
+              ? '\n' + attachments.map((url) => `📎 ${url}`).join('\n')
+              : '';
             const retryResult = await this.client.chat.postMessage({
               channel: slackChannelId,
-              text: senderPrefix + text,
+              text: senderPrefix + text + retryAttachmentSuffix,
               username: username || 'SlackBoard Bot',
               icon_emoji: ':robot_face:'
             });

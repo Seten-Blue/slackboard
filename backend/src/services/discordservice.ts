@@ -378,6 +378,7 @@ class discordService {
     text: string,
     senderUsername?: string,
     senderAvatar?: string,
+    attachments?: string[],
   ): Promise<string | null> {
     if (!this.isConfigured()) {
       console.log('Discord no configurado, mensaje solo local:', { internalChannelId, text });
@@ -392,6 +393,15 @@ class discordService {
     const webhook = senderUsername ? await this.getOrCreateWebhook(channelDoc) : null;
 
     if (webhook) {
+      if (attachments && attachments.length > 0) {
+        const sent = await webhook.send({
+          content: text,
+          files: attachments,
+          username: senderUsername,
+          avatarURL: senderAvatar || undefined,
+        });
+        return sent.id;
+      }
       const sent = await webhook.send({
         content: text,
         username: senderUsername,
@@ -405,6 +415,10 @@ class discordService {
       throw new Error('El canal de Discord vinculado ya no existe o no admite mensajes de texto.');
     }
 
+    if (attachments && attachments.length > 0) {
+      const sent = await (discordChannel as TextChannel).send({ content: text, files: attachments });
+      return sent.id;
+    }
     const sent = await (discordChannel as TextChannel).send(text);
     return sent.id;
   }

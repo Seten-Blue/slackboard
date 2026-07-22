@@ -1,7 +1,6 @@
-<div class="flex flex-col h-full min-h-0 bg-paper" (click)="showEmojiPicker = false">
+<div class="flex flex-col h-full min-h-0 bg-paper">
   <!-- Área de mensajes con scroll -->
   <div #messageContainer class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-1">
-    <!-- Estado de carga -->
     <div *ngIf="loading" class="flex justify-center items-center h-full">
       <div class="flex items-center gap-2 text-ink-950/40 text-sm">
         <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
@@ -9,7 +8,6 @@
       </div>
     </div>
 
-    <!-- Sin canal seleccionado -->
     <div *ngIf="!channel && !loading" class="flex flex-col items-center justify-center h-full text-center px-6">
       <div class="w-14 h-14 rounded-2xl bg-ink-950/5 flex items-center justify-center mb-4">
         <svg class="w-6 h-6 text-ink-950/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -18,7 +16,6 @@
       <p class="text-sm text-ink-950/50">Elige un canal de la lista para empezar a chatear</p>
     </div>
 
-    <!-- Sin mensajes -->
     <div *ngIf="channel && messages.length === 0 && !loading" class="flex flex-col items-center justify-center h-full text-center px-6">
       <div class="w-14 h-14 rounded-2xl bg-signal/10 flex items-center justify-center mb-4">
         <span class="text-2xl">✨</span>
@@ -30,16 +27,14 @@
     <!-- Lista de mensajes -->
     <div *ngFor="let message of messages; let i = index"
          class="group flex items-start gap-3 px-2 py-1 rounded-lg hover:bg-ink-950/[0.03] transition-colors"
-         [class.mt-3]="!shouldGroupWithPrevious(i)">
+         [class.mt-3]="!shouldGroupWithPrevious(i)"
+         [class.py-3]="isStickerMessage(message)">
 
       <div class="w-9 flex-shrink-0">
-        <img
-          *ngIf="!shouldGroupWithPrevious(i)"
+        <img *ngIf="!shouldGroupWithPrevious(i)"
           [src]="message.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
-          [alt]="message.sender?.username"
-          class="w-9 h-9 rounded-lg">
-        <span
-          *ngIf="shouldGroupWithPrevious(i)"
+          [alt]="message.sender?.username" class="w-9 h-9 rounded-lg">
+        <span *ngIf="shouldGroupWithPrevious(i)"
           class="hidden group-hover:block text-[10px] font-mono text-ink-950/30 text-center leading-9">
           {{ formatTime(message.createdAt) }}
         </span>
@@ -52,14 +47,19 @@
           <span *ngIf="message.isEdited" class="text-[11px] text-ink-950/30">(editado)</span>
         </div>
 
-        <p class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
+        <!-- Sticker message -->
+        <div *ngIf="isStickerMessage(message)" class="sticker-display">
+          <span class="text-6xl leading-none">{{ message.content }}</span>
+        </div>
 
-        <!-- Adjuntos mejorados -->
+        <!-- Text message -->
+        <p *ngIf="!isStickerMessage(message)" class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
+
+        <!-- Adjuntos -->
         <div *ngIf="message.attachments?.length" class="mt-2 space-y-2">
           <div *ngFor="let url of message.attachments">
-            <!-- Imagen -->
             <div *ngIf="isImageUrl(url)" class="relative group/attachment inline-block">
-              <img [src]="url" class="max-w-xs rounded-lg border border-ink-950/10 cursor-pointer hover:opacity-90 transition-opacity">
+              <img [src]="url" class="max-w-xs max-h-80 rounded-lg border border-ink-950/10 cursor-pointer hover:opacity-90 transition-opacity object-cover">
               <a [href]="url" target="_blank" rel="noopener noreferrer"
                  (click)="downloadFile(url, $event)"
                  class="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-md text-white opacity-0 group-hover/attachment:opacity-100 transition-opacity"
@@ -67,7 +67,6 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               </a>
             </div>
-            <!-- Archivo no-imagen -->
             <div *ngIf="!isImageUrl(url)"
                  (click)="downloadFile(url, $event)"
                  class="inline-flex items-center gap-3 px-3.5 py-2.5 bg-ink-950/[0.04] hover:bg-ink-950/[0.08] border border-ink-950/10 rounded-lg cursor-pointer transition-colors group/attachment">
@@ -82,8 +81,7 @@
         </div>
 
         <div *ngIf="message.reactions && message.reactions.length > 0" class="flex flex-wrap gap-1 mt-1.5">
-          <button
-            *ngFor="let reaction of message.reactions"
+          <button *ngFor="let reaction of message.reactions"
             (click)="addReaction(message._id, reaction.emoji)"
             class="inline-flex items-center gap-1 px-2 py-0.5 bg-signal/10 border border-signal/20 rounded-full text-xs hover:bg-signal/20 transition-colors">
             <span>{{ reaction.emoji }}</span>
@@ -91,7 +89,7 @@
           </button>
         </div>
 
-        <div class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div *ngIf="!isStickerMessage(message)" class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button (click)="addReaction(message._id, '👍')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">👍</button>
           <button (click)="addReaction(message._id, '❤️')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">❤️</button>
           <button (click)="addReaction(message._id, '😂')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">😂</button>
@@ -99,7 +97,6 @@
       </div>
     </div>
 
-    <!-- Usuario escribiendo -->
     <div *ngIf="userTyping" class="flex items-center gap-2 px-2 py-2 text-ink-950/40 text-sm italic">
       <div class="flex gap-1">
         <div class="w-1.5 h-1.5 bg-ink-950/30 rounded-full animate-bounce" style="animation-delay: 0s"></div>
@@ -111,45 +108,70 @@
   </div>
 
   <!-- Composer -->
-  <div *ngIf="channel" class="flex-shrink-0 border-t border-ink-950/10 bg-white px-5 py-4">
+  <div *ngIf="channel" class="flex-shrink-0 border-t border-ink-950/10 bg-white px-5 py-4 relative">
     <div *ngIf="selectedFile" class="flex items-center gap-2 mb-2 px-3 py-2 bg-signal/5 border border-signal/20 rounded-lg text-sm">
-      <span class="text-ink-950/70 truncate flex-1">{{ getFileIcon('') }} {{ selectedFile.name }}</span>
+      <span class="text-ink-950/70 truncate flex-1">{{ getFileIcon(selectedFile.name) }} {{ selectedFile.name }} ({{ (selectedFile.size / 1024) | number:'1.0-0' }} KB)</span>
       <button (click)="removeSelectedFile()" class="text-ink-950/40 hover:text-red-500 flex-shrink-0" title="Quitar archivo">✕</button>
     </div>
 
-    <!-- Emoji Picker -->
-    <div *ngIf="showEmojiPicker" class="emoji-picker-container" (click)="onEmojiPickerClick($event)">
-      <div class="emoji-picker-tabs">
-        <button *ngFor="let cat of emojiCategories; let ci = index"
-                class="emoji-picker-tab"
-                [class.active]="false"
-                (click)="null">
-          {{ cat.label }}
-        </button>
+    <!-- Unified Picker (Emojis + Stickers) -->
+    <div *ngIf="showPicker" class="picker-container" (click)="onPickerClick($event)">
+      <div class="picker-tabs">
+        <button (click)="setPickerTab('emojis', $event)" class="picker-tab" [class.active]="pickerTab === 'emojis'">Emojis</button>
+        <button (click)="setPickerTab('stickers', $event)" class="picker-tab" [class.active]="pickerTab === 'stickers'">Stickers</button>
       </div>
-      <div class="emoji-picker-grid">
-        <ng-container *ngFor="let cat of emojiCategories">
-          <button *ngFor="let emoji of cat.emojis"
-                  (click)="insertEmoji(emoji)"
-                  class="emoji-picker-item"
-                  [title]="cat.label">
-            {{ emoji }}
-          </button>
-        </ng-container>
+
+      <!-- Emojis Tab -->
+      <div *ngIf="pickerTab === 'emojis'" class="picker-content">
+        <div class="emoji-category-labels">
+          <button *ngFor="let cat of emojiCategories" class="emoji-cat-btn">{{ cat.label }}</button>
+        </div>
+        <div class="emoji-grid">
+          <ng-container *ngFor="let cat of emojiCategories">
+            <button *ngFor="let emoji of cat.emojis" (click)="insertEmoji(emoji)" class="emoji-item" [title]="cat.label">{{ emoji }}</button>
+          </ng-container>
+        </div>
       </div>
+
+      <!-- Stickers Tab -->
+      <div *ngIf="pickerTab === 'stickers'" class="picker-content">
+        <div class="sticker-packs-scroll">
+          <div *ngFor="let pack of stickerPacks" class="sticker-pack">
+            <p class="sticker-pack-label">{{ pack.name }}</p>
+            <div class="sticker-grid">
+              <button *ngFor="let sticker of pack.stickers" (click)="sendSticker(sticker)" class="sticker-item" [title]="sticker.label">
+                <span class="text-3xl">{{ sticker.emoji }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attachment Menu -->
+    <div *ngIf="showAttachMenu" class="attach-menu-container" (click)="onPickerClick($event)">
+      <button *ngFor="let opt of attachOptions" (click)="handleAttachOption(opt.id)" class="attach-menu-item">
+        <span class="text-xl">{{ opt.icon }}</span>
+        <div class="text-left">
+          <p class="text-sm font-medium text-ink-950">{{ opt.label }}</p>
+          <p class="text-xs text-ink-950/50">{{ opt.desc }}</p>
+        </div>
+      </button>
     </div>
 
     <div class="flex items-end gap-3">
       <input type="file" #fileInput (change)="onFileSelected($event)" class="hidden">
 
-      <button
-        (click)="fileInput.click(); $event.stopPropagation()"
-        type="button"
-        [disabled]="uploadingFile"
-        class="w-11 h-11 flex-shrink-0 flex items-center justify-center text-ink-950/40 hover:text-ink-950/70 hover:bg-ink-950/5 rounded-xl transition-colors disabled:opacity-50"
-        title="Adjuntar archivo">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-      </button>
+      <!-- Attach button with menu -->
+      <div class="relative">
+        <button
+          (click)="toggleAttachMenu($event)"
+          type="button"
+          class="attach-toggle-btn w-11 h-11 flex-shrink-0 flex items-center justify-center text-ink-950/40 hover:text-ink-950/70 hover:bg-ink-950/5 rounded-xl transition-colors"
+          title="Adjuntar">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </button>
+      </div>
 
       <div class="flex-1 relative">
         <textarea
@@ -157,17 +179,17 @@
           [(ngModel)]="newMessage"
           (keydown)="onKeyDown($event)"
           (input)="onTyping()"
-          (click)="$event.stopPropagation()"
           placeholder="Escribe un mensaje en #{{ channel.name }}"
           rows="1"
-          class="w-full px-4 py-3 pr-11 bg-ink-950/[0.04] border border-transparent rounded-xl focus:outline-none focus:border-signal/50 focus:bg-white resize-none text-[15px] placeholder:text-ink-950/35 transition-colors"
+          class="w-full px-4 py-3 pr-14 bg-ink-950/[0.04] border border-transparent rounded-xl focus:outline-none focus:border-signal/50 focus:bg-white resize-none text-[15px] placeholder:text-ink-950/35 transition-colors"
           style="max-height: 120px; overflow-y: auto;"></textarea>
-        <button
-          (click)="toggleEmojiPicker(); $event.stopPropagation()"
-          class="absolute right-3 bottom-3 text-ink-950/30 hover:text-ink-950/60 transition-colors"
-          title="Agregar emoji">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </button>
+        <div class="absolute right-2 bottom-2">
+          <button (click)="togglePicker($event)"
+            class="picker-toggle-btn w-8 h-8 flex items-center justify-center text-ink-950/30 hover:text-ink-950/60 rounded-lg hover:bg-ink-950/5 transition-colors"
+            title="Emojis y Stickers">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.671 1.5-1.5S16.328 8 15.5 8 14 8.671 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.671 1.5-1.5S9.328 8 8.5 8 7 8.671 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+          </button>
+        </div>
       </div>
 
       <button
@@ -185,3 +207,19 @@
     </div>
   </div>
 </div>
+
+<!-- Poll Modal -->
+<app-poll-modal
+  [isOpen]="showPollModal"
+  [channelName]="channel?.name || ''"
+  (close)="showPollModal = false"
+  (submit)="onPollSubmit($event)"
+></app-poll-modal>
+
+<!-- Thread Modal -->
+<app-thread-modal
+  [isOpen]="showThreadModal"
+  [channelName]="channel?.name || ''"
+  (close)="showThreadModal = false"
+  (submit)="onThreadSubmit($event)"
+></app-thread-modal>

@@ -1,0 +1,74 @@
+<div *ngIf="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="onClose()">
+  <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-6" (click)="$event.stopPropagation()">
+
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="font-display font-semibold text-base text-ink-950">Crear encuesta</h2>
+      <button (click)="onClose()" class="text-ink-950/40 hover:text-ink-950 text-lg leading-none">✕</button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-ink-950 mb-1.5">Pregunta</label>
+        <input type="text"
+               [(ngModel)]="question"
+               placeholder="Escribe tu pregunta..."
+               class="w-full px-3 py-2 rounded-lg border border-ink-950/10 bg-paper text-ink-950 text-sm placeholder-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-ink-950 mb-1.5">Opciones</label>
+        <div class="space-y-2">
+          <div *ngFor="let option of options; let i = index" class="flex items-center gap-2">
+            <input type="text"
+                   [(ngModel)]="options[i]"
+                   [placeholder]="'Opcion ' + (i + 1)"
+                   class="flex-1 px-3 py-2 rounded-lg border border-ink-950/10 bg-paper text-ink-950 text-sm placeholder-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal" />
+            <button *ngIf="options.length > 2"
+                    (click)="removeOption(i)"
+                    class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-ink-950/40 hover:text-red-500 hover:bg-red-50 transition-colors text-sm">
+              ✕
+            </button>
+            <div *ngIf="options.length <= 2" class="w-8 h-8 flex-shrink-0"></div>
+          </div>
+        </div>
+        <button *ngIf="options.length < 10"
+                (click)="addOption()"
+                class="mt-2 flex items-center gap-1 text-sm font-medium text-signal hover:text-signal/80 transition-colors">
+          <span class="text-lg leading-none">+</span> Agregar opcion
+        </button>
+      </div>
+
+      <div class="flex items-center gap-6 pt-1">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <span class="relative inline-flex items-center">
+            <input type="checkbox" [(ngModel)]="allowMultiple" class="sr-only peer" />
+            <span class="w-9 h-5 rounded-full bg-ink-950/10 peer-checked:bg-signal transition-colors"></span>
+            <span class="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4"></span>
+          </span>
+          <span class="text-sm text-ink-950/70">Multiples respuestas</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <span class="relative inline-flex items-center">
+            <input type="checkbox" [(ngModel)]="isAnonymous" class="sr-only peer" />
+            <span class="w-9 h-5 rounded-full bg-ink-950/10 peer-checked:bg-signal transition-colors"></span>
+            <span class="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4"></span>
+          </span>
+          <span class="text-sm text-ink-950/70">Votacion anonima</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-ink-950/10">
+      <button (click)="onClose()"
+              class="px-4 py-2 rounded-lg border border-ink-950/15 text-sm font-medium text-ink-950 hover:bg-ink-950/5 transition-colors">
+        Cancelar
+      </button>
+      <button (click)="onSubmit()"
+              [disabled]="!isValid"
+              class="px-4 py-2 rounded-lg bg-signal text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90">
+        Crear encuesta
+      </button>
+    </div>
+
+  </div>
+</div>

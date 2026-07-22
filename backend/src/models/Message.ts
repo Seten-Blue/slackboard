@@ -4,7 +4,7 @@ export interface IMessage extends Document {
   content: string;
   channel: mongoose.Types.ObjectId;
   sender: mongoose.Types.ObjectId;
-  type: 'text' | 'image' | 'file';
+  type: 'text' | 'image' | 'file' | 'sticker';
   isEdited: boolean;
   reactions: {
     emoji: string;
@@ -36,7 +36,7 @@ const MessageSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'image', 'file'],
+      enum: ['text', 'image', 'file', 'sticker'],
       default: 'text',
     },
     isEdited: {

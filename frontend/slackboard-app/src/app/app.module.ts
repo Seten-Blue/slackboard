@@ -21,6 +21,8 @@ import { DiscordLinkModalComponent } from './components/discord-link-modal/disco
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { SlackLinkModalComponent } from './components/slack-link-modal/slack-link-modal.component';
 import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
+import { PollModalComponent } from './components/poll-modal/poll-modal.component';
+import { ThreadModalComponent } from './components/thread-modal/thread-modal.component';
 
 @NgModule({
   declarations: [
@@ -37,7 +39,9 @@ import { ProfileSettingsComponent } from './components/profile-settings/profile-
     ResetPasswordComponent,
     DiscordLinkModalComponent,
     SlackLinkModalComponent,
-    ProfileSettingsComponent
+    ProfileSettingsComponent,
+    PollModalComponent,
+    ThreadModalComponent
   ],
   imports: [
     BrowserModule,

@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges, HostListener } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
 import { Subscription } from 'rxjs';
@@ -12,6 +12,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   @Input() channel: any;
   @ViewChild('messageContainer') messageContainer!: ElementRef;
   @ViewChild('messageInput') messageInput!: ElementRef;
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   messages: any[] = [];
   newMessage = '';
@@ -26,29 +27,95 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   selectedFile: File | null = null;
   uploadingFile = false;
 
-  showEmojiPicker = false;
+  showPicker = false;
+  pickerTab: 'emojis' | 'stickers' = 'emojis';
+  showAttachMenu = false;
+  showPollModal = false;
+  showThreadModal = false;
 
   readonly emojiCategories = [
+    { label: 'Frecuentes', emojis: ['😀', '😂', '😍', '🥰', '😎', '🤔', '😅', '👍', '❤️', '🔥', '✨', '🎉', '👏', '💪', '🙌', '💯'] },
+    { label: 'Caras', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🫢', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑'] },
+    { label: 'Manos', emojis: ['👍', '👎', '👏', '🙌', '🤝', '💪', '🫶', '✌️', '🤘', '🤙', '👋', '✋', '🖐️', '👌', '🤌', '🫳', '🫴', '🙏'] },
+    { label: 'Objetos', emojis: ['📎', '📁', '📂', '📝', '✏️', '🖊️', '📌', '🔗', '📊', '📈', '🗓️', '⏰', '💻', '🖥️', '📱', '📧'] },
+    { label: 'Actividad', emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '⭐', '🌟', '💫', '✅', '❌', '⚠️', '🚀', '💡', '🤖', '🎯'] }
+  ];
+
+  readonly stickerPacks = [
     {
-      label: 'Frecuentes',
-      emojis: ['😀', '😂', '😍', '🥰', '😎', '🤔', '😅', '👍', '❤️', '🔥', '✨', '🎉', '👏', '💪', '🙌', '💯']
+      name: 'Reacciones',
+      stickers: [
+        { id: 'thumbsup', emoji: '👍', label: 'Aprobado' },
+        { id: 'heart', emoji: '❤️', label: 'Corazon' },
+        { id: 'fire', emoji: '🔥', label: 'Fuego' },
+        { id: 'clap', emoji: '👏', label: 'Aplauso' },
+        { id: 'laugh', emoji: '😂', label: 'Me muero' },
+        { id: 'cry', emoji: '😭', label: 'Lloro' },
+        { id: 'wow', emoji: '😮', label: 'Wow' },
+        { id: 'think', emoji: '🤔', label: 'Pensando' },
+        { id: 'cool', emoji: '😎', label: 'Cool' },
+        { id: 'pray', emoji: '🙏', label: 'Gracias' },
+        { id: 'strong', emoji: '💪', label: 'Fuerza' },
+        { id: 'hundred', emoji: '💯', label: 'Perfecto' },
+      ]
     },
     {
-      label: 'Caras',
-      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🫢', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑']
+      name: 'Objetos',
+      stickers: [
+        { id: 'rocket', emoji: '🚀', label: 'Lanzamiento' },
+        { id: 'star', emoji: '⭐', label: 'Estrella' },
+        { id: 'trophy', emoji: '🏆', label: 'Victoria' },
+        { id: 'lightning', emoji: '⚡', label: 'Energia' },
+        { id: 'sparkles', emoji: '✨', label: 'Brillar' },
+        { id: 'check', emoji: '✅', label: 'Hecho' },
+        { id: 'x', emoji: '❌', label: 'No' },
+        { id: 'warning', emoji: '⚠️', label: 'Atencion' },
+        { id: 'bug', emoji: '🐛', label: 'Bug' },
+        { id: 'wip', emoji: '🔧', label: 'En progreso' },
+        { id: 'party', emoji: '🎉', label: 'Fiesta' },
+        { id: 'eyes', emoji: '👀', label: 'Mirando' },
+      ]
     },
     {
-      label: 'Manos',
-      emojis: ['👍', '👎', '👏', '🙌', '🤝', '💪', '🫶', '✌️', '🤘', '🤙', '👋', '✋', '🖐️', '👌', '🤌', '🫳', '🫴', '🙏']
+      name: 'Animales',
+      stickers: [
+        { id: 'cat', emoji: '🐱', label: 'Gato' },
+        { id: 'dog', emoji: '🐶', label: 'Perro' },
+        { id: 'bear', emoji: '🐻', label: 'Oso' },
+        { id: 'fox', emoji: '🦊', label: 'Zorro' },
+        { id: 'owl', emoji: '🦉', label: 'Buho' },
+        { id: 'penguin', emoji: '🐧', label: 'Pingüino' },
+        { id: 'unicorn', emoji: '🦄', label: 'Unicornio' },
+        { id: 'dragon', emoji: '🐉', label: 'Dragon' },
+        { id: 'robot', emoji: '🤖', label: 'Robot' },
+        { id: 'alien', emoji: '👽', label: 'Alien' },
+        { id: 'ghost', emoji: '👻', label: 'Fantasma' },
+        { id: 'skull', emoji: '💀', label: 'Muerto' },
+      ]
     },
     {
-      label: 'Objetos',
-      emojis: ['📎', '📁', '📂', '📝', '✏️', '🖊️', '📌', '🔗', '📊', '📈', '🗓️', '⏰', '💻', '🖥️', '📱', '📧']
-    },
-    {
-      label: 'Actividad',
-      emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '⭐', '🌟', '💫', '✅', '❌', '⚠️', '🚀', '💡', '🤖', '🎯']
+      name: 'Comida',
+      stickers: [
+        { id: 'coffee', emoji: '☕', label: 'Cafe' },
+        { id: 'pizza', emoji: '🍕', label: 'Pizza' },
+        { id: 'beer', emoji: '🍺', label: 'Cerveza' },
+        { id: 'taco', emoji: '🌮', label: 'Taco' },
+        { id: 'sushi', emoji: '🍣', label: 'Sushi' },
+        { id: 'cake', emoji: '🎂', label: 'Torta' },
+        { id: 'icecream', emoji: '🍦', label: 'Helado' },
+        { id: 'cookie', emoji: '🍪', label: 'Galleta' },
+        { id: 'apple', emoji: '🍎', label: 'Manzana' },
+        { id: 'banana', emoji: '🍌', label: 'Banana' },
+        { id: 'grape', emoji: '🍇', label: 'Uvas' },
+        { id: 'watermelon', emoji: '🍉', label: 'Sandia' },
+      ]
     }
+  ];
+
+  attachOptions = [
+    { id: 'file', icon: '📎', label: 'Archivo', desc: 'Subir un archivo o imagen' },
+    { id: 'poll', icon: '📊', label: 'Encuesta', desc: 'Crear una encuesta rapida' },
+    { id: 'thread', icon: '💬', label: 'Hilo', desc: 'Crear un hilo de conversacion' },
   ];
 
   constructor(
@@ -58,15 +125,24 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.currentUser = this.chatService.getCurrentUser();
   }
 
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.picker-container') && !target.closest('.picker-toggle-btn')) {
+      this.showPicker = false;
+    }
+    if (!target.closest('.attach-menu-container') && !target.closest('.attach-toggle-btn')) {
+      this.showAttachMenu = false;
+    }
+  }
+
   ngOnInit() {
     this.setupSocketListeners();
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
-    if (this.typingTimeout) {
-      clearTimeout(this.typingTimeout);
-    }
+    if (this.typingTimeout) clearTimeout(this.typingTimeout);
   }
 
   ngAfterViewChecked() {
@@ -78,7 +154,10 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   ngOnChanges() {
     if (this.channel) {
-      this.showEmojiPicker = false;
+      this.showPicker = false;
+      this.showAttachMenu = false;
+      this.showPollModal = false;
+      this.showThreadModal = false;
       this.loadMessages();
       this.socketService.joinChannel(this.channel._id);
     }
@@ -98,24 +177,15 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     const typingSub = this.socketService.onUserTyping().subscribe((data: any) => {
       if (data.channelId === this.channel?._id && data.username !== this.currentUser.username) {
         this.userTyping = data.username;
-
-        if (this.typingTimeout) {
-          clearTimeout(this.typingTimeout);
-        }
-        this.typingTimeout = setTimeout(() => {
-          this.userTyping = null;
-        }, 3000);
+        if (this.typingTimeout) clearTimeout(this.typingTimeout);
+        this.typingTimeout = setTimeout(() => { this.userTyping = null; }, 3000);
       }
     });
 
     const updatedSub = this.socketService.onMessageUpdated().subscribe((data: any) => {
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
-        this.messages[index] = {
-          ...this.messages[index],
-          content: data.content,
-          isEdited: true
-        };
+        this.messages[index] = { ...this.messages[index], content: data.content, isEdited: true };
       }
     });
 
@@ -126,10 +196,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     const reactionSub = this.socketService.onMessageReaction().subscribe((data: any) => {
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
-        this.messages[index] = {
-          ...this.messages[index],
-          reactions: data.reactions
-        };
+        this.messages[index] = { ...this.messages[index], reactions: data.reactions };
       }
     });
 
@@ -138,20 +205,15 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   loadMessages() {
     if (!this.channel) return;
-
     this.loading = true;
     this.messages = [];
-
     this.chatService.getMessagesByChannel(this.channel._id).subscribe({
       next: (response) => {
         this.messages = response.data || [];
         this.loading = false;
         this.shouldScrollToBottom = true;
       },
-      error: (error) => {
-        console.error('Error cargando mensajes:', error);
-        this.loading = false;
-      }
+      error: () => { this.loading = false; }
     });
   }
 
@@ -159,22 +221,18 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     if ((!this.newMessage.trim() && !this.selectedFile) || !this.channel) return;
 
     const proceed = (attachments: string[]) => {
-      const messageData = {
-        content: this.newMessage.trim() || (attachments.length ? 'Adjunto' : ''),
+      const hasAttachments = attachments.length > 0;
+      const messageData: any = {
+        content: this.newMessage.trim() || (hasAttachments ? this.selectedFile?.name || 'Archivo adjunto' : ''),
         channel: this.channel._id,
-        type: attachments.length ? 'file' : 'text',
+        type: hasAttachments ? (this.isImageUrl(attachments[0]) ? 'image' : 'file') : 'text',
         attachments
       };
 
       this.chatService.sendMessage(messageData).subscribe({
         next: (response) => {
           this.messages.push(response.data);
-
-          this.socketService.sendMessage({
-            channelId: this.channel._id,
-            message: response.data
-          });
-
+          this.socketService.sendMessage({ channelId: this.channel._id, message: response.data });
           this.newMessage = '';
           this.selectedFile = null;
           this.shouldScrollToBottom = true;
@@ -203,6 +261,97 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     }
   }
 
+  sendSticker(sticker: any) {
+    if (!this.channel) return;
+
+    const messageData = {
+      content: sticker.emoji,
+      channel: this.channel._id,
+      type: 'sticker' as const,
+      attachments: []
+    };
+
+    this.chatService.sendMessage(messageData).subscribe({
+      next: (response) => {
+        this.messages.push(response.data);
+        this.socketService.sendMessage({ channelId: this.channel._id, message: response.data });
+        this.showPicker = false;
+        this.shouldScrollToBottom = true;
+      },
+      error: (error) => {
+        console.error('Error enviando sticker:', error);
+      }
+    });
+  }
+
+  handleAttachOption(optionId: string) {
+    this.showAttachMenu = false;
+    switch (optionId) {
+      case 'file':
+        this.openFilePicker();
+        break;
+      case 'poll':
+        this.showPollModal = true;
+        break;
+      case 'thread':
+        this.showThreadModal = true;
+        break;
+    }
+  }
+
+  onPollSubmit(pollData: any) {
+    this.showPollModal = false;
+    if (!this.channel) return;
+
+    const optionsList = pollData.options.map((opt: string, i: number) => `${i + 1}. ${opt}`).join('\n');
+    const settings = [];
+    if (pollData.allowMultiple) settings.push('Permite multiples respuestas');
+    if (pollData.isAnonymous) settings.push('Votacion anonima');
+    const settingsLine = settings.length > 0 ? `\n⚙️ ${settings.join(' · ')}` : '';
+
+    const pollContent = `📊 **Encuesta:** ${pollData.question}\n${optionsList}${settingsLine}`;
+
+    const messageData = {
+      content: pollContent,
+      channel: this.channel._id,
+      type: 'text',
+      attachments: []
+    };
+
+    this.chatService.sendMessage(messageData).subscribe({
+      next: (response) => {
+        this.messages.push(response.data);
+        this.socketService.sendMessage({ channelId: this.channel._id, message: response.data });
+        this.shouldScrollToBottom = true;
+      },
+      error: () => alert('Error al crear la encuesta')
+    });
+  }
+
+  onThreadSubmit(threadData: any) {
+    this.showThreadModal = false;
+    if (!this.channel) return;
+
+    const msg = threadData.initialMessage || '*Este es el inicio de un hilo de conversacion.*';
+    const threadContent = `💬 **Hilo:** ${threadData.title}\n---\n${msg}`;
+
+    const messageData = {
+      content: threadContent,
+      channel: this.channel._id,
+      type: 'text',
+      attachments: []
+    };
+
+    this.chatService.sendMessage(messageData).subscribe({
+      next: (response) => {
+        this.messages.push(response.data);
+        this.socketService.sendMessage({ channelId: this.channel._id, message: response.data });
+        this.shouldScrollToBottom = true;
+      },
+      error: () => alert('Error al crear el hilo')
+    });
+  }
+
   onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -212,11 +361,14 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   onTyping() {
     if (!this.channel) return;
+    this.socketService.sendTyping({ channelId: this.channel._id, username: this.currentUser.username });
+  }
 
-    this.socketService.sendTyping({
-      channelId: this.channel._id,
-      username: this.currentUser.username
-    });
+  openFilePicker() {
+    if (this.fileInput?.nativeElement) {
+      this.fileInput.nativeElement.value = '';
+      this.fileInput.nativeElement.click();
+    }
   }
 
   onFileSelected(event: Event) {
@@ -228,19 +380,30 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.selectedFile = null;
   }
 
-  toggleEmojiPicker() {
-    this.showEmojiPicker = !this.showEmojiPicker;
+  togglePicker(event: Event) {
+    event.stopPropagation();
+    this.showPicker = !this.showPicker;
+    this.showAttachMenu = false;
+  }
+
+  setPickerTab(tab: 'emojis' | 'stickers', event: Event) {
+    event.stopPropagation();
+    this.pickerTab = tab;
+  }
+
+  toggleAttachMenu(event: Event) {
+    event.stopPropagation();
+    this.showAttachMenu = !this.showAttachMenu;
+    this.showPicker = false;
   }
 
   insertEmoji(emoji: string) {
     this.newMessage += emoji;
-    this.showEmojiPicker = false;
-    if (this.messageInput) {
-      this.messageInput.nativeElement.focus();
-    }
+    this.showPicker = false;
+    if (this.messageInput) this.messageInput.nativeElement.focus();
   }
 
-  onEmojiPickerClick(event: Event) {
+  onPickerClick(event: Event) {
     event.stopPropagation();
   }
 
@@ -265,9 +428,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       const parts = url.split('/');
       const last = parts[parts.length - 1].split('?')[0];
       return decodeURIComponent(last) || 'archivo';
-    } catch {
-      return 'archivo';
-    }
+    } catch { return 'archivo'; }
   }
 
   getFileIcon(url: string): string {
@@ -281,17 +442,17 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     return '📎';
   }
 
+  isStickerMessage(message: any): boolean {
+    return message.type === 'sticker';
+  }
+
   addReaction(messageId: string, emoji: string) {
     this.chatService.addReaction(messageId, emoji).subscribe({
       next: (response) => {
         const index = this.messages.findIndex(m => m._id === messageId);
-        if (index !== -1) {
-          this.messages[index] = response.data;
-        }
+        if (index !== -1) this.messages[index] = response.data;
       },
-      error: (error) => {
-        console.error('Error agregando reaccion:', error);
-      }
+      error: (error) => console.error('Error agregando reaccion:', error)
     });
   }
 
@@ -301,7 +462,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     const previous = this.messages[index - 1];
     if (!current || !previous) return false;
     if (current.sender?._id !== previous.sender?._id) return false;
-
+    if (current.type === 'sticker' || previous.type === 'sticker') return false;
     const currentTime = new Date(current.createdAt).getTime();
     const previousTime = new Date(previous.createdAt).getTime();
     return (currentTime - previousTime) < 5 * 60 * 1000;
@@ -314,18 +475,11 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-
     if (minutes < 1) return 'Ahora';
     if (minutes < 60) return `hace ${minutes}m`;
     if (hours < 24) return `hace ${hours}h`;
     if (days < 7) return `hace ${days}d`;
-
-    return date.toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
   private scrollToBottom(): void {
@@ -334,8 +488,6 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         const element = this.messageContainer.nativeElement;
         element.scrollTop = element.scrollHeight;
       }
-    } catch (err) {
-      console.error('Error scrolling:', err);
-    }
+    } catch {}
   }
 }

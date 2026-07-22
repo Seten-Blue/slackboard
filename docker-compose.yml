@@ -32,6 +32,7 @@ services:
       - mongodb
     volumes:
       - /app/node_modules
+      - backend-uploads:/app/uploads
     networks:
       - slackboard-network
     command: node dist/index.js
@@ -53,6 +54,7 @@ services:
 
 volumes:
   mongo-data:
+  backend-uploads:
 
 networks:
   slackboard-network:
