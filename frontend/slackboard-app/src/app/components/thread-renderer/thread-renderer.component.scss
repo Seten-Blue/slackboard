@@ -1,0 +1,87 @@
+.thread-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.03), rgba(139, 92, 246, 0.02));
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-left: 3px solid #6366f1;
+  border-radius: 10px;
+  padding: 14px 16px;
+  max-width: 420px;
+  margin-top: 4px;
+  transition: border-color 0.2s;
+
+  &:hover {
+    border-left-color: #4f46e5;
+  }
+}
+
+.thread-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.thread-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.thread-icon {
+  font-size: 16px;
+}
+
+.thread-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.thread-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(20, 17, 42, 0.9);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-sub {
+  font-size: 11px;
+  color: rgba(20, 17, 42, 0.4);
+  margin: 0;
+}
+
+.thread-body {
+  padding: 8px 0 0;
+}
+
+.thread-message {
+  font-size: 13px;
+  color: rgba(20, 17, 42, 0.65);
+  margin: 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.thread-footer {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(99, 102, 241, 0.08);
+}
+
+.thread-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  padding: 3px 10px;
+  border-radius: 10px;
+}

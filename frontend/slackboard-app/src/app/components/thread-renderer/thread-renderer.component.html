@@ -1,0 +1,17 @@
+<div class="thread-card" *ngIf="message?.threadData">
+  <div class="thread-header">
+    <div class="thread-icon-wrap">
+      <span class="thread-icon">💬</span>
+    </div>
+    <div class="thread-info">
+      <p class="thread-title">{{ threadTitle }}</p>
+      <p class="thread-sub">Hilo de conversacion</p>
+    </div>
+  </div>
+  <div *ngIf="threadMessage" class="thread-body">
+    <p class="thread-message">{{ threadMessage }}</p>
+  </div>
+  <div class="thread-footer">
+    <span class="thread-badge">🧵 Hilo abierto</span>
+  </div>
+</div>

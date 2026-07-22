@@ -41,7 +41,7 @@ export const getMessagesByChannel = async (req: AuthRequest, res: Response) => {
 // Crear un nuevo mensaje
 export const createMessage = async (req: AuthRequest, res: Response) => {
   try {
-    const { content, channel, type = 'text', attachments = [] } = req.body;
+    const { content, channel, type = 'text', attachments = [], pollData = null, threadData = null } = req.body;
 
     if (!req.userId) {
       return res.status(401).json({ success: false, message: 'No autenticado' });
@@ -62,6 +62,8 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
       sender: req.userId,
       type,
       attachments: Array.isArray(attachments) ? attachments : [],
+      pollData: pollData || undefined,
+      threadData: threadData || undefined,
     });
 
     const populatedMessage: any = await Message.findById(message._id)
@@ -250,6 +252,74 @@ export const addReaction = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Error al agregar reaccion',
+      error: error.message,
+    });
+  }
+};
+
+// Votar en una encuesta
+export const votePoll = async (req: AuthRequest, res: Response) => {
+  try {
+    const { messageId } = req.params;
+    const { optionIndex } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
+    }
+
+    if (message.type !== 'poll' || !message.pollData) {
+      return res.status(400).json({ success: false, message: 'Este mensaje no es una encuesta' });
+    }
+
+    if (message.pollData.expiresAt && new Date() > message.pollData.expiresAt) {
+      return res.status(400).json({ success: false, message: 'Esta encuesta ya expiro' });
+    }
+
+    if (optionIndex < 0 || optionIndex >= message.pollData.options.length) {
+      return res.status(400).json({ success: false, message: 'Opcion invalida' });
+    }
+
+    const pollData = message.pollData as any;
+
+    if (pollData.allowMultiple) {
+      const option = pollData.options[optionIndex];
+      const alreadyVoted = option.voters.some((v: any) => v.toString() === userId);
+      if (alreadyVoted) {
+        option.voters = option.voters.filter((v: any) => v.toString() !== userId);
+      } else {
+        option.voters.push(userId);
+      }
+    } else {
+      let hadVotedBefore = false;
+      for (const opt of pollData.options) {
+        const idx = opt.voters.findIndex((v: any) => v.toString() === userId);
+        if (idx !== -1) {
+          opt.voters.splice(idx, 1);
+          hadVotedBefore = true;
+        }
+      }
+      if (!hadVotedBefore || true) {
+        pollData.options[optionIndex].voters.push(userId);
+      }
+    }
+
+    message.markModified('pollData');
+    await message.save();
+
+    const populated = await Message.findById(messageId)
+      .populate('sender', 'username email avatar status');
+
+    res.json({ success: true, data: populated });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al votar',
       error: error.message,
     });
   }

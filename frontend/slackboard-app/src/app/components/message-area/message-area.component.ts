@@ -303,19 +303,30 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.showPollModal = false;
     if (!this.channel) return;
 
-    const optionsList = pollData.options.map((opt: string, i: number) => `${i + 1}. ${opt}`).join('\n');
-    const settings = [];
-    if (pollData.allowMultiple) settings.push('Permite multiples respuestas');
-    if (pollData.isAnonymous) settings.push('Votacion anonima');
-    const settingsLine = settings.length > 0 ? `\n⚙️ ${settings.join(' · ')}` : '';
-
-    const pollContent = `📊 **Encuesta:** ${pollData.question}\n${optionsList}${settingsLine}`;
+    const now = new Date();
+    let expiresAt: Date | null = null;
+    if (pollData.duration > 0) {
+      expiresAt = new Date(now.getTime() + pollData.duration * 3600000);
+    }
 
     const messageData = {
-      content: pollContent,
+      content: `📊 ${pollData.question}`,
       channel: this.channel._id,
-      type: 'text',
-      attachments: []
+      type: 'poll',
+      attachments: [],
+      pollData: {
+        question: pollData.question,
+        options: pollData.options.map((opt: any) => ({
+          emoji: opt.emoji || '',
+          text: opt.text,
+          voters: []
+        })),
+        allowMultiple: pollData.allowMultiple,
+        isAnonymous: pollData.isAnonymous,
+        duration: pollData.duration,
+        createdBy: this.currentUser._id,
+        expiresAt
+      }
     };
 
     this.chatService.sendMessage(messageData).subscribe({
@@ -332,14 +343,15 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.showThreadModal = false;
     if (!this.channel) return;
 
-    const msg = threadData.initialMessage || '*Este es el inicio de un hilo de conversacion.*';
-    const threadContent = `💬 **Hilo:** ${threadData.title}\n---\n${msg}`;
-
     const messageData = {
-      content: threadContent,
+      content: `💬 ${threadData.title}`,
       channel: this.channel._id,
-      type: 'text',
-      attachments: []
+      type: 'thread',
+      attachments: [],
+      threadData: {
+        title: threadData.title,
+        initialMessage: threadData.initialMessage
+      }
     };
 
     this.chatService.sendMessage(messageData).subscribe({
@@ -446,6 +458,14 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     return message.type === 'sticker';
   }
 
+  isPollMessage(message: any): boolean {
+    return message.type === 'poll' && message.pollData;
+  }
+
+  isThreadMessage(message: any): boolean {
+    return message.type === 'thread' && message.threadData;
+  }
+
   addReaction(messageId: string, emoji: string) {
     this.chatService.addReaction(messageId, emoji).subscribe({
       next: (response) => {
@@ -463,6 +483,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     if (!current || !previous) return false;
     if (current.sender?._id !== previous.sender?._id) return false;
     if (current.type === 'sticker' || previous.type === 'sticker') return false;
+    if (current.type === 'poll' || current.type === 'thread') return false;
     const currentTime = new Date(current.createdAt).getTime();
     const previousTime = new Date(previous.createdAt).getTime();
     return (currentTime - previousTime) < 5 * 60 * 1000;

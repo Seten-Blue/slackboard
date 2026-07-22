@@ -5,6 +5,7 @@ import {
   updateMessage,
   deleteMessage,
   addReaction,
+  votePoll,
 } from '../controllers/messageController';
 import { requireAuth } from '../middleware/auth';
 
@@ -29,5 +30,8 @@ router.delete('/:id', deleteMessage);
 
 // POST /api/messages/:messageId/reaction - Agregar/quitar reaccion
 router.post('/:messageId/reaction', addReaction);
+
+// POST /api/messages/:messageId/poll/vote - Votar en una encuesta
+router.post('/:messageId/poll/vote', votePoll);
 
 export default router;

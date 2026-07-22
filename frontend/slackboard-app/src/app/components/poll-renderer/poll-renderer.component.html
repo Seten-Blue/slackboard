@@ -1,0 +1,33 @@
+<div class="poll-card" *ngIf="message?.pollData">
+  <div class="poll-header">
+    <span class="poll-icon">📊</span>
+    <span class="poll-label">Encuesta</span>
+    <span *ngIf="expired" class="poll-expired-badge">Finalizada</span>
+  </div>
+  
+  <p class="poll-question">{{ message.pollData.question }}</p>
+  
+  <div class="poll-options">
+    <button *ngFor="let opt of message.pollData.options; let i = index"
+            (click)="vote(i)"
+            [class.voted]="votedIndex === i"
+            [class.expired]="expired"
+            [class.my-vote]="isMyVote(opt.voters)"
+            class="poll-option-btn">
+      <div class="poll-option-bg" [style.width.%]="getPercentage(opt.voters)"></div>
+      <div class="poll-option-content">
+        <span *ngIf="opt.emoji" class="opt-emoji">{{ opt.emoji }}</span>
+        <span class="opt-text">{{ opt.text }}</span>
+        <span class="opt-count">{{ opt.voters?.length || 0 }}</span>
+        <span class="opt-pct">{{ getPercentage(opt.voters) }}%</span>
+      </div>
+    </button>
+  </div>
+  
+  <div class="poll-footer">
+    <span class="poll-total">{{ totalVotes }} voto{{ totalVotes !== 1 ? 's' : '' }}</span>
+    <span *ngIf="timeLeft" class="poll-time">⏱ {{ timeLeft }}</span>
+    <span *ngIf="message.pollData.allowMultiple" class="poll-multi">☑ Multiples respuestas</span>
+    <span *ngIf="message.pollData.isAnonymous" class="poll-anon">🔒 Anonima</span>
+  </div>
+</div>

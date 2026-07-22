@@ -1,45 +1,77 @@
-<div *ngIf="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="onClose()">
-  <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-6" (click)="$event.stopPropagation()">
+<div *ngIf="isOpen" class="modal-backdrop" (click)="onBackdropClick($event)">
+  <div class="modal-card" (click)="$event.stopPropagation()">
 
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="font-display font-semibold text-base text-ink-950">Crear encuesta</h2>
-      <button (click)="onClose()" class="text-ink-950/40 hover:text-ink-950 text-lg leading-none">✕</button>
+    <div class="flex items-center justify-between px-6 pt-6 pb-2">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">📊</span>
+        <h2 class="font-display font-semibold text-lg text-ink-950">Crear encuesta</h2>
+      </div>
+      <button (click)="onClose()" class="w-8 h-8 flex items-center justify-center rounded-full text-ink-950/40 hover:text-ink-950 hover:bg-ink-950/5 transition-colors text-sm">✕</button>
     </div>
 
-    <div class="space-y-4">
+    <div class="px-6 pb-6 pt-2 space-y-5">
+
       <div>
         <label class="block text-sm font-medium text-ink-950 mb-1.5">Pregunta</label>
         <input type="text"
                [(ngModel)]="question"
                placeholder="Escribe tu pregunta..."
-               class="w-full px-3 py-2 rounded-lg border border-ink-950/10 bg-paper text-ink-950 text-sm placeholder-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal" />
+               class="w-full px-3.5 py-2.5 rounded-xl border border-ink-950/10 bg-ink-950/[0.02] text-ink-950 text-sm placeholder-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal transition-all" />
       </div>
 
       <div>
         <label class="block text-sm font-medium text-ink-950 mb-1.5">Opciones</label>
         <div class="space-y-2">
-          <div *ngFor="let option of options; let i = index" class="flex items-center gap-2">
+          <div *ngFor="let option of options; let i = index"
+               class="option-row flex items-center gap-2 relative">
+            <button type="button"
+                    (click)="openEmojiPicker(i, $event)"
+                    class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border border-ink-950/10 bg-ink-950/[0.02] hover:bg-signal/5 hover:border-signal/30 transition-all text-lg cursor-pointer"
+                    [ngClass]="{'text-ink-950/30': !option.emoji, 'text-lg': !!option.emoji}">
+              <span>{{ option.emoji }}</span>
+              <span *ngIf="!option.emoji">😀</span>
+            </button>
+            <div *ngIf="showEmojiPicker &amp;&amp; editingOptionIndex === i" class="emoji-popup">
+              <div class="emoji-grid-mini">
+                <button *ngFor="let emoji of quickEmojis"
+                        type="button"
+                        (click)="pickEmoji(emoji); $event.stopPropagation()"
+                        class="emoji-mini-btn">
+                  {{ emoji }}
+                </button>
+              </div>
+            </div>
             <input type="text"
-                   [(ngModel)]="options[i]"
+                   [(ngModel)]="options[i].text"
                    [placeholder]="'Opcion ' + (i + 1)"
-                   class="flex-1 px-3 py-2 rounded-lg border border-ink-950/10 bg-paper text-ink-950 text-sm placeholder-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal" />
+                   class="flex-1 px-3.5 py-2.5 rounded-xl border border-ink-950/10 bg-ink-950/[0.02] text-ink-950 text-sm placeholder-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal transition-all" />
             <button *ngIf="options.length > 2"
+                    type="button"
                     (click)="removeOption(i)"
-                    class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-ink-950/40 hover:text-red-500 hover:bg-red-50 transition-colors text-sm">
+                    class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl text-ink-950/30 hover:text-red-500 hover:bg-red-50 transition-colors text-sm">
               ✕
             </button>
-            <div *ngIf="options.length <= 2" class="w-8 h-8 flex-shrink-0"></div>
+            <div *ngIf="options.length &lt;= 2" class="w-10 h-10 flex-shrink-0"></div>
           </div>
         </div>
         <button *ngIf="options.length < 10"
                 (click)="addOption()"
-                class="mt-2 flex items-center gap-1 text-sm font-medium text-signal hover:text-signal/80 transition-colors">
+                class="mt-2.5 flex items-center gap-1.5 text-sm font-medium text-signal hover:text-signal/80 transition-colors">
           <span class="text-lg leading-none">+</span> Agregar opcion
         </button>
       </div>
 
       <div class="flex items-center gap-6 pt-1">
-        <label class="flex items-center gap-2 cursor-pointer select-none">
+        <div>
+          <label class="block text-xs font-medium text-ink-950/50 mb-1">Duracion</label>
+          <select [(ngModel)]="duration"
+                  class="px-3 py-1.5 rounded-xl border border-ink-950/10 bg-ink-950/[0.02] text-ink-950 text-sm focus:outline-none focus:ring-2 focus:ring-signal/30 focus:border-signal transition-all cursor-pointer appearance-none pr-8 bg-no-repeat bg-[length:12px] bg-[right_8px_center]"
+                  style="background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E&quot;);">
+            <option *ngFor="let opt of durationOptions" [value]="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div class="flex-1"></div>
+        <label class="flex items-center gap-2.5 cursor-pointer select-none">
           <span class="relative inline-flex items-center">
             <input type="checkbox" [(ngModel)]="allowMultiple" class="sr-only peer" />
             <span class="w-9 h-5 rounded-full bg-ink-950/10 peer-checked:bg-signal transition-colors"></span>
@@ -47,7 +79,10 @@
           </span>
           <span class="text-sm text-ink-950/70">Multiples respuestas</span>
         </label>
-        <label class="flex items-center gap-2 cursor-pointer select-none">
+      </div>
+
+      <div>
+        <label class="flex items-center gap-2.5 cursor-pointer select-none">
           <span class="relative inline-flex items-center">
             <input type="checkbox" [(ngModel)]="isAnonymous" class="sr-only peer" />
             <span class="w-9 h-5 rounded-full bg-ink-950/10 peer-checked:bg-signal transition-colors"></span>
@@ -58,14 +93,14 @@
       </div>
     </div>
 
-    <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-ink-950/10">
+    <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-950/10">
       <button (click)="onClose()"
-              class="px-4 py-2 rounded-lg border border-ink-950/15 text-sm font-medium text-ink-950 hover:bg-ink-950/5 transition-colors">
+              class="px-4 py-2 rounded-xl border border-ink-950/15 text-sm font-medium text-ink-950 hover:bg-ink-950/5 transition-colors">
         Cancelar
       </button>
       <button (click)="onSubmit()"
               [disabled]="!isValid"
-              class="px-4 py-2 rounded-lg bg-signal text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90">
+              class="px-5 py-2 rounded-xl bg-signal text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:opacity-90 hover:shadow-lg hover:shadow-signal/20">
         Crear encuesta
       </button>
     </div>

@@ -101,6 +101,12 @@ export class ChatService {
     });
   }
 
+  votePoll(messageId: string, optionIndex: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/messages/${messageId}/poll/vote`, {
+      optionIndex
+    });
+  }
+
   setCurrentChannel(channel: any): void {
     this.currentChannelSubject.next(channel);
   }

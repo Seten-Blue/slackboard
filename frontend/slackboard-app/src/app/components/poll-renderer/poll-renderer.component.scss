@@ -1,0 +1,158 @@
+.poll-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(99, 102, 241, 0.01));
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 12px;
+  padding: 14px 16px;
+  max-width: 420px;
+  margin-top: 4px;
+}
+
+.poll-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.poll-icon {
+  font-size: 16px;
+}
+
+.poll-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6366f1;
+}
+
+.poll-expired-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+
+.poll-question {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(20, 17, 42, 0.9);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.poll-option-btn {
+  position: relative;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid rgba(20, 17, 42, 0.12);
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  text-align: left;
+  
+  &:hover:not(.expired) {
+    border-color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
+  }
+  
+  &.voted {
+    border-color: #6366f1;
+  }
+  
+  &.my-vote {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.04);
+  }
+  
+  &.expired {
+    cursor: default;
+  }
+}
+
+.poll-option-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+  border-radius: 9px;
+  transition: width 0.4s ease;
+}
+
+.my-vote .poll-option-bg {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.06));
+}
+
+.poll-option-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opt-emoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.opt-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(20, 17, 42, 0.85);
+  flex: 1;
+}
+
+.opt-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.opt-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(20, 17, 42, 0.45);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.poll-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(20, 17, 42, 0.06);
+}
+
+.poll-total {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(20, 17, 42, 0.4);
+}
+
+.poll-time {
+  font-size: 11px;
+  color: rgba(20, 17, 42, 0.35);
+}
+
+.poll-multi, .poll-anon {
+  font-size: 11px;
+  color: rgba(20, 17, 42, 0.35);
+}

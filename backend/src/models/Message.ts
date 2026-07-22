@@ -1,16 +1,39 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export interface IPollOption {
+  emoji: string;
+  text: string;
+  voters: mongoose.Types.ObjectId[];
+}
+
+export interface IPollData {
+  question: string;
+  options: IPollOption[];
+  allowMultiple: boolean;
+  isAnonymous: boolean;
+  duration: number;
+  createdBy: mongoose.Types.ObjectId;
+  expiresAt: Date | null;
+}
+
+export interface IThreadData {
+  title: string;
+  initialMessage: string;
+}
+
 export interface IMessage extends Document {
   content: string;
   channel: mongoose.Types.ObjectId;
   sender: mongoose.Types.ObjectId;
-  type: 'text' | 'image' | 'file' | 'sticker';
+  type: 'text' | 'image' | 'file' | 'sticker' | 'poll' | 'thread';
   isEdited: boolean;
   reactions: {
     emoji: string;
     users: mongoose.Types.ObjectId[];
   }[];
   attachments?: string[];
+  pollData?: IPollData;
+  threadData?: IThreadData;
   discordMessageId?: string;
   whatsappMessageId?: string;
   sentViaBot?: boolean;
@@ -36,7 +59,7 @@ const MessageSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'image', 'file', 'sticker'],
+      enum: ['text', 'image', 'file', 'sticker', 'poll', 'thread'],
       default: 'text',
     },
     isEdited: {
@@ -59,6 +82,16 @@ const MessageSchema: Schema = new Schema(
     attachments: {
       type: [String],
       default: [],
+    },
+    // ← NUEVO: datos estructurados para encuestas
+    pollData: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    // ← NUEVO: datos estructurados para hilos
+    threadData: {
+      type: Schema.Types.Mixed,
+      default: null,
     },
     // ← NUEVO: id del mensaje original en Discord. Permite encontrar este
     // mensaje cuando llega su edicion, borrado o una reaccion desde Discord.
