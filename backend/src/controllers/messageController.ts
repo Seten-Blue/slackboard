@@ -96,7 +96,14 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
         if (channelExists.slackChannelId) {
           const slackService = require('../services/slackService').default;
           if (slackService.isConfigured()) {
-            await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
+            if (pollData) {
+              const slackResult = await slackService.sendPollMessage(channelExists.name, pollData, senderUsername);
+              if (slackResult) {
+                await Message.findByIdAndUpdate(message._id, { slackMessageTs: slackResult });
+              }
+            } else {
+              await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
+            }
             console.log('✅ Mensaje sincronizado con Slack');
           }
         }
@@ -399,6 +406,32 @@ export const votePoll = async (req: AuthRequest, res: Response) => {
         }
       } catch (discordErr: any) {
         console.error('⚠️ Error sincronizando voto a Discord:', discordErr.message);
+      }
+    }
+
+    // Sync vote to Slack: add number emoji reaction, remove old if changing option
+    const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+    if ((message as any).slackMessageTs && message.channel) {
+      try {
+        const slackService = require('../services/slackService').default;
+        if (slackService.isConfigured()) {
+          const slackTs = (message as any).slackMessageTs;
+          const channelObj = await Channel.findById(message.channel);
+          if (channelObj?.slackChannelId) {
+            if (!pollData.allowMultiple && previousOptionIndex !== -1 && previousOptionIndex !== optionIndex) {
+              const oldEmoji = NUM_EMOJIS[previousOptionIndex];
+              if (oldEmoji) {
+                await slackService.removeReactionFromSlackMessage(channelObj.slackChannelId, slackTs, oldEmoji);
+              }
+            }
+            const newEmoji = NUM_EMOJIS[optionIndex];
+            if (newEmoji) {
+              await slackService.addReactionToSlackMessage(channelObj.slackChannelId, slackTs, newEmoji);
+            }
+          }
+        }
+      } catch (slackErr: any) {
+        console.error('⚠️ Error sincronizando voto a Slack:', slackErr.message);
       }
     }
 

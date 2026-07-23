@@ -41,6 +41,7 @@ export interface IMessage extends Document {
   threadParent?: mongoose.Types.ObjectId;
   discordMessageId?: string;
   discordThreadId?: string;
+  slackMessageTs?: string;
   whatsappMessageId?: string;
   sentViaBot?: boolean;
   createdAt: Date;
@@ -115,6 +116,12 @@ const MessageSchema: Schema = new Schema(
     },
     // ← NUEVO: id del thread en Discord (solo en mensajes raíz de thread)
     discordThreadId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    slackMessageTs: {
       type: String,
       default: null,
       index: true,

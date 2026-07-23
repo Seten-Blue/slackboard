@@ -1,18 +1,27 @@
-import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges, HostListener } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges, HostListener, AfterViewInit } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
 import { Subscription } from 'rxjs';
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  r: number;
+}
 
 @Component({
   selector: 'app-message-area',
   templateUrl: './message-area.component.html',
   styleUrls: ['./message-area.component.scss']
 })
-export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked, OnChanges {
+export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked, OnChanges, AfterViewInit {
   @Input() channel: any;
   @ViewChild('messageContainer') messageContainer!: ElementRef;
   @ViewChild('messageInput') messageInput!: ElementRef;
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('particleCanvas') particleCanvasRef!: ElementRef<HTMLCanvasElement>;
 
   messages: any[] = [];
   newMessage = '';
@@ -23,6 +32,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   private subscriptions: Subscription[] = [];
   private shouldScrollToBottom = false;
+  private animationFrameId: number | null = null;
+  private particles: Particle[] = [];
 
   selectedFile: File | null = null;
   uploadingFile = false;
@@ -147,6 +158,11 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
     if (this.typingTimeout) clearTimeout(this.typingTimeout);
+    this.stopParticles();
+  }
+
+  ngAfterViewInit() {
+    setTimeout(() => this.startParticles(), 0);
   }
 
   ngAfterViewChecked() {
@@ -164,6 +180,94 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       this.showThreadModal = false;
       this.loadMessages();
       this.socketService.joinChannel(this.channel._id);
+      this.stopParticles();
+      setTimeout(() => this.startParticles(), 0);
+    }
+  }
+
+  // ========== Partículas de fondo ==========
+  private getParticleColors(): { dot: string; line: string } {
+    const platform = this.channel?.platform;
+    if (platform === 'slack') {
+      return { dot: 'rgba(74, 21, 75, 0.6)', line: 'rgba(74, 21, 75, 0.2)' };
+    }
+    // Discord y por defecto: estilo Trello
+    return { dot: 'rgba(139, 124, 246, 0.85)', line: 'rgba(76, 63, 201, 0.32)' };
+  }
+
+  private resizeCanvas(): void {
+    const canvas = this.particleCanvasRef?.nativeElement;
+    if (!canvas) return;
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
+
+  private startParticles(): void {
+    const canvas = this.particleCanvasRef?.nativeElement;
+    if (!canvas) return;
+
+    this.stopParticles();
+    this.resizeCanvas();
+
+    const count = 40;
+    this.particles = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.4 + 0.5,
+    }));
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const linkDistance = 120;
+    const colors = this.getParticleColors();
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const p of this.particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = colors.dot;
+        ctx.fill();
+      }
+
+      for (let i = 0; i < this.particles.length; i++) {
+        for (let j = i + 1; j < this.particles.length; j++) {
+          const a = this.particles[i];
+          const b = this.particles[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < linkDistance) {
+            const opacity = 1 - dist / linkDistance;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = colors.line.replace(/[\d.]+\)$/, `${opacity * 0.35})`);
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+
+      this.animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+  }
+
+  private stopParticles(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
   }
 

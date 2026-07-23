@@ -301,7 +301,97 @@ async renameChannel(channelId: string, newName: string): Promise<any> {
   }
 }
 
-  // ← NUEVO: verifica que la peticion realmente venga de Slack usando el Signing Secret
+  // ========== Polls: enviar encuesta en texto plano a Slack ==========
+  async sendPollMessage(channelName: string, pollData: any, username?: string): Promise<string | null> {
+    if (!this.isConfigured() || !pollData) return null;
+
+    const normalizedChannelName = this.normalizeChannelName(channelName);
+    let slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
+    if (!slackChannelId) {
+      await this.initializeChannelMap();
+      slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
+    }
+    if (!slackChannelId) return null;
+
+    const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+    const optionLines = (pollData.options || [])
+      .map((opt: any, i: number) => {
+        const emoji = NUM_EMOJIS[i] || `${i + 1}\uFE0F\u20E3`;
+        const text = (opt.text || '').trim() || `Opcion ${i + 1}`;
+        return `${emoji} ${text}`;
+      })
+      .join('\n');
+
+    const lines = [
+      `📊 ${pollData.question || 'Encuesta'}`,
+      '',
+      optionLines,
+      '',
+    ];
+
+    if (pollData.allowMultiple) lines.push('☑ Multiple respuesta');
+    if (pollData.isAnonymous) lines.push('🔒 Anonima');
+    if (pollData.duration) lines.push(`⏱ ${pollData.duration}h`);
+
+    lines.push('', 'Reacciona con el numero de tu opcion para votar');
+
+    const text = lines.join('\n');
+
+    try {
+      const result = await this.client.chat.postMessage({
+        channel: slackChannelId,
+        text,
+        username: username || 'SlackBoard Bot',
+        icon_emoji: ':robot_face:',
+      });
+      console.log(`✅ Encuesta enviada a Slack: ${result.ts}`);
+      return result.ts || null;
+    } catch (error: any) {
+      console.error('❌ Error enviando encuesta a Slack:', error.message);
+      return null;
+    }
+  }
+
+  // ========== Reacciones en Slack ==========
+  async addReactionToSlackMessage(slackChannelId: string, slackMessageTs: string, emoji: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    try {
+      await this.client.reactions.add({
+        channel: slackChannelId,
+        timestamp: slackMessageTs,
+        name: emoji,
+      });
+    } catch (error: any) {
+      if (error?.data?.error === 'already_reacted') return;
+      console.error('❌ Error agregando reacción en Slack:', error.message);
+    }
+  }
+
+  async removeReactionFromSlackMessage(slackChannelId: string, slackMessageTs: string, emoji: string): Promise<void> {
+    if (!this.isConfigured()) return;
+    try {
+      await this.client.reactions.remove({
+        channel: slackChannelId,
+        timestamp: slackMessageTs,
+        name: emoji,
+      });
+    } catch (error: any) {
+      if (error?.data?.error === 'no_reaction') return;
+      console.error('❌ Error removiendo reacción de Slack:', error.message);
+    }
+  }
+
+  async resolveChannelIdByName(channelName: string): Promise<string | null> {
+    const normalized = this.normalizeChannelName(channelName);
+    let id = this.channelMap.get(normalized) || this.channelMap.get(channelName.toLowerCase());
+    if (!id) {
+      await this.initializeChannelMap();
+      id = this.channelMap.get(normalized) || this.channelMap.get(channelName.toLowerCase());
+    }
+    return id || null;
+  }
+
   verifySignature(rawBody: string, timestamp: string, signature: string): boolean {
     if (!this.signingSecret) {
       console.warn('⚠️  SLACK_SIGNING_SECRET no configurado, se omite verificacion de firma (inseguro, configuralo pronto).');

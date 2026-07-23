@@ -281,6 +281,82 @@ router.post('/events', async (req: Request, res: Response) => {
       
       const channelType = (event.channel_type || 'channel').toString();
 
+      // Manejar reacciones entrantes de Slack
+      if (event.type === 'reaction_added' || event.type === 'reaction_removed') {
+        const isAdd = event.type === 'reaction_added';
+        const emoji = event.reaction;
+        const slackMessageTs = event.item?.ts;
+        const slackUserId = event.user;
+
+        if (!emoji || !slackMessageTs || !slackUserId) {
+          return res.status(200).send('OK');
+        }
+
+        console.log(`👍 Reacción de Slack: ${event.type} emoji=${emoji} ts=${slackMessageTs} user=${slackUserId}`);
+
+        try {
+          const slackUser = await slackService.getUserInfo(slackUserId);
+          const user = slackUser ? await User.findOne({ email: slackUser.profile?.email }) : null;
+          if (!user) {
+            console.log('⚠️  Usuario de reacción no encontrado en SlackBoard');
+            return res.status(200).send('OK');
+          }
+
+          // Buscar el mensaje de SlackBoard por slackMessageTs
+          const message: any = await Message.findOne({ slackMessageTs });
+          if (!message || message.type !== 'poll' || !message.pollData) {
+            return res.status(200).send('OK');
+          }
+
+          const pollData = message.pollData as any;
+          const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+          const SLACK_EMOJI_MAP: Record<string, number> = {
+            'one': 0, 'two': 1, 'three': 2, 'four': 3, 'five': 4,
+            'six': 5, 'seven': 6, 'eight': 7, 'nine': 8, 'keycap_ten': 9,
+          };
+          const optionIndex = SLACK_EMOJI_MAP[emoji] ?? NUM_EMOJIS.indexOf(emoji);
+          if (optionIndex === -1 || optionIndex >= pollData.options.length) {
+            return res.status(200).send('OK');
+          }
+
+          const option = pollData.options[optionIndex];
+          const mongoUserId = String(user._id);
+
+          if (isAdd) {
+            if (pollData.allowMultiple) {
+              const alreadyVoted = option.voters.some((v: any) => v.toString() === mongoUserId);
+              if (!alreadyVoted) option.voters.push(user._id);
+            } else {
+              for (const opt of pollData.options) {
+                const idx = opt.voters.findIndex((v: any) => v.toString() === mongoUserId);
+                if (idx !== -1) opt.voters.splice(idx, 1);
+              }
+              const alreadyVoted = option.voters.some((v: any) => v.toString() === mongoUserId);
+              if (!alreadyVoted) option.voters.push(user._id);
+            }
+          } else {
+            option.voters = option.voters.filter((v: any) => v.toString() !== mongoUserId);
+          }
+
+          message.markModified('pollData');
+          await message.save();
+
+          const io = req.app.get('io') as Server;
+          if (io) {
+            io.to(String(message.channel)).emit('poll-voted', {
+              messageId: message._id,
+              pollData: message.pollData,
+            });
+          }
+
+          console.log(`✅ Voto ${isAdd ? 'agregado' : 'removido'} desde Slack: user=${mongoUserId}, option=${optionIndex}`);
+        } catch (err: any) {
+          console.error('❌ Error procesando reacción de Slack:', err.message);
+        }
+
+        return res.status(200).send('OK');
+      }
+
       // Manejar mensaje de canal publico, privado o DM sin depender de un payload exacto
       if (event.type === 'message' && ['channel', 'group', 'im'].includes(channelType)) {
         console.log('💬 Procesando mensaje de Slack');

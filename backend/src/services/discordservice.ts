@@ -110,10 +110,12 @@ class discordService {
     // Poll votes: use raw event because messagePollVoteAdd doesn't include message_id
     this.client.on('raw' as any, (packet: any) => {
       if (packet.t === 'MESSAGE_POLL_VOTE_ADD') {
+        console.log(`[DEBUG] MESSAGE_POLL_VOTE_ADD: ${JSON.stringify(packet.d)}`);
         this.handlePollVoteRaw(packet.d, 'add').catch((err: any) =>
           console.error('❌ Error procesando voto de poll de Discord:', err.message)
         );
       } else if (packet.t === 'MESSAGE_POLL_VOTE_REMOVE') {
+        console.log(`[DEBUG] MESSAGE_POLL_VOTE_REMOVE: ${JSON.stringify(packet.d)}`);
         this.handlePollVoteRaw(packet.d, 'remove').catch((err: any) =>
           console.error('❌ Error procesando remoción de voto de poll de Discord:', err.message)
         );
