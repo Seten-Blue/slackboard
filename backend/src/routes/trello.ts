@@ -28,8 +28,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-// ← pública a propósito: un <img src> no puede mandar el header Authorization,
-// y el proxy nunca expone el key/token real de Trello
+// Public: proxy para adjuntos en <img src> (no puede enviar Authorization)
 router.get('/cards/:cardId/attachments/:attachmentId/view', viewCardAttachment);
 
 router.use(requireAuth);

@@ -49,16 +49,18 @@ export const toggleAIForChannel = async (req: Request, res: Response) => {
 // Fuerza la creacion (o devuelve si ya existe) del canal dedicado a la IA
 export const getOrCreateAIChannel = async (req: AuthRequest, res: Response) => {
   try {
-    const channel = await ensureAIChannel();
+    if (!req.userId) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+
+    const channel = await ensureAIChannel(req.userId);
 
     // Agregar al usuario autenticado como miembro del canal de IA
-    if (req.userId) {
-      await Channel.findByIdAndUpdate(
-        channel._id,
-        { $addToSet: { members: req.userId } },
-        { new: true }
-      );
-    }
+    await Channel.findByIdAndUpdate(
+      channel._id,
+      { $addToSet: { members: req.userId } },
+      { new: true }
+    );
 
     res.json({
       success: true,

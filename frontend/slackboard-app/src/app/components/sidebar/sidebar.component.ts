@@ -394,7 +394,7 @@ export class SidebarComponent implements OnInit {
   }
 
   get aiChannel() {
-    return this.channels.find(c => c.name === 'asistente-ia');
+    return this.channels.find(c => c.isAIChannel === true || c.name === 'asistente-ia');
   }
 
   selectAIChannel(): void {

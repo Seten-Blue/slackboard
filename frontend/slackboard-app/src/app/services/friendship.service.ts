@@ -6,6 +6,7 @@ import { environment } from '../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class FriendshipService {
   private api = `${environment.apiUrl}/friendship`;
+  private authApi = `${environment.apiUrl}/auth`;
 
   constructor(private http: HttpClient) {}
 
@@ -39,5 +40,9 @@ export class FriendshipService {
 
   removeFriend(id: string): Observable<any> {
     return this.http.delete(`${this.api}/remove/${id}`);
+  }
+
+  getUserProfile(userId: string): Observable<any> {
+    return this.http.get(`${this.authApi}/user/${userId}`);
   }
 }

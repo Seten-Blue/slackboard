@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { TrelloService } from '../../services/trello.service';
+import { AuthService } from '../../services/auth.service';
 
 interface TrelloBoard {
   id: string;
@@ -83,6 +84,13 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   loadingBoard = false;
   showBoardPicker = false;
 
+  trelloLinked = false;
+  showSetup = false;
+  setupApiKey = '';
+  setupToken = '';
+  setupLoading = false;
+  setupError: string | null = null;
+
   addingCardToList: string | null = null;
   newCardName = '';
 
@@ -121,10 +129,10 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   private animationFrameId: number | null = null;
   private resizeListener = () => this.resizeCanvas();
 
-  constructor(private trelloService: TrelloService) {}
+  constructor(private trelloService: TrelloService, private authService: AuthService) {}
 
   ngOnInit() {
-    this.loadBoards();
+    this.checkTrelloStatus();
   }
 
   ngAfterViewInit(): void {
@@ -134,6 +142,57 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     window.removeEventListener('resize', this.resizeListener);
     this.stopParticles();
+  }
+
+  checkTrelloStatus() {
+    this.authService.getTrelloStatus().subscribe({
+      next: (res) => {
+        this.trelloLinked = res.data?.linked || false;
+        if (this.trelloLinked) {
+          this.loadBoards();
+        } else {
+          this.loadingBoards = false;
+          this.showSetup = true;
+        }
+      },
+      error: () => {
+        this.loadingBoards = false;
+        this.showSetup = true;
+      }
+    });
+  }
+
+  linkTrello() {
+    if (!this.setupApiKey.trim() || !this.setupToken.trim()) {
+      this.setupError = 'Se requiere API Key y Token de Trello';
+      return;
+    }
+    this.setupLoading = true;
+    this.setupError = null;
+    this.authService.linkTrello(this.setupApiKey.trim(), this.setupToken.trim()).subscribe({
+      next: () => {
+        this.trelloLinked = true;
+        this.showSetup = false;
+        this.setupLoading = false;
+        this.loadBoards();
+      },
+      error: (err) => {
+        this.setupLoading = false;
+        this.setupError = err?.error?.message || 'Error al vincular Trello';
+      }
+    });
+  }
+
+  unlinkTrello() {
+    if (!confirm('Desvincular tu cuenta de Trello?')) return;
+    this.authService.unlinkTrello().subscribe({
+      next: () => {
+        this.trelloLinked = false;
+        this.boards = [];
+        this.selectedBoard = null;
+        this.showSetup = true;
+      }
+    });
   }
 
   loadBoards() {
@@ -149,6 +208,9 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (error) => {
         console.error('Error cargando tableros de Trello:', error);
         this.loadingBoards = false;
+        if (error?.status === 400) {
+          this.showSetup = true;
+        }
       }
     });
   }

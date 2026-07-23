@@ -19,6 +19,11 @@ export class FriendsComponent implements OnInit, OnDestroy {
   feedback: { type: 'success' | 'error'; message: string } | null = null;
   private subs: Subscription[] = [];
 
+  profilePanelOpen = false;
+  profilePanelUserId: string | null = null;
+  profilePanelUsername: string | null = null;
+  profilePanelAvatar: string | null = null;
+
   constructor(private friendship: FriendshipService, private socketService: SocketService) {}
 
   ngOnInit() {
@@ -94,6 +99,20 @@ export class FriendsComponent implements OnInit, OnDestroy {
       next: (res) => { this.showFeedback('success', res.message || 'Amigo eliminado'); this.loadAll(); },
       error: (err) => this.showFeedback('error', err.error?.message || 'Error al eliminar amigo')
     });
+  }
+
+  openProfile(userId: string, username: string, avatar: string) {
+    this.profilePanelUserId = userId;
+    this.profilePanelUsername = username;
+    this.profilePanelAvatar = avatar;
+    this.profilePanelOpen = true;
+  }
+
+  closeProfile() {
+    this.profilePanelOpen = false;
+    this.profilePanelUserId = null;
+    this.profilePanelUsername = null;
+    this.profilePanelAvatar = null;
   }
 
   private showFeedback(type: 'success' | 'error', message: string) {

@@ -5,11 +5,54 @@
        'bg-gradient-to-br from-[#1a0033] via-[#3b0764] to-[#0f0326]': currentBackground === 'nebula'
      }">
 
-  <canvas *ngIf="currentBackground === 'particles'" #particleCanvas
+  <!-- Trello Setup View -->
+  <div *ngIf="showSetup" class="flex-1 flex items-center justify-center p-8">
+    <div class="w-full max-w-md bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-8">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-[#0079BF]/20 flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-bold text-[#0079BF]">T</span>
+        </div>
+        <h2 class="font-display font-bold text-xl text-white">Conectar Trello</h2>
+        <p class="text-sm text-white/50 mt-1">Vincula tu cuenta de Trello para ver tus tableros</p>
+      </div>
+
+      <div *ngIf="setupError" class="mb-4 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+        {{ setupError }}
+      </div>
+
+      <div class="space-y-3.5">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">API Key</label>
+          <input type="text" [(ngModel)]="setupApiKey"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-[#0079BF]/60 text-sm text-white placeholder:text-white/30 transition-all"
+                 placeholder="Tu API Key de Trello" />
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Token</label>
+          <input type="text" [(ngModel)]="setupToken"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-[#0079BF]/60 text-sm text-white placeholder:text-white/30 transition-all"
+                 placeholder="Tu Token de Trello" />
+        </div>
+        <button (click)="linkTrello()" [disabled]="setupLoading"
+                class="w-full py-3 rounded-xl bg-[#0079BF] text-white font-medium text-sm hover:bg-[#0079BF]/90 disabled:opacity-50 transition-all mt-2">
+          {{ setupLoading ? 'Vinculando...' : 'Vincular cuenta' }}
+        </button>
+      </div>
+
+      <div class="mt-5 pt-5 border-t border-white/10 text-center">
+        <p class="text-xs text-white/40">
+          Obtene tu API Key en
+          <a href="https://trello.com/power-ups/admin" target="_blank" class="text-[#0079BF] hover:underline">trello.com/power-ups/admin</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <canvas *ngIf="currentBackground === 'particles' && !showSetup" #particleCanvas
           class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
 
   <!-- Header: selector de tablero + selector de fondo -->
-  <header class="relative z-30 flex-shrink-0 bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4">
+  <header *ngIf="!showSetup" class="relative z-30 flex-shrink-0 bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4">
     <div class="flex items-center justify-between">
       <div class="relative">
         <button
@@ -63,7 +106,7 @@
   </header>
 
   <!-- Tablero kanban -->
-  <div class="relative z-10 flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 py-5">
+  <div *ngIf="!showSetup" class="relative z-10 flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 py-5">
     <div *ngIf="loadingBoards || loadingBoard" class="flex items-center gap-2 text-white/50 text-sm">
       <span class="w-1.5 h-1.5 rounded-full bg-[#8b7cf6] animate-pulse"></span>
       Cargando…

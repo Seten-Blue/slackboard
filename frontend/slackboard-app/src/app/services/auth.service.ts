@@ -12,6 +12,12 @@ export interface AuthUser {
   apellido?: string;
   telefono?: string;
   idioma?: string;
+  bio?: string;
+  ubicacion?: string;
+  intereses?: string[];
+  github?: string;
+  linkedin?: string;
+  website?: string;
 }
 
 interface AuthResponse {
@@ -93,6 +99,12 @@ export class AuthService {
     apellido?: string;
     telefono?: string;
     idioma?: string;
+    bio?: string;
+    ubicacion?: string;
+    intereses?: string[];
+    github?: string;
+    linkedin?: string;
+    website?: string;
   }): Observable<ProfileUpdateResponse> {
     return this.http.put<ProfileUpdateResponse>(`${this.apiUrl}/auth/profile`, data).pipe(
       tap(response => {
@@ -127,6 +139,18 @@ export class AuthService {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
     this.currentUserSubject.next(null);
+  }
+
+  linkTrello(trelloApiKey: string, trelloToken: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/auth/trello`, { trelloApiKey, trelloToken });
+  }
+
+  unlinkTrello(): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/auth/trello`);
+  }
+
+  getTrelloStatus(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/auth/trello/status`);
   }
 
   private setSession(response: AuthResponse): void {

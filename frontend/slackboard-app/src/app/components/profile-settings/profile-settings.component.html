@@ -1,79 +1,178 @@
-<div class="min-h-screen flex items-center justify-center bg-ink-950 relative overflow-hidden px-4">
-  <div class="pointer-events-none absolute -top-32 -left-24 w-96 h-96 rounded-full bg-signal/20 blur-3xl" aria-hidden="true"></div>
-  <div class="pointer-events-none absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-pulse/20 blur-3xl" aria-hidden="true"></div>
+<div class="h-full overflow-y-auto p-6" style="scrollbar-width: none; -ms-overflow-style: none;">
+  <div class="mb-6">
+    <h1 class="text-xl font-display font-bold text-ink-950">Mi Perfil</h1>
+    <p class="text-sm text-ink-950/50 mt-0.5">Administra tu informacion personal y preferencias</p>
+  </div>
 
-  <div class="relative w-full max-w-sm bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
-    <div class="text-center mb-7">
-      <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-signal to-pulse flex items-center justify-center mx-auto mb-4 shadow-lg shadow-signal/30">
-        <span class="font-display font-bold text-white text-lg">S</span>
-      </div>
-      <h1 class="font-display font-semibold text-xl text-white">Mi Perfil</h1>
-      <p class="text-sm text-white/40 mt-1.5">Actualiza tu informacion personal</p>
-    </div>
+  <div *ngIf="errorMsg" class="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+    {{ errorMsg }}
+  </div>
 
-    <div *ngIf="errorMsg" class="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-      {{ errorMsg }}
-    </div>
+  <div *ngIf="successMsg" class="mb-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-600 text-sm">
+    {{ successMsg }}
+  </div>
 
-    <div *ngIf="successMsg" class="mb-4 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
-      {{ successMsg }}
-    </div>
+  <form (ngSubmit)="save()" class="space-y-6 max-w-2xl">
 
-    <form (ngSubmit)="save()" class="space-y-3.5">
-      <div>
-        <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Nombre de usuario</label>
-        <input type="text" [(ngModel)]="username" name="username"
-               class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
-               placeholder="Tu nombre para mostrar" />
-        <p class="text-[10px] text-white/30 mt-1">Este nombre se mostrara en los mensajes que envies a Slack y Discord</p>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Nombre</label>
-          <input type="text" [(ngModel)]="nombre" name="nombre"
-                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
-                 placeholder="Tu nombre" />
+    <!-- Avatar / Foto de perfil -->
+    <div class="bg-white rounded-2xl border border-ink-950/5 p-6">
+      <h2 class="font-display font-semibold text-sm text-ink-950 mb-4 uppercase tracking-wider">Foto de perfil</h2>
+      <div class="flex items-center gap-5">
+        <div class="relative group">
+          <img [src]="avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + username"
+               class="w-20 h-20 rounded-2xl object-cover border-2 border-ink-950/10">
+          <label class="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <input type="file" accept="image/*" (change)="onPhotoSelected($event)" class="hidden">
+          </label>
+          <div *ngIf="uploadingPhoto" class="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center">
+            <span class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          </div>
         </div>
         <div>
-          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Apellido</label>
-          <input type="text" [(ngModel)]="apellido" name="apellido"
-                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
-                 placeholder="Tu apellido" />
+          <p class="text-sm font-medium text-ink-950">{{ username || 'Sin nombre' }}</p>
+          <p class="text-xs text-ink-950/40 mt-0.5">Click en la imagen para cambiarla</p>
         </div>
       </div>
-
-      <div>
-        <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Telefono</label>
-        <input type="tel" [(ngModel)]="telefono" name="telefono"
-               class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
-               placeholder="+54 11 1234-5678" />
-      </div>
-
-      <div>
-        <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Idioma</label>
-        <input type="text" [(ngModel)]="idioma" name="idioma"
-               class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
-               placeholder="es, en, pt, etc." />
-      </div>
-
-      <div>
-        <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">URL del avatar (opcional)</label>
+      <div class="mt-4">
+        <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">URL del avatar (alternativo)</label>
         <input type="url" [(ngModel)]="avatar" name="avatar"
-               class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-signal/60 text-sm text-white placeholder:text-white/20 transition-colors"
+               class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
                placeholder="https://ejemplo.com/avatar.jpg" />
       </div>
+    </div>
 
-      <div class="flex gap-3 pt-2">
-        <button type="button" (click)="goBack()"
-                class="flex-1 py-3 rounded-lg bg-white/5 border border-white/10 text-white/60 font-medium text-sm hover:bg-white/10 transition-all">
-          Cancelar
-        </button>
-        <button type="submit" [disabled]="loading"
-                class="flex-1 py-3 rounded-lg bg-gradient-to-r from-signal to-signal/80 text-white font-medium text-sm hover:shadow-lg hover:shadow-signal/30 disabled:opacity-50 transition-all">
-          {{ loading ? 'Guardando…' : 'Guardar' }}
+    <!-- Informacion basica -->
+    <div class="bg-white rounded-2xl border border-ink-950/5 p-6">
+      <h2 class="font-display font-semibold text-sm text-ink-950 mb-4 uppercase tracking-wider">Informacion basica</h2>
+      <div class="space-y-3.5">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Nombre de usuario</label>
+          <input type="text" [(ngModel)]="username" name="username"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                 placeholder="Tu nombre para mostrar" />
+          <p class="text-[10px] text-ink-950/30 mt-1">Este nombre se mostrara en los mensajes que envies a Slack y Discord</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Nombre</label>
+            <input type="text" [(ngModel)]="nombre" name="nombre"
+                   class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                   placeholder="Tu nombre" />
+          </div>
+          <div>
+            <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Apellido</label>
+            <input type="text" [(ngModel)]="apellido" name="apellido"
+                   class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                   placeholder="Tu apellido" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Telefono</label>
+            <input type="tel" [(ngModel)]="telefono" name="telefono"
+                   class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                   placeholder="+54 11 1234-5678" />
+          </div>
+          <div>
+            <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Idioma</label>
+            <input type="text" [(ngModel)]="idioma" name="idioma"
+                   class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                   placeholder="es, en, pt, etc." />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bio y ubicacion -->
+    <div class="bg-white rounded-2xl border border-ink-950/5 p-6">
+      <h2 class="font-display font-semibold text-sm text-ink-950 mb-4 uppercase tracking-wider">Sobre ti</h2>
+      <div class="space-y-3.5">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Bio</label>
+          <textarea [(ngModel)]="bio" name="bio" rows="3"
+                    class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all resize-none"
+                    placeholder="Contanos algo sobre vos..." maxlength="500"></textarea>
+          <p class="text-[10px] text-ink-950/30 mt-1">{{ bio.length }}/500 caracteres</p>
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40">Ubicacion</label>
+          <input type="text" [(ngModel)]="ubicacion" name="ubicacion"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                 placeholder="Buenos Aires, Argentina" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Intereses -->
+    <div class="bg-white rounded-2xl border border-ink-950/5 p-6">
+      <h2 class="font-display font-semibold text-sm text-ink-950 mb-4 uppercase tracking-wider">Intereses</h2>
+      <div class="flex flex-wrap gap-2 mb-3" *ngIf="intereses.length > 0">
+        <span *ngFor="let interes of intereses" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-signal/10 text-signal text-xs font-medium rounded-lg">
+          {{ interes }}
+          <button type="button" (click)="removeInteres(interes)" class="hover:text-red-500 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </span>
+      </div>
+      <div class="flex gap-2">
+        <input type="text" [(ngModel)]="newInteres" name="newInteres" (keydown)="onInteresKeydown($event)"
+               class="flex-1 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+               placeholder="Escribi un interes y presiona Enter" />
+        <button type="button" (click)="addInteres()"
+                class="px-4 py-2.5 bg-ink-950/5 text-ink-950/60 rounded-xl text-sm font-medium hover:bg-ink-950/10 transition-colors">
+          Agregar
         </button>
       </div>
-    </form>
-  </div>
+      <p class="text-[10px] text-ink-950/30 mt-2">Maximo 10 intereses. Ej: programacion, musica, gaming</p>
+    </div>
+
+    <!-- Redes sociales -->
+    <div class="bg-white rounded-2xl border border-ink-950/5 p-6">
+      <h2 class="font-display font-semibold text-sm text-ink-950 mb-4 uppercase tracking-wider">Redes sociales</h2>
+      <div class="space-y-3.5">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40 flex items-center gap-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            GitHub
+          </label>
+          <input type="text" [(ngModel)]="github" name="github"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                 placeholder="https://github.com/tu-usuario" />
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40 flex items-center gap-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            LinkedIn
+          </label>
+          <input type="text" [(ngModel)]="linkedin" name="linkedin"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                 placeholder="https://linkedin.com/in/tu-usuario" />
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono text-ink-950/40 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+            Sitio web
+          </label>
+          <input type="text" [(ngModel)]="website" name="website"
+                 class="w-full mt-1.5 px-3 py-2.5 bg-ink-950/[0.03] border border-ink-950/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-signal/20 text-sm text-ink-950 placeholder:text-ink-950/30 transition-all"
+                 placeholder="https://tu-sitio.com" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="flex gap-3 pb-8">
+      <button type="button" (click)="goBack()"
+              class="flex-1 py-3 rounded-xl bg-ink-950/5 border border-ink-950/10 text-ink-950/60 font-medium text-sm hover:bg-ink-950/10 transition-all">
+        Cancelar
+      </button>
+      <button type="submit" [disabled]="loading"
+              class="flex-1 py-3 rounded-xl bg-gradient-to-r from-signal to-signal/80 text-white font-medium text-sm hover:shadow-lg hover:shadow-signal/30 disabled:opacity-50 transition-all">
+        {{ loading ? 'Guardando...' : 'Guardar cambios' }}
+      </button>
+    </div>
+  </form>
 </div>

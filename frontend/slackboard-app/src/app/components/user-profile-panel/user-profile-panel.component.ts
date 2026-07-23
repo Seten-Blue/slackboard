@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
 import { FriendshipService } from '../../services/friendship.service';
+import { AuthService, AuthUser } from '../../services/auth.service';
 
 @Component({
   selector: 'app-user-profile-panel',
@@ -17,12 +18,24 @@ export class UserProfilePanelComponent implements OnInit, OnChanges {
   loading = false;
   actionLoading = false;
 
-  constructor(private friendshipService: FriendshipService) {}
+  userProfile: any = null;
+  loadingProfile = false;
+  commonInterests: string[] = [];
 
-  ngOnInit() { this.loadFriendship(); }
+  constructor(
+    private friendshipService: FriendshipService,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() { this.loadAll(); }
 
   ngOnChanges() {
-    if (this.isOpen && this.userId) this.loadFriendship();
+    if (this.isOpen && this.userId) this.loadAll();
+  }
+
+  private loadAll() {
+    this.loadFriendship();
+    this.loadUserProfile();
   }
 
   loadFriendship() {
@@ -55,6 +68,28 @@ export class UserProfilePanelComponent implements OnInit, OnChanges {
       },
       error: () => { this.loading = false; }
     });
+  }
+
+  private loadUserProfile() {
+    if (!this.userId) return;
+    this.loadingProfile = true;
+    this.friendshipService.getUserProfile(this.userId).subscribe({
+      next: (res) => {
+        this.userProfile = res.data || null;
+        this.loadingProfile = false;
+        this.calculateCommonInterests();
+      },
+      error: () => { this.loadingProfile = false; }
+    });
+  }
+
+  private calculateCommonInterests() {
+    this.commonInterests = [];
+    const currentUser = this.authService.currentUser;
+    if (!currentUser?.intereses?.length || !this.userProfile?.intereses?.length) return;
+
+    const userSet = new Set(currentUser.intereses.map((i: string) => i.toLowerCase()));
+    this.commonInterests = this.userProfile.intereses.filter((i: string) => userSet.has(i.toLowerCase()));
   }
 
   sendRequest() {
@@ -104,5 +139,16 @@ export class UserProfilePanelComponent implements OnInit, OnChanges {
 
   onClose() {
     this.close.emit();
+  }
+
+  get initials(): string {
+    const name = this.userProfile?.nombre || this.userProfile?.username || this.username || '?';
+    return name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase();
+  }
+
+  get memberSince(): string {
+    if (!this.userProfile?.createdAt) return '';
+    const date = new Date(this.userProfile.createdAt);
+    return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   }
 }

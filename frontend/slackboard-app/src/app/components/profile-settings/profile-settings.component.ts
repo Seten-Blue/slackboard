@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthService, AuthUser } from '../../services/auth.service';
+import { ChatService } from '../../services/chat.service';
 import { Router } from '@angular/router';
 
 @Component({
@@ -15,11 +16,23 @@ export class ProfileSettingsComponent implements OnInit {
   apellido = '';
   telefono = '';
   idioma = '';
+  bio = '';
+  ubicacion = '';
+  intereses: string[] = [];
+  newInteres = '';
+  github = '';
+  linkedin = '';
+  website = '';
   loading = false;
   successMsg: string | null = null;
   errorMsg: string | null = null;
+  uploadingPhoto = false;
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(
+    private authService: AuthService,
+    private chatService: ChatService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
     this.authService.refreshUser().subscribe({
@@ -42,6 +55,55 @@ export class ProfileSettingsComponent implements OnInit {
       this.apellido = this.user.apellido || '';
       this.telefono = this.user.telefono || '';
       this.idioma = this.user.idioma || '';
+      this.bio = this.user.bio || '';
+      this.ubicacion = this.user.ubicacion || '';
+      this.intereses = this.user.intereses ? [...this.user.intereses] : [];
+      this.github = this.user.github || '';
+      this.linkedin = this.user.linkedin || '';
+      this.website = this.user.website || '';
+    }
+  }
+
+  onPhotoSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      this.errorMsg = 'La imagen no puede superar 5 MB';
+      return;
+    }
+
+    this.uploadingPhoto = true;
+    this.errorMsg = null;
+    this.chatService.uploadAttachment(file).subscribe({
+      next: (response) => {
+        this.avatar = response.url;
+        this.uploadingPhoto = false;
+      },
+      error: () => {
+        this.errorMsg = 'Error al subir la imagen';
+        this.uploadingPhoto = false;
+      }
+    });
+  }
+
+  addInteres(): void {
+    const val = this.newInteres.trim();
+    if (val && !this.intereses.includes(val) && this.intereses.length < 10) {
+      this.intereses.push(val);
+      this.newInteres = '';
+    }
+  }
+
+  removeInteres(interes: string): void {
+    this.intereses = this.intereses.filter(i => i !== interes);
+  }
+
+  onInteresKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.addInteres();
     }
   }
 
@@ -68,6 +130,12 @@ export class ProfileSettingsComponent implements OnInit {
       apellido: this.apellido.trim() || undefined,
       telefono: this.telefono.trim() || undefined,
       idioma: this.idioma.trim() || undefined,
+      bio: this.bio.trim() || undefined,
+      ubicacion: this.ubicacion.trim() || undefined,
+      intereses: this.intereses.length > 0 ? this.intereses : undefined,
+      github: this.github.trim() || undefined,
+      linkedin: this.linkedin.trim() || undefined,
+      website: this.website.trim() || undefined,
     }).subscribe({
       next: (response) => {
         this.loading = false;

@@ -8,7 +8,7 @@ import slackService from './slackService';
 
 const AI_EMAIL = 'ai@slackboard.com';
 const AI_USERNAME = 'Zork';
-const AI_CHANNEL_NAME = 'Zork';
+const AI_CHANNEL_PREFIX = 'Zork';
 const HISTORY_LIMIT = 12;
 
 const SLASH_REGEX = /^\/zork\s+([\s\S]+)/i;
@@ -49,19 +49,20 @@ async function getOrCreateAIUser(): Promise<string> {
   return cachedAIUserId;
 }
 
-export async function ensureAIChannel() {
+export async function ensureAIChannel(userId?: string) {
   const aiUserId = await getOrCreateAIUser();
+  const channelName = userId ? `${AI_CHANNEL_PREFIX} - ${userId}` : AI_CHANNEL_PREFIX;
 
   try {
     const channel = await Channel.findOneAndUpdate(
-      { name: AI_CHANNEL_NAME },
+      { name: channelName },
       {
         $setOnInsert: {
-          name: AI_CHANNEL_NAME,
-          description: 'Zork, tu asistente con superpoderes conversacionales',
-          isPrivate: false,
+          name: channelName,
+          description: 'Zork, tu asistente personal con superpoderes conversacionales',
+          isPrivate: !!userId,
           createdBy: aiUserId,
-          members: [aiUserId],
+          members: userId ? [aiUserId, userId] : [aiUserId],
           isAIChannel: true,
         },
       },
@@ -70,7 +71,7 @@ export async function ensureAIChannel() {
     return channel;
   } catch (error: any) {
     if (error.code === 11000) {
-      const existing = await Channel.findOne({ name: AI_CHANNEL_NAME });
+      const existing = await Channel.findOne({ name: channelName });
       if (existing) return existing;
     }
     throw error;

@@ -51,6 +51,12 @@ export const register = async (req: Request, res: Response) => {
         apellido: user.apellido,
         telefono: user.telefono,
         idioma: user.idioma,
+        bio: user.bio,
+        ubicacion: user.ubicacion,
+        intereses: user.intereses,
+        github: user.github,
+        linkedin: user.linkedin,
+        website: user.website,
       },
     });
   } catch (error: any) {
@@ -89,6 +95,12 @@ export const login = async (req: Request, res: Response) => {
         apellido: user.apellido,
         telefono: user.telefono,
         idioma: user.idioma,
+        bio: user.bio,
+        ubicacion: user.ubicacion,
+        intereses: user.intereses,
+        github: user.github,
+        linkedin: user.linkedin,
+        website: user.website,
       },
     });
   } catch (error: any) {
@@ -98,7 +110,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const { username, avatar, nombre, apellido, telefono, idioma } = req.body;
+    const { username, avatar, nombre, apellido, telefono, idioma, bio, ubicacion, intereses, github, linkedin, website } = req.body;
     const userId = req.userId;
 
     if (!userId) {
@@ -121,21 +133,17 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     }
 
     const updateData: any = { username: trimmedUsername };
-    if (avatar !== undefined) {
-      updateData.avatar = avatar || null;
-    }
-    if (nombre !== undefined) {
-      updateData.nombre = nombre || null;
-    }
-    if (apellido !== undefined) {
-      updateData.apellido = apellido || null;
-    }
-    if (telefono !== undefined) {
-      updateData.telefono = telefono || null;
-    }
-    if (idioma !== undefined) {
-      updateData.idioma = idioma || null;
-    }
+    if (avatar !== undefined) updateData.avatar = avatar || null;
+    if (nombre !== undefined) updateData.nombre = nombre || null;
+    if (apellido !== undefined) updateData.apellido = apellido || null;
+    if (telefono !== undefined) updateData.telefono = telefono || null;
+    if (idioma !== undefined) updateData.idioma = idioma || null;
+    if (bio !== undefined) updateData.bio = bio || null;
+    if (ubicacion !== undefined) updateData.ubicacion = ubicacion || null;
+    if (intereses !== undefined) updateData.intereses = Array.isArray(intereses) ? intereses : [];
+    if (github !== undefined) updateData.github = github || null;
+    if (linkedin !== undefined) updateData.linkedin = linkedin || null;
+    if (website !== undefined) updateData.website = website || null;
 
     const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
     if (!user) {
@@ -154,6 +162,12 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         apellido: user.apellido,
         telefono: user.telefono,
         idioma: user.idioma,
+        bio: user.bio,
+        ubicacion: user.ubicacion,
+        intereses: user.intereses,
+        github: user.github,
+        linkedin: user.linkedin,
+        website: user.website,
       },
     });
   } catch (error: any) {
@@ -317,6 +331,12 @@ export const googleAuth = async (req: Request, res: Response) => {
         apellido: user.apellido,
         telefono: user.telefono,
         idioma: user.idioma,
+        bio: user.bio,
+        ubicacion: user.ubicacion,
+        intereses: user.intereses,
+        github: user.github,
+        linkedin: user.linkedin,
+        website: user.website,
       },
     });
   } catch (error: any) {

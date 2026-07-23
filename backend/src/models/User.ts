@@ -10,6 +10,14 @@ export interface IUser extends Document {
   apellido?: string;
   telefono?: string;
   idioma?: string;
+  bio?: string;
+  ubicacion?: string;
+  intereses?: string[];
+  github?: string;
+  linkedin?: string;
+  website?: string;
+  trelloApiKey?: string;
+  trelloToken?: string;
   status: 'online' | 'offline' | 'away';
   role: 'admin' | 'user';
   googleId?: string;
@@ -18,7 +26,7 @@ export interface IUser extends Document {
   discordAvatar?: string;
   discordAccessToken?: string;
   discordRefreshToken?: string;
-discordTokenExpiresAt?: Date;
+  discordTokenExpiresAt?: Date;
   slackWorkspaces?: {
     teamId: string;
     teamName: string;
@@ -26,7 +34,8 @@ discordTokenExpiresAt?: Date;
     botAccessToken: string;
     connectedAt: Date;
   }[];
-  resetPasswordTokenHash?: string;  resetPasswordExpires?: Date;
+  resetPasswordTokenHash?: string;
+  resetPasswordExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
@@ -73,6 +82,44 @@ const UserSchema: Schema = new Schema(
       type: String,
       default: null,
       trim: true,
+    },
+    bio: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 500,
+    },
+    ubicacion: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    intereses: {
+      type: [String],
+      default: [],
+    },
+    github: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    linkedin: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    website: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    trelloApiKey: {
+      type: String,
+      default: null,
+    },
+    trelloToken: {
+      type: String,
+      default: null,
     },
     status: {
       type: String,
