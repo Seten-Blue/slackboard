@@ -126,9 +126,15 @@ io.on('connection', (socket) => {
     console.log(`Usuario ${socket.id} se unio al canal: ${channelId}`);
   });
 
+  // Unirse a la sala personal del usuario (para notificaciones de amistad)
+  socket.on('join-user', (userId: string) => {
+    socket.join(`user:${userId}`);
+    console.log(`Usuario ${socket.id} se unio a su sala: user:${userId}`);
+  });
+
   // Enviar mensaje
   socket.on('send-message', (data: any) => {
-    io.to(data.channelId).emit('new-message', data);
+    socket.to(data.channelId).emit('new-message', data);
   });
 
   // Usuario escribiendo

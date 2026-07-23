@@ -16,6 +16,9 @@ export class SocketService {
   private userTyping$ = new Subject<any>();
   private threadReply$ = new Subject<any>();
   private pollVoted$ = new Subject<any>();
+  private friendshipNewRequest$ = new Subject<any>();
+  private friendshipUpdate$ = new Subject<any>();
+  private friendshipRemoved$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
   private pendingJoins: string[] = [];
@@ -63,6 +66,9 @@ export class SocketService {
     this.socket.on('user-typing', (data: any) => this.userTyping$.next(data));
     this.socket.on('thread:reply', (data: any) => this.threadReply$.next(data));
     this.socket.on('poll-voted', (data: any) => this.pollVoted$.next(data));
+    this.socket.on('friendship:new-request', (data: any) => this.friendshipNewRequest$.next(data));
+    this.socket.on('friendship:update', (data: any) => this.friendshipUpdate$.next(data));
+    this.socket.on('friendship:removed', (data: any) => this.friendshipRemoved$.next(data));
   }
 
   private flushPendingJoins() {
@@ -80,6 +86,15 @@ export class SocketService {
       this.socket.emit('join-channel', channelId);
     } else {
       this.pendingJoins.push(channelId);
+    }
+  }
+
+  joinUser(userId: string) {
+    if (!this.socket) return;
+    if (this.socket.connected) {
+      this.socket.emit('join-user', userId);
+    } else {
+      this.socket.once('connect', () => this.socket?.emit('join-user', userId));
     }
   }
 
@@ -121,6 +136,18 @@ export class SocketService {
 
   onPollVoted(): Observable<any> {
     return this.pollVoted$.asObservable();
+  }
+
+  onFriendshipNewRequest(): Observable<any> {
+    return this.friendshipNewRequest$.asObservable();
+  }
+
+  onFriendshipUpdate(): Observable<any> {
+    return this.friendshipUpdate$.asObservable();
+  }
+
+  onFriendshipRemoved(): Observable<any> {
+    return this.friendshipRemoved$.asObservable();
   }
 
   onConnected(): Observable<any> {

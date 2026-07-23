@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { Router } from '@angular/router';
 import { DiscordService } from '../../services/discord.service';
+import { SocketService } from '../../services/socket.service';
+import { FriendshipService } from '../../services/friendship.service';
 import { SlackService } from '../../services/slack.service';
 import { WhatsappService } from '../../services/whatsapp.service';
 import { AuthService } from '../../services/auth.service';
@@ -86,6 +88,7 @@ export class SidebarComponent implements OnInit {
 
   showSlackModal = false;
   slackLinked: boolean | null = null; // null = todavia no se consulto
+  pendingFriendCount = 0;
   
 
   get selectedPlatform(): Platform {
@@ -98,7 +101,9 @@ export class SidebarComponent implements OnInit {
     private discordService: DiscordService,
     private slackService: SlackService,
     private whatsappService: WhatsappService,
-    public authService: AuthService
+    public authService: AuthService,
+    private socketService: SocketService,
+    private friendshipService: FriendshipService
   ) {}
 
   ngOnInit(): void {
@@ -116,6 +121,11 @@ export class SidebarComponent implements OnInit {
 
     this.checkDiscordStatus();
     this.checkSlackStatus();
+    this.loadPendingFriendCount();
+
+    this.socketService.onFriendshipNewRequest().subscribe(() => this.loadPendingFriendCount());
+    this.socketService.onFriendshipUpdate().subscribe(() => this.loadPendingFriendCount());
+    this.socketService.onFriendshipRemoved().subscribe(() => this.loadPendingFriendCount());
 
     // Si venimos de un redirect de OAuth (Discord/Slack nos mandaron de
     // vuelta a /chat), reabrimos el modal correspondiente.
@@ -167,6 +177,13 @@ export class SidebarComponent implements OnInit {
   // ============ MENÚ ============
   toggleMenu(menu: MenuKey): void {
     this.menuOpened[menu] = !this.menuOpened[menu];
+  }
+
+  loadPendingFriendCount() {
+    this.friendshipService.listPending().subscribe({
+      next: (res) => { this.pendingFriendCount = (res.data?.received || []).length; },
+      error: () => {}
+    });
   }
 
   selectDashboardItem(id: string): void {

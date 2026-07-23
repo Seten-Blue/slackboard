@@ -18,7 +18,7 @@ const normalizeChannelName = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-');
 
 // ← CORREGIDO: matching por nombre normalizado en vez de comparacion exacta
-const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?: string) => {
+const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?: string, requestingUserId?: string) => {
   const fallbackName = channelName || `slack-${slackChannelId}`;
   const normalizedIncoming = normalizeChannelName(fallbackName);
 
@@ -43,6 +43,11 @@ const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?:
       await channel.save();
       console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannelId})`);
     }
+    if (requestingUserId && channel.members && !channel.members.some((m: any) => m.toString() === requestingUserId)) {
+      channel.members.push(requestingUserId);
+      await channel.save();
+      console.log(`👤 Usuario ${requestingUserId} agregado como miembro del canal "${channel.name}"`);
+    }
     return channel;
   }
 
@@ -52,11 +57,16 @@ const resolveOrCreateSlackChannel = async (slackChannelId: string, channelName?:
     throw new Error('No existe un usuario admin para crear el canal sincronizado desde Slack');
   }
 
+  const creatorMembers: any[] = [adminUser._id];
+  if (requestingUserId && adminUser._id?.toString() !== requestingUserId) {
+    creatorMembers.push(requestingUserId);
+  }
+
   channel = await Channel.create({
     name: fallbackName,
     description: `Canal sincronizado desde Slack (${fallbackName})`,
     isPrivate: false,
-    members: [adminUser._id],
+    members: creatorMembers,
     createdBy: adminUser._id,
     slackChannelId
   });
@@ -205,9 +215,67 @@ router.post('/send-message', async (req: Request, res: Response) => {
   }
 });
 
-// Endpoint para eventos de Slack (webhooks)
+// Endpoint para eventos de Slack (webhooks) — maneja tanto eventos como interactive payloads
 router.post('/events', async (req: Request, res: Response) => {
   try {
+    // Slack interactive payloads (button clicks) vienen como payload JSON codificado en form
+    const payload = req.body.payload ? JSON.parse(req.body.payload) : null;
+    if (payload && payload.type === 'block_actions') {
+      console.log('🔘 Interactive payload recibido de Slack:', payload.type);
+
+      const actions = payload.actions || [];
+      const userId = payload.user?.id;
+
+      for (const action of actions) {
+        const [actionId, friendshipId] = (action.action_id || '').split(':');
+        if (!friendshipId || !['friend_accept', 'friend_reject'].includes(actionId)) continue;
+
+        const Friendship = (await import('../models/Friendship')).default;
+        const friendship = await Friendship.findById(friendshipId);
+        if (!friendship) {
+          return res.status(200).json({ text: 'Esta solicitud ya no existe.' });
+        }
+        if (friendship.status !== 'pending') {
+          return res.status(200).json({ text: 'Esta solicitud ya fue procesada.' });
+        }
+
+        // Verify the clicking user is the recipient
+        const slackUser = await slackService.getUserInfo(userId);
+        const mongoUser = slackUser ? await User.findOne({ email: slackUser.profile?.email }) : null;
+        if (!mongoUser || !friendship.userB.equals((mongoUser as any)._id)) {
+          return res.status(200).json({ text: 'Esta solicitud no es para vos.' });
+        }
+
+        if (actionId === 'friend_accept') {
+          friendship.status = 'accepted';
+          await friendship.save();
+
+          const initiatorUser = await User.findById(friendship.initiator);
+          if (initiatorUser?.slackWorkspaces?.length) {
+            await slackService.sendFriendAcceptedDM(
+              initiatorUser.email,
+              mongoUser.username,
+            );
+          }
+
+          const io = req.app.get('io') as Server;
+          if (io) {
+            io.to(`user:${friendship.userA}`).emit('friendship:update', { friendshipId, status: 'accepted' });
+            io.to(`user:${friendship.userB}`).emit('friendship:update', { friendshipId, status: 'accepted' });
+          }
+
+          return res.status(200).json({ text: '✅ Solicitud aceptada!' });
+        } else {
+          friendship.status = 'rejected';
+          await friendship.save();
+          return res.status(200).json({ text: '❌ Solicitud rechazada.' });
+        }
+      }
+
+      return res.status(200).send('OK');
+    }
+
+    // Resto: eventos de Slack (event_callback)
     console.log('📨 Recibido evento de Slack:', JSON.stringify(req.body, null, 2));
 
     const { type, challenge, event } = req.body;
@@ -361,8 +429,8 @@ router.post('/events', async (req: Request, res: Response) => {
       if (event.type === 'message' && ['channel', 'group', 'im'].includes(channelType)) {
         console.log('💬 Procesando mensaje de Slack');
 
-        if (event.subtype) {
-          console.log(`⏭️  Ignorando mensaje con subtype: ${event.subtype}`);
+        if (event.subtype || event.bot_id) {
+          console.log(`⏭️  Ignorando mensaje con subtype/bot_id: ${event.subtype || event.bot_id}`);
           return res.status(200).send('OK');
         }
 
@@ -396,7 +464,7 @@ router.post('/events', async (req: Request, res: Response) => {
             console.warn('⚠️  No se pudo obtener informacion del canal de Slack:', channelInfoError.message);
           }
 
-          const channel: any = await resolveOrCreateSlackChannel(event.channel, channelName);
+          const channel: any = await resolveOrCreateSlackChannel(event.channel, channelName, user?._id?.toString());
 
           if (channel && user) {
             const createdMessage = await Message.create({

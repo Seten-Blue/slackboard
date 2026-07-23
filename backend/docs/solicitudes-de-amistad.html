@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitudes de Amistad - SlackBoard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f8f9fa; color: #1a1a2e; line-height: 1.6; }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1a1a2e; }
+    .subtitle { color: #666; font-size: 1.1rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.4rem; font-weight: 600; margin: 2rem 0 1rem; color: #1a1a2e; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: #334155; }
+
+    .card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card.highlight { border-left: 4px solid #6366f1; }
+    .card.warning { border-left: 4px solid #f59e0b; background: #fffbeb; }
+    .card.success { border-left: 4px solid #10b981; background: #f0fdf4; }
+
+    .flow-diagram { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; padding: 1rem; background: #f1f5f9; border-radius: 8px; }
+    .flow-step { background: white; border: 2px solid #6366f1; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
+    .flow-step.platform { background: #6366f1; color: white; border-color: #6366f1; }
+    .flow-arrow { color: #94a3b8; font-size: 1.2rem; }
+
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-web { background: #ede9fe; color: #6366f1; }
+    .badge-slack { background: #fce7f3; color: #db2777; }
+    .badge-discord { background: #dbeafe; color: #2563eb; }
+    .badge-api { background: #d1fae5; color: #059669; }
+
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+    th { background: #f1f5f9; text-align: left; padding: 0.75rem; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    code { background: #f1f5f9; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; font-family: 'Fira Code', monospace; }
+    .endpoint { font-family: monospace; font-weight: 600; }
+    .method { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: white; }
+    .method-get { background: #10b981; }
+    .method-post { background: #3b82f6; }
+    .method-put { background: #f59e0b; }
+    .method-delete { background: #ef4444; }
+
+    .status-pending { color: #f59e0b; font-weight: 600; }
+    .status-accepted { color: #10b981; font-weight: 600; }
+    .status-rejected { color: #ef4444; font-weight: 600; }
+
+    ul, ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+    li { margin-bottom: 0.3rem; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+    .emoji { font-size: 1.2rem; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 0.85rem; text-align: center; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Solicitudes de Amistad</h1>
+  <p class="subtitle">Documentacion completa del sistema de amistad en SlackBoard</p>
+
+  <!-- ===================== QUE ES ===================== -->
+  <h2>Que es</h2>
+  <div class="card">
+    <p>SlackBoard permite a los usuarios conectarse entre si mediante <strong>solicitudes de amistad</strong>. Las amistades son <strong>mutuales</strong>: ambas partes deben aceptar la solicitud para que se establezca la conexion. Esto garantiza que ambos usuarios estan de acuerdo en comunicarse.</p>
+  </div>
+
+  <!-- ===================== ESTADOS ===================== -->
+  <h2>Estados de una solicitud</h2>
+  <div class="two-col">
+    <div class="card">
+      <h3><span class="status-pending">Pendiente</span></h3>
+      <p>El usuario A envio una solicitud. El usuario B aun no respondio. La solicitud puede ser:</p>
+      <ul>
+        <li><strong>Aceptada</strong> por el receptor</li>
+        <li><strong>Rechazada</strong> por el receptor</li>
+        <li><strong>Cancelada</strong> por cualquiera de los dos</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="status-accepted">Aceptada</span></h3>
+      <p>Ambos usuarios son ahora amigos. Pueden:</p>
+      <ul>
+        <li>Verse mutuamente en la lista de amigos</li>
+        <li>Recibir notificaciones de actividad</li>
+        <li>Eliminar la amistad en cualquier momento</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== FLUJO COMPLETO ===================== -->
+  <h2>Flujo completo</h2>
+
+  <div class="card highlight">
+    <h3>1. Buscar usuario</h3>
+    <p>El usuario busca personas en la pestana <strong>"Buscar"</strong> usando el campo de texto. La busqueda es por nombre de usuario (minimo 2 caracteres).</p>
+    <div class="flow-diagram">
+      <span class="flow-step">Pestana Buscar</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">Escribir nombre</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">Resultados en vivo</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">Clic en "Agregar"</span>
+    </div>
+  </div>
+
+  <div class="card highlight">
+    <h3>2. Enviar solicitud</h3>
+    <p>Al hacer clic en <strong>"Agregar"</strong>, se envia una solicitud de amistad. El sistema:</p>
+    <ul>
+      <li>Crea un registro en la base de datos con estado <code>pending</code></li>
+      <li>Notifica al destinatario por <strong>Socket.IO</strong> (en tiempo real si esta conectado)</li>
+      <li>Notifica por <strong>DM en Discord</strong> (si tiene cuenta vinculada)</li>
+      <li>Notifica por <strong>DM en Slack</strong> (si tiene cuenta vinculada)</li>
+    </ul>
+  </div>
+
+  <div class="card highlight">
+    <h3>3. Responder a la solicitud</h3>
+    <p>El destinatario ve la solicitud en la pestana <strong>"Solicitudes"</strong> bajo la seccion <strong>"Recibidas"</strong>. Puede:</p>
+    <ul>
+      <li><strong>Aceptar</strong> &rarr; se convierten en amigos</li>
+      <li><strong>Rechazar</strong> &rarr; la solicitud se elimina</li>
+      <li><strong>Cancelar</strong> (solo para quien la envio) &rarr; la solicitud se elimina</li>
+    </ul>
+    <p style="margin-top:0.5rem; font-size:0.9rem; color:#666;">Los botones de aceptar/rechazar tambien aparecen como <strong>botones interactivos</strong> en los DM de Slack y Discord.</p>
+  </div>
+
+  <!-- ===================== DONDE SE PUEDE HACER ===================== -->
+  <h2>Plataformas donde se puede responder</h2>
+
+  <div class="card">
+    <table>
+      <tr>
+        <th>Plataforma</th>
+        <th>Enviar solicitud</th>
+        <th>Aceptar / Rechazar</th>
+      </tr>
+      <tr>
+        <td><span class="badge badge-web">Web</span> SlackBoard UI</td>
+        <td>Si &mdash; pestana "Buscar"</td>
+        <td>Si &mdash; pestana "Solicitudes"</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-slack">Slack</span> DM</td>
+        <td>No</td>
+        <td>Si &mdash; botones interactivos en el DM</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-discord">Discord</span> DM</td>
+        <td>No</td>
+        <td>Si &mdash; botones interactivos en el DM</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ===================== COMO FUNCIONA POR DETRAS ===================== -->
+  <h2>Como funciona por detras</h2>
+
+  <div class="card">
+    <h3>Modelo de datos</h3>
+    <p>Cada solicitud es un documento <code>Friendship</code> en MongoDB:</p>
+    <table>
+      <tr><th>Campo</th><th>Tipo</th><th>Descripcion</th></tr>
+      <tr><td><code>userA</code></td><td>ObjectId</td><td>Usuario con ID menor (para evitar duplicados)</td></tr>
+      <tr><td><code>userB</code></td><td>ObjectId</td><td>Usuario con ID mayor</td></tr>
+      <tr><td><code>initiator</code></td><td>ObjectId</td><td>Quien envio la solicitud</td></tr>
+      <tr><td><code>status</code></td><td>String</td><td><code>pending</code>, <code>accepted</code>, o <code>rejected</code></td></tr>
+    </table>
+    <p style="margin-top:0.75rem; font-size:0.9rem; color:#666;">El par <code>userA + userB</code> tiene un <strong>indice unico</strong>, lo que garantiza que no puede haber dos solicitudes entre los mismos usuarios.</p>
+  </div>
+
+  <div class="card">
+    <h3>Indice unico compuesto</h3>
+    <p>Para prevenir duplicados, se usa una funcion <code>normalizePair</code> que ordena los IDs:</p>
+    <pre style="background:#f1f5f9;padding:1rem;border-radius:6px;overflow-x:auto;font-size:0.85rem;margin-top:0.5rem;">function normalizePair(a, b) {
+  return a &lt; b ? { userA: a, userB: b } : { userA: b, userB: a };
+}</pre>
+    <p style="margin-top:0.5rem; font-size:0.9rem; color:#666;">Esto asegura que sin importar quien inicie la solicitud, el registro en la base de datos sea siempre el mismo.</p>
+  </div>
+
+  <!-- ===================== ENDPOINTS ===================== -->
+  <h2>API Endpoints <span class="badge badge-api">REST</span></h2>
+
+  <div class="card">
+    <table>
+      <tr>
+        <th>Metodo</th>
+        <th>Endpoint</th>
+        <th>Descripcion</th>
+      </tr>
+      <tr>
+        <td><span class="method method-get">GET</span></td>
+        <td class="endpoint">/api/friendship/search?q=</td>
+        <td>Buscar usuarios por nombre (minimo 2 caracteres)</td>
+      </tr>
+      <tr>
+        <td><span class="method method-get">GET</span></td>
+        <td class="endpoint">/api/friendship/list</td>
+        <td>Listar amigos aceptados</td>
+      </tr>
+      <tr>
+        <td><span class="method method-get">GET</span></td>
+        <td class="endpoint">/api/friendship/pending</td>
+        <td>Listar solicitudes pendientes (recibidas y enviadas)</td>
+      </tr>
+      <tr>
+        <td><span class="method method-post">POST</span></td>
+        <td class="endpoint">/api/friendship/request</td>
+        <td>Enviar solicitud de amistad (body: <code>{ to: userId }</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="method method-put">PUT</span></td>
+        <td class="endpoint">/api/friendship/accept/:id</td>
+        <td>Aceptar solicitud pendiente</td>
+      </tr>
+      <tr>
+        <td><span class="method method-put">PUT</span></td>
+        <td class="endpoint">/api/friendship/reject/:id</td>
+        <td>Rechazar solicitud pendiente</td>
+      </tr>
+      <tr>
+        <td><span class="method method-delete">DELETE</span></td>
+        <td class="endpoint">/api/friendship/cancel/:id</td>
+        <td>Cancelar/eliminar solicitud pendiente (iniciador o receptor)</td>
+      </tr>
+      <tr>
+        <td><span class="method method-delete">DELETE</span></td>
+        <td class="endpoint">/api/friendship/remove/:id</td>
+        <td>Eliminar amigo aceptado</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card warning">
+    <h3>Notas importantes sobre la API</h3>
+    <ul>
+      <li><strong>Aceptar/Rechazar son idempotentes</strong>: si la solicitud ya fue procesada (ej. via Slack/Discord), devuelven exito en vez de error.</li>
+      <li><strong>Cancelar funciona para ambos usuarios</strong>: tanto el iniciador como el receptor pueden eliminar una solicitud pendiente.</li>
+      <li><strong>El ID de la solicitud</strong> se obtiene del endpoint <code>/pending</code>, que devuelve los IDs en los campos <code>received[].id</code> y <code>sent[].id</code>.</li>
+      <li>Todos los endpoints requieren <strong>autenticacion</strong> (token JWT en header <code>Authorization</code>).</li>
+    </ul>
+  </div>
+
+  <!-- ===================== NOTIFICACIONES ===================== -->
+  <h2>Notificaciones en tiempo real</h2>
+
+  <div class="card">
+    <h3>Eventos Socket.IO</h3>
+    <table>
+      <tr><th>Evento</th><th>Descripcion</th><th>Payload</th></tr>
+      <tr>
+        <td><code>friendship:new-request</code></td>
+        <td>Nueva solicitud recibida</td>
+        <td><code>{ friendshipId, from, fromUserId }</code></td>
+      </tr>
+      <tr>
+        <td><code>friendship:update</code></td>
+        <td>Solicitud aceptada o rechazada</td>
+        <td><code>{ friendshipId, status }</code></td>
+      </tr>
+      <tr>
+        <td><code>friendship:removed</code></td>
+        <td>Solicitud eliminada o amistad removida</td>
+        <td><code>{ friendshipId }</code></td>
+      </tr>
+    </table>
+    <p style="margin-top:0.75rem; font-size:0.9rem; color:#666;">Todos los usuarios conectados a la sala <code>user:{userId}</code> reciben estos eventos. El badge de solicitudes en la sidebar se actualiza automaticamente.</p>
+  </div>
+
+  <!-- ===================== CASOS ESPECIALES ===================== -->
+  <h2>Casos especiales</h2>
+
+  <div class="card">
+    <h3>Envio de solicitud</h3>
+    <ul>
+      <li>No podes enviarte una solicitud a vos mismo</li>
+      <li>No podes enviar solicitud si ya son amigos</li>
+      <li>No podes enviar solicitud si ya hay una pendiente</li>
+      <li>Si la solicitud fue rechazada, podes reenviar una nueva</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Aceptar / Rechazar</h3>
+    <ul>
+      <li>Solo el <strong>receptor</strong> puede aceptar o rechazar (el iniciador no puede aceptar su propia solicitud)</li>
+      <li>Si la solicitud ya fue procesada via Slack/Discord, el endpoint devolvia exito (idempotente)</li>
+      <li>Si la solicitud no existe o ya no esta pendiente, se devuelve error</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Eliminar amistad</h3>
+    <ul>
+      <li>Cualquiera de los dos amigos puede eliminar la amistad</li>
+      <li>La eliminacion es inmediata y permanente</li>
+      <li>Pueden volver a enviarse una solicitud despues de eliminarse</li>
+    </ul>
+  </div>
+
+  <!-- ===================== DIAGRAMA ===================== -->
+  <h2>Diagrama de flujo</h2>
+  <div class="card" style="overflow-x:auto;">
+    <pre style="font-family:'Fira Code',monospace;font-size:0.85rem;line-height:1.8;">
+  Usuario A                     Backend                      Usuario B
+     |                            |                              |
+     |--- POST /friendship/request --->                          |
+     |    { to: B }               |                              |
+     |                            |--- Socket.IO: new-request -->|
+     |                            |--- DM Slack/Discord -------->|
+     |<--- 200 OK ---------------|                              |
+     |                            |                              |
+     |                            |<-- PUT /friendship/accept ---|
+     |<--- Socket.IO: update -----|                              |
+     |                            |--- Socket.IO: update ------->|
+     |<--- DM Slack/Discord ------|                              |
+     |                            |--- DM Slack/Discord -------->|
+     |                            |                              |
+     |                      (Ahora son amigos)                   |
+    </pre>
+  </div>
+
+  <footer>
+    SlackBoard &mdash; Sistema de Solicitudes de Amistad &mdash; Documentacion generada automaticamente
+  </footer>
+
+</div>
+</body>
+</html>

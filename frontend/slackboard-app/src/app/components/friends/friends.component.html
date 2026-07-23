@@ -1,6 +1,9 @@
 <div class="h-full flex flex-col">
   <header class="flex-shrink-0 px-6 py-4 border-b border-ink-950/10 bg-white/80 backdrop-blur">
     <h2 class="font-display font-semibold text-lg text-ink-950">Amigos</h2>
+    <div *ngIf="feedback" class="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium" [ngClass]="feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'">
+      {{ feedback.message }}
+    </div>
     <div class="flex gap-1 mt-3">
       <button (click)="activeTab='friends'" [class]="activeTab === 'friends' ? 'bg-ink-950 text-white' : 'bg-ink-950/5 text-ink-950/60 hover:bg-ink-950/10'" class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
         Amigos ({{ friends.length }})
@@ -64,8 +67,14 @@
         <img [src]="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="w-9 h-9 rounded-lg">
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-ink-950 truncate">{{ u.username }}</p>
+          <p *ngIf="u.friendshipStatus === 'friends'" class="text-xs text-green-600">Ya son amigos</p>
+          <p *ngIf="u.friendshipStatus === 'pending_sent'" class="text-xs text-amber-600">Solicitud enviada</p>
+          <p *ngIf="u.friendshipStatus === 'pending_received'" class="text-xs text-blue-600">Solicitud recibida</p>
         </div>
-        <button (click)="sendRequest(u._id)" class="text-xs bg-signal text-white px-3 py-1 rounded-lg hover:opacity-90 transition-opacity">Agregar</button>
+        <button *ngIf="!u.friendshipStatus || u.friendshipStatus === 'none'" (click)="sendRequest(u._id)" class="text-xs bg-signal text-white px-3 py-1 rounded-lg hover:opacity-90 transition-opacity">Agregar</button>
+        <span *ngIf="u.friendshipStatus === 'friends'" class="text-xs text-green-600 bg-green-50 px-3 py-1 rounded-lg font-medium">Amigos</span>
+        <span *ngIf="u.friendshipStatus === 'pending_sent'" class="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-lg font-medium">Pendiente</span>
+        <button *ngIf="u.friendshipStatus === 'pending_received'" (click)="accept(u.friendshipId)" class="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors">Aceptar</button>
       </div>
       <p *ngIf="searchQuery.length >= 2 && searchResults.length === 0" class="text-sm text-ink-950/40 text-center py-8">No se encontraron usuarios</p>
     </ng-container>

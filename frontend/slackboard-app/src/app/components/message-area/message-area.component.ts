@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges, HostListener, AfterViewInit } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges, HostListener, AfterViewInit, NgZone } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
 import { Subscription } from 'rxjs';
@@ -26,6 +26,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   messages: any[] = [];
   newMessage = '';
   loading = false;
+  sending = false;
   userTyping: string | null = null;
   typingTimeout: any;
   currentUser: any;
@@ -33,6 +34,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   private subscriptions: Subscription[] = [];
   private shouldScrollToBottom = false;
   private animationFrameId: number | null = null;
+  private timeCache = new Map<string, string>();
+  private timeCacheInterval: any = null;
   private particles: Particle[] = [];
 
   selectedFile: File | null = null;
@@ -141,7 +144,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   constructor(
     private chatService: ChatService,
-    private socketService: SocketService
+    private socketService: SocketService,
+    private ngZone: NgZone
   ) {
     this.currentUser = this.chatService.getCurrentUser();
   }
@@ -159,11 +163,13 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
 
   ngOnInit() {
     this.setupSocketListeners();
+    this.timeCacheInterval = setInterval(() => this.timeCache.clear(), 60000);
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
     if (this.typingTimeout) clearTimeout(this.typingTimeout);
+    if (this.timeCacheInterval) clearInterval(this.timeCacheInterval);
     this.stopParticles();
   }
 
@@ -268,7 +274,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       this.animationFrameId = requestAnimationFrame(draw);
     };
 
-    draw();
+    this.ngZone.runOutsideAngular(() => draw());
   }
 
   private stopParticles(): void {
@@ -281,9 +287,17 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   setupSocketListeners() {
     const newMessageSub = this.socketService.onNewMessage().subscribe((data: any) => {
       if (data.channelId === this.channel?._id) {
-        const exists = this.messages.some(m => m._id === data.message._id);
-        if (!exists) {
-          this.messages.push(data.message);
+        const incoming = data.message;
+        const isDuplicate = this.messages.some(m =>
+          m._id === incoming._id ||
+          (
+            m.sender?._id === incoming.sender?._id &&
+            m.content === incoming.content &&
+            Math.abs(new Date(m.createdAt).getTime() - new Date(incoming.createdAt).getTime()) < 10000
+          )
+        );
+        if (!isDuplicate) {
+          this.messages.push(incoming);
           this.shouldScrollToBottom = true;
         }
       }
@@ -331,7 +345,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.messages = [];
     this.chatService.getMessagesByChannel(this.channel._id).subscribe({
       next: (response) => {
-        this.messages = response.data || [];
+        const raw: any[] = response.data || [];
+        this.messages = this.dedupMessages(raw);
         this.loading = false;
         this.shouldScrollToBottom = true;
       },
@@ -339,8 +354,20 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     });
   }
 
+  private dedupMessages(msgs: any[]): any[] {
+    const seen = new Map<string, any>();
+    for (const m of msgs) {
+      const key = `${m.sender?._id}|${m.content}|${Math.round(new Date(m.createdAt).getTime() / 10000)}`;
+      if (!seen.has(key)) {
+        seen.set(key, m);
+      }
+    }
+    return Array.from(seen.values());
+  }
+
   sendMessage() {
-    if ((!this.newMessage.trim() && !this.selectedFile) || !this.channel) return;
+    if ((!this.newMessage.trim() && !this.selectedFile) || !this.channel || this.sending) return;
+    this.sending = true;
 
     const proceed = (attachments: string[]) => {
       const hasAttachments = attachments.length > 0;
@@ -358,10 +385,12 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
           this.newMessage = '';
           this.selectedFile = null;
           this.shouldScrollToBottom = true;
+          this.sending = false;
         },
         error: (error) => {
           console.error('Error enviando mensaje:', error);
           alert('Error al enviar el mensaje');
+          this.sending = false;
         }
       });
     };
@@ -375,6 +404,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         },
         error: (error) => {
           this.uploadingFile = false;
+          this.sending = false;
           alert(error?.error?.message || 'No se pudo subir el archivo.');
         }
       });
@@ -636,17 +666,21 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   formatTime(timestamp: string): string {
+    if (this.timeCache.has(timestamp)) return this.timeCache.get(timestamp)!;
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-    if (minutes < 1) return 'Ahora';
-    if (minutes < 60) return `hace ${minutes}m`;
-    if (hours < 24) return `hace ${hours}h`;
-    if (days < 7) return `hace ${days}d`;
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    let result: string;
+    if (minutes < 1) result = 'Ahora';
+    else if (minutes < 60) result = `hace ${minutes}m`;
+    else if (hours < 24) result = `hace ${hours}h`;
+    else if (days < 7) result = `hace ${days}d`;
+    else result = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    this.timeCache.set(timestamp, result);
+    return result;
   }
 
   private scrollToBottom(): void {

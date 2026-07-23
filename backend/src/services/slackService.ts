@@ -392,6 +392,81 @@ async renameChannel(channelId: string, newName: string): Promise<any> {
     return id || null;
   }
 
+  // ========== Friend Request DMs ==========
+  async sendFriendRequestDM(
+    toEmail: string,
+    fromUsername: string,
+    friendshipId: string,
+  ): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    try {
+      const userRes = await this.client.users.lookupByEmail({ email: toEmail });
+      if (!userRes?.ok || !userRes.user?.id) {
+        console.warn(`[SlackService] No se pudo resolver email ${toEmail} a Slack user ID`);
+        return;
+      }
+      const slackUserId = userRes.user.id;
+
+      const result = await this.client.chat.postMessage({
+        channel: slackUserId,
+        text: `👤 *${fromUsername}* te envio una solicitud de amistad en SlackBoard.`,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `👤 *${fromUsername}* te envio una solicitud de amistad en SlackBoard.`,
+            },
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: 'Aceptar', emoji: true },
+                style: 'primary',
+                action_id: `friend_accept:${friendshipId}`,
+              },
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: 'Rechazar', emoji: true },
+                style: 'danger',
+                action_id: `friend_reject:${friendshipId}`,
+              },
+            ],
+          },
+        ],
+      });
+      console.log(`[SlackService] Friend request DM sent to ${slackUserId} (from ${toEmail}) from ${fromUsername}`);
+    } catch (err: any) {
+      console.warn(`[SlackService] No se pudo enviar DM de friend request a ${toEmail}:`, err.message);
+    }
+  }
+
+  async sendFriendAcceptedDM(
+    toEmail: string,
+    acceptedByUsername: string,
+  ): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    try {
+      const userRes = await this.client.users.lookupByEmail({ email: toEmail });
+      if (!userRes?.ok || !userRes.user?.id) {
+        console.warn(`[SlackService] No se pudo resolver email ${toEmail} a Slack user ID`);
+        return;
+      }
+      const slackUserId = userRes.user.id;
+
+      await this.client.chat.postMessage({
+        channel: slackUserId,
+        text: `✅ *${acceptedByUsername}* acepto tu solicitud de amistad en SlackBoard. Ya son amigos!`,
+      });
+    } catch (err: any) {
+      console.warn(`[SlackService] No se pudo enviar DM de friend accepted a ${toEmail}:`, err.message);
+    }
+  }
+
   verifySignature(rawBody: string, timestamp: string, signature: string): boolean {
     if (!this.signingSecret) {
       console.warn('⚠️  SLACK_SIGNING_SECRET no configurado, se omite verificacion de firma (inseguro, configuralo pronto).');

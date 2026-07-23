@@ -30,6 +30,7 @@ export class AppComponent implements OnInit {
       this.updateChrome();
       if (user) {
         this.socketService.connect();
+        this.socketService.joinUser(user._id);
       } else {
         this.socketService.disconnect();
       }

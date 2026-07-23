@@ -4,15 +4,22 @@ import Channel from '../models/Channel';
 import aiService from '../services/aiService';
 import { AuthRequest } from '../middleware/auth';
 
-// Obtener mensajes de un canal — solo si el usuario autenticado es miembro
+// Obtener mensajes de un canal — cualquier usuario autenticado puede leer
+// Si el canal existe pero el usuario no es miembro, se agrega automaticamente
 export const getMessagesByChannel = async (req: AuthRequest, res: Response) => {
   try {
     const { channelId } = req.params;
     const { limit = 50, skip = 0 } = req.query;
 
-    const channel = await Channel.findOne({ _id: channelId, members: req.userId });
+    const channel: any = await Channel.findById(channelId);
     if (!channel) {
       return res.status(404).json({ success: false, message: 'Canal no encontrado' });
+    }
+
+    // Auto-agregar como miembro si falta
+    if (req.userId && channel.members && !channel.members.some((m: any) => m.toString() === req.userId)) {
+      channel.members.push(req.userId);
+      await channel.save();
     }
 
     const messages = await Message.find({ channel: channelId, threadParent: null })
@@ -57,13 +64,18 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // ← el canal debe existir Y el usuario autenticado debe ser miembro
-    const channelExists = await Channel.findOne({ _id: channel, members: req.userId });
+    // ← el canal debe existir; si el usuario no es miembro, se agrega automaticamente
+    const channelExists: any = await Channel.findById(channel);
     if (!channelExists) {
       return res.status(404).json({
         success: false,
         message: 'Canal no encontrado',
       });
+    }
+
+    if (req.userId && channelExists.members && !channelExists.members.some((m: any) => m.toString() === req.userId)) {
+      channelExists.members.push(req.userId);
+      await channelExists.save();
     }
 
     const message = await Message.create({

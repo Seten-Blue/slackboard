@@ -8,6 +8,10 @@ import {
   DMChannel,
   Webhook,
   Routes,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  Interaction,
 } from 'discord.js';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -142,6 +146,13 @@ class discordService {
 
     this.client.on('error', (err) => console.error('❌ Error del cliente de Discord:', err.message));
 
+    // Handle button interactions (friend requests)
+    this.client.on('interactionCreate', (interaction) =>
+      this.handleInteraction(interaction).catch((err) =>
+        console.error('❌ Error procesando interaccion de Discord:', err.message)
+      )
+    );
+
     await this.client.login(this.token);
   }
 
@@ -264,8 +275,9 @@ class discordService {
   // ============ EVENTOS ENTRANTES ============
   private async handleMessageCreate(message: DiscordMessage) {
     // Ignora unicamente los mensajes que el propio bot envio (para no hacer loop);
-    // SÍ acepta mensajes de otros bots/webhooks si eso es "cualquier comunicacion".
+    // Tambien ignora mensajes de webhooks (nuestros mensajes salen por webhook)
     if (message.author.id === this.client?.user?.id) return;
+    if ((message as any).webhookId) return;
     if (!this.guildAllowed(message.guildId)) return;
 
     const user = await this.resolveOrCreateDiscordUser(message.author);
@@ -628,6 +640,122 @@ class discordService {
       this.io.to(existing.channel.toString()).emit('thread-deleted', {
         messageId: existing._id,
       });
+    }
+  }
+
+  // ============ FRIEND REQUEST NOTIFICATIONS ============
+
+  async sendFriendRequestDM(
+    toDiscordUserId: string,
+    fromUsername: string,
+    friendshipId: string,
+  ): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    try {
+      const user = await this.getClient().users.fetch(toDiscordUserId);
+      if (!user || user.bot) return;
+
+      const dm = await user.createDM();
+
+      const acceptRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`friend_accept:${friendshipId}`)
+          .setLabel('Aceptar')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`friend_reject:${friendshipId}`)
+          .setLabel('Rechazar')
+          .setStyle(ButtonStyle.Danger),
+      );
+
+      await dm.send({
+        content: `👤 **${fromUsername}** te envio una solicitud de amistad en SlackBoard.`,
+        components: [acceptRow],
+      });
+
+      console.log(`[DiscordService] Friend request DM sent to ${toDiscordUserId} from ${fromUsername}`);
+    } catch (err: any) {
+      console.warn(`[DiscordService] No se pudo enviar DM de friend request a ${toDiscordUserId}:`, err.message);
+    }
+  }
+
+  async sendFriendAcceptedDM(
+    toDiscordUserId: string,
+    acceptedByUsername: string,
+  ): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    try {
+      const user = await this.getClient().users.fetch(toDiscordUserId);
+      if (!user || user.bot) return;
+
+      const dm = await user.createDM();
+      await dm.send({
+        content: `✅ **${acceptedByUsername}** acepto tu solicitud de amistad en SlackBoard. Ya son amigos!`,
+      });
+    } catch (err: any) {
+      console.warn(`[DiscordService] No se pudo enviar DM de friend accepted a ${toDiscordUserId}:`, err.message);
+    }
+  }
+
+  private async handleInteraction(interaction: Interaction) {
+    if (!interaction.isButton()) return;
+
+    const [action, friendshipId] = (interaction.customId || '').split(':');
+    if (!friendshipId) return;
+
+    if (action === 'friend_accept' || action === 'friend_reject') {
+      const Friendship = (await import('../models/Friendship')).default;
+      const friendship = await Friendship.findById(friendshipId);
+      if (!friendship) {
+        await interaction.reply({ content: 'Esta solicitud ya no existe.', ephemeral: true });
+        return;
+      }
+
+      if (friendship.status !== 'pending') {
+        await interaction.reply({ content: 'Esta solicitud ya fue procesada.', ephemeral: true });
+        return;
+      }
+
+      const discordUserId = interaction.user.id;
+
+      // Verify the clicking user is the recipient
+      const mongoUser = await User.findOne({ discordUserId });
+      if (!mongoUser || (mongoUser as any)._id.toString() !== friendship.userB.toString()) {
+        await interaction.reply({ content: 'Esta solicitud no es para vos.', ephemeral: true });
+        return;
+      }
+
+      if (action === 'friend_accept') {
+        friendship.status = 'accepted';
+        await friendship.save();
+        await interaction.reply({ content: '✅ Solicitud aceptada!', ephemeral: true });
+
+        // Notify the initiator via Discord/Slack DM
+        const initiatorUser = await User.findById(friendship.initiator);
+        if (initiatorUser?.discordUserId) {
+          const acceptor = await User.findById(friendship.userB);
+          await this.sendFriendAcceptedDM(initiatorUser.discordUserId, acceptor?.username || 'Alguien');
+        }
+        if (initiatorUser?.slackWorkspaces?.length) {
+          const acceptor = await User.findById(friendship.userB);
+          const slackService = (await import('./slackService')).default;
+          await slackService.sendFriendAcceptedDM(initiatorUser.email, acceptor?.username || 'Alguien');
+        }
+      } else {
+        friendship.status = 'rejected';
+        await friendship.save();
+        await interaction.reply({ content: '❌ Solicitud rechazada.', ephemeral: true });
+      }
+
+      // Emit socket event
+      if (this.io) {
+        const friendAId = friendship.userA.toString();
+        const friendBId = friendship.userB.toString();
+        this.io.to(`user:${friendAId}`).emit('friendship:update', { friendshipId, status: friendship.status });
+        this.io.to(`user:${friendBId}`).emit('friendship:update', { friendshipId, status: friendship.status });
+      }
     }
   }
 

@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class FriendshipService {
-  private api = '/api/friendship';
+  private api = `${environment.apiUrl}/friendship`;
 
   constructor(private http: HttpClient) {}
 
