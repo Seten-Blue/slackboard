@@ -189,7 +189,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   private getParticleColors(): { dot: string; line: string } {
     const platform = this.channel?.platform;
     if (platform === 'slack') {
-      return { dot: 'rgba(74, 21, 75, 0.6)', line: 'rgba(74, 21, 75, 0.2)' };
+      return { dot: 'rgba(100, 40, 130, 0.85)', line: 'rgba(100, 40, 130, 0.35)' };
     }
     // Discord y por defecto: estilo Trello
     return { dot: 'rgba(139, 124, 246, 0.85)', line: 'rgba(76, 63, 201, 0.32)' };
@@ -209,13 +209,14 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     this.stopParticles();
     this.resizeCanvas();
 
-    const count = 40;
+    const isSlack = this.channel?.platform === 'slack';
+    const count = isSlack ? 50 : 40;
     this.particles = Array.from({ length: count }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       vx: (Math.random() - 0.5) * 0.3,
       vy: (Math.random() - 0.5) * 0.3,
-      r: Math.random() * 1.4 + 0.5,
+      r: Math.random() * (isSlack ? 2.0 : 1.4) + (isSlack ? 0.8 : 0.5),
     }));
 
     const ctx = canvas.getContext('2d');
@@ -251,8 +252,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = colors.line.replace(/[\d.]+\)$/, `${opacity * 0.35})`);
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = colors.line.replace(/[\d.]+\)$/, `${opacity * 0.45})`);
+            ctx.lineWidth = 0.6;
             ctx.stroke();
           }
         }
