@@ -109,11 +109,11 @@ class discordService {
 
     // Poll votes: use raw event because messagePollVoteAdd doesn't include message_id
     this.client.on('raw' as any, (packet: any) => {
-      if (packet.t === 'MESSAGE_POLL_ANSWER_ADD') {
+      if (packet.t === 'MESSAGE_POLL_VOTE_ADD') {
         this.handlePollVoteRaw(packet.d, 'add').catch((err: any) =>
           console.error('❌ Error procesando voto de poll de Discord:', err.message)
         );
-      } else if (packet.t === 'MESSAGE_POLL_ANSWER_REMOVE') {
+      } else if (packet.t === 'MESSAGE_POLL_VOTE_REMOVE') {
         this.handlePollVoteRaw(packet.d, 'remove').catch((err: any) =>
           console.error('❌ Error procesando remoción de voto de poll de Discord:', err.message)
         );
@@ -459,14 +459,17 @@ class discordService {
 
   // ============ POLL VOTES: Sincronización desde Discord nativo ============
 
-  // Raw gateway payload: { user_id, answer: { answer_id, poll_media }, message_id }
+  // Raw gateway payload: { user_id, message_id, answer_id, channel_id, guild_id }
   private async handlePollVoteRaw(data: any, action: 'add' | 'remove') {
     if (!data) return;
 
     const userId = data.user_id;
     const messageId = data.message_id;
-    const answerData = data.answer;
-    if (!userId || !messageId || !answerData) return;
+    const answerId = String(data.answer_id || '');
+    if (!userId || !messageId || !answerId) {
+      console.log(`[DiscordService] Poll vote raw: missing data`, data);
+      return;
+    }
 
     // Ignore bot votes
     const discordUserObj = await this.getClient().users.fetch(userId).catch(() => null);
@@ -483,22 +486,14 @@ class discordService {
     const pollData = existing.pollData as any;
 
     // Map Discord answer_id to option index
-    const answerId = String(answerData.answer_id || '');
     let optionIndex = -1;
 
     if (pollData.discordAnswerIds && Array.isArray(pollData.discordAnswerIds)) {
       optionIndex = pollData.discordAnswerIds.indexOf(answerId);
     }
 
-    // Fallback: match by answer text
-    if (optionIndex === -1 && answerData.poll_media?.text) {
-      optionIndex = pollData.options.findIndex((opt: any) =>
-        (opt.text || '').trim().toLowerCase() === answerData.poll_media.text.trim().toLowerCase()
-      );
-    }
-
-    // Fallback: match by 1-indexed position (Discord answer_ids start at 1)
-    if (optionIndex === -1 && answerId) {
+    // Fallback: Discord answer_ids start at 1
+    if (optionIndex === -1) {
       const numericId = parseInt(answerId, 10);
       if (!isNaN(numericId) && numericId >= 1 && numericId <= pollData.options.length) {
         optionIndex = numericId - 1;

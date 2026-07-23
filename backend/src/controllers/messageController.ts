@@ -47,6 +47,16 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, message: 'No autenticado' });
     }
 
+    const DEFAULT_POLL_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+    if (pollData && pollData.options) {
+      for (let i = 0; i < pollData.options.length; i++) {
+        if (!pollData.options[i].emoji || !pollData.options[i].emoji.trim()) {
+          pollData.options[i].emoji = DEFAULT_POLL_EMOJIS[i] || `⃣${i + 1}`;
+        }
+      }
+    }
+
     // ← el canal debe existir Y el usuario autenticado debe ser miembro
     const channelExists = await Channel.findOne({ _id: channel, members: req.userId });
     if (!channelExists) {
@@ -336,6 +346,14 @@ export const votePoll = async (req: AuthRequest, res: Response) => {
 
     const pollData = message.pollData as any;
 
+    // Track the old voted option index before changing (for single-choice)
+    let previousOptionIndex = -1;
+    if (!pollData.allowMultiple) {
+      previousOptionIndex = pollData.options.findIndex((opt: any) =>
+        opt.voters.some((v: any) => v.toString() === userId)
+      );
+    }
+
     if (pollData.allowMultiple) {
       const option = pollData.options[optionIndex];
       const alreadyVoted = option.voters.some((v: any) => v.toString() === userId);
@@ -357,19 +375,27 @@ export const votePoll = async (req: AuthRequest, res: Response) => {
     message.markModified('pollData');
     await message.save();
 
-    // Sync vote to Discord: add reaction with the option's emoji on the poll message
-    const option = pollData.options[optionIndex];
-    const optionEmoji = (option.emoji || '').trim() || String(optionIndex + 1);
-    console.log(`[DEBUG] votePoll: discordMessageId=${(message as any).discordMessageId}, channel=${message.channel}, emoji=${optionEmoji}`);
+    // Sync vote to Discord: add new reaction, remove old reaction if changing option
     if ((message as any).discordMessageId && message.channel) {
       try {
         const discordservice = require('../services/discordservice').default;
         if (discordservice.isConfigured()) {
-          await discordservice.addReactionToMessage(
-            String(message.channel),
-            (message as any).discordMessageId,
-            optionEmoji,
-          );
+          const discordMsgId = (message as any).discordMessageId;
+          const channelStr = String(message.channel);
+
+          if (!pollData.allowMultiple && previousOptionIndex !== -1 && previousOptionIndex !== optionIndex) {
+            const oldOption = pollData.options[previousOptionIndex];
+            const oldEmoji = (oldOption.emoji || '').trim();
+            if (oldEmoji) {
+              await discordservice.removeReactionFromMessage(channelStr, discordMsgId, oldEmoji);
+            }
+          }
+
+          const newOption = pollData.options[optionIndex];
+          const newEmoji = (newOption.emoji || '').trim();
+          if (newEmoji) {
+            await discordservice.addReactionToMessage(channelStr, discordMsgId, newEmoji);
+          }
         }
       } catch (discordErr: any) {
         console.error('⚠️ Error sincronizando voto a Discord:', discordErr.message);
