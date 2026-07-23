@@ -1,0 +1,73 @@
+<div class="h-full flex flex-col">
+  <header class="flex-shrink-0 px-6 py-4 border-b border-ink-950/10 bg-white/80 backdrop-blur">
+    <h2 class="font-display font-semibold text-lg text-ink-950">Amigos</h2>
+    <div class="flex gap-1 mt-3">
+      <button (click)="activeTab='friends'" [class]="activeTab === 'friends' ? 'bg-ink-950 text-white' : 'bg-ink-950/5 text-ink-950/60 hover:bg-ink-950/10'" class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
+        Amigos ({{ friends.length }})
+      </button>
+      <button (click)="activeTab='requests'" [class]="activeTab === 'requests' ? 'bg-ink-950 text-white' : 'bg-ink-950/5 text-ink-950/60 hover:bg-ink-950/10'" class="px-3 py-1 rounded-full text-xs font-medium transition-colors relative">
+        Solicitudes
+        <span *ngIf="pendingCount" class="absolute -top-1.5 -right-1.5 bg-signal text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{{ pendingCount }}</span>
+      </button>
+      <button (click)="activeTab='search'" [class]="activeTab === 'search' ? 'bg-ink-950 text-white' : 'bg-ink-950/5 text-ink-950/60 hover:bg-ink-950/10'" class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
+        Buscar
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4" style="scrollbar-width: none;">
+    <!-- FRIENDS LIST -->
+    <ng-container *ngIf="activeTab === 'friends'">
+      <div *ngFor="let f of friends" class="flex items-center gap-3 p-3 bg-white rounded-xl border border-ink-950/5">
+        <img [src]="f.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + f.username" class="w-9 h-9 rounded-lg">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-ink-950 truncate">{{ f.username }}</p>
+          <p class="text-xs text-ink-950/40">{{ f.status === 'online' ? 'En linea' : 'Desconectado' }}</p>
+        </div>
+        <button (click)="remove(f.friendshipId)" class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors">Eliminar</button>
+      </div>
+      <p *ngIf="friends.length === 0 && !loading" class="text-sm text-ink-950/40 text-center py-8">No tenes amigos todavia</p>
+    </ng-container>
+
+    <!-- PENDING REQUESTS -->
+    <ng-container *ngIf="activeTab === 'requests'">
+      <p *ngIf="pendingReceived.length" class="text-xs font-semibold text-ink-950/40 uppercase tracking-wide mb-2">Recibidas</p>
+      <div *ngFor="let r of pendingReceived" class="flex items-center gap-3 p-3 bg-white rounded-xl border border-ink-950/5">
+        <img [src]="r.from?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + r.from?.username" class="w-9 h-9 rounded-lg">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-ink-950 truncate">{{ r.from?.username }}</p>
+        </div>
+        <button (click)="accept(r._id)" class="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors">Aceptar</button>
+        <button (click)="reject(r._id)" class="text-xs bg-ink-950/5 text-ink-950/60 px-3 py-1 rounded-lg hover:bg-ink-950/10 transition-colors">Rechazar</button>
+      </div>
+
+      <p *ngIf="pendingSent.length" class="text-xs font-semibold text-ink-950/40 uppercase tracking-wide mt-4 mb-2">Enviadas</p>
+      <div *ngFor="let r of pendingSent" class="flex items-center gap-3 p-3 bg-white rounded-xl border border-ink-950/5">
+        <img [src]="r.to?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + r.to?.username" class="w-9 h-9 rounded-lg">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-ink-950 truncate">{{ r.to?.username }}</p>
+          <p class="text-xs text-ink-950/40">Pendiente</p>
+        </div>
+        <button (click)="cancel(r._id)" class="text-xs text-ink-950/40 hover:text-red-500 px-2 py-1 rounded hover:bg-red-50 transition-colors">Cancelar</button>
+      </div>
+
+      <p *ngIf="pendingReceived.length === 0 && pendingSent.length === 0 && !loading" class="text-sm text-ink-950/40 text-center py-8">No hay solicitudes pendientes</p>
+    </ng-container>
+
+    <!-- SEARCH -->
+    <ng-container *ngIf="activeTab === 'search'">
+      <div class="relative">
+        <input [(ngModel)]="searchQuery" (input)="search()" placeholder="Buscar usuario..." class="w-full px-4 py-2.5 bg-white border border-ink-950/10 rounded-xl text-sm text-ink-950 placeholder:text-ink-950/30 focus:outline-none focus:ring-2 focus:ring-signal/20 focus:border-signal/40">
+        <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-950/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      </div>
+      <div *ngFor="let u of searchResults" class="flex items-center gap-3 p-3 bg-white rounded-xl border border-ink-950/5 mt-2">
+        <img [src]="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="w-9 h-9 rounded-lg">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-ink-950 truncate">{{ u.username }}</p>
+        </div>
+        <button (click)="sendRequest(u._id)" class="text-xs bg-signal text-white px-3 py-1 rounded-lg hover:opacity-90 transition-opacity">Agregar</button>
+      </div>
+      <p *ngIf="searchQuery.length >= 2 && searchResults.length === 0" class="text-sm text-ink-950/40 text-center py-8">No se encontraron usuarios</p>
+    </ng-container>
+  </div>
+</div>

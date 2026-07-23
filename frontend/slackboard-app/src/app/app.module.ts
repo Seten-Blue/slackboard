@@ -29,6 +29,8 @@ import { ThreadPanelComponent } from './components/thread-panel/thread-panel.com
 import { DashboardActivityComponent } from './components/dashboard-activity/dashboard-activity.component';
 import { DashboardTrafficComponent } from './components/dashboard-traffic/dashboard-traffic.component';
 import { DashboardStatisticsComponent } from './components/dashboard-statistics/dashboard-statistics.component';
+import { FriendsComponent } from './components/friends/friends.component';
+import { UserProfilePanelComponent } from './components/user-profile-panel/user-profile-panel.component';
 
 @NgModule({
   declarations: [
@@ -53,7 +55,9 @@ import { DashboardStatisticsComponent } from './components/dashboard-statistics/
     ThreadPanelComponent,
     DashboardActivityComponent,
     DashboardTrafficComponent,
-    DashboardStatisticsComponent
+    DashboardStatisticsComponent,
+    FriendsComponent,
+    UserProfilePanelComponent
   ],
   imports: [
     BrowserModule,

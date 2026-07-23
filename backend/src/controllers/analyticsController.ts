@@ -6,6 +6,7 @@ import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { getFriendIds } from './friendshipController';
 
 // Helper: get channel IDs where user is member
 async function getUserChannelIds(userId: string): Promise<string[]> {
@@ -24,14 +25,16 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
     const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-    // Users who recently sent messages in the user's channels (last 24h)
+    // Users who recently sent messages in the user's channels (last 24h) - only friends
+    const friendIds = await getFriendIds(userId);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const recentSenderIds = await Message.distinct('sender', {
       channel: { $in: channelIds },
       createdAt: { $gte: oneDayAgo },
+      sender: { $in: friendIds },
     });
     const connectedUsers = await User.find({
-      _id: { $in: recentSenderIds, $ne: userId },
+      _id: { $in: recentSenderIds },
     }).select('username avatar status').limit(15).lean();
 
     // Messages sent in last 5 min (user's channels)
@@ -306,10 +309,11 @@ export const getStatistics = async (req: AuthRequest, res: Response) => {
       { $project: { hour: '$_id.hour', day: '$_id.day', count: 1, _id: 0 } },
     ]);
 
-    // Top users (in user's channels, excluding self)
+    // Top users (friends only, in user's channels, excluding self and bots)
+    const friendIds = await getFriendIds(userId);
     const userObjectId = new mongoose.Types.ObjectId(userId);
     const topUsers = await Message.aggregate([
-      { $match: { channel: { $in: channelIds }, sender: { $ne: userObjectId }, sentViaBot: { $ne: true } } },
+      { $match: { channel: { $in: channelIds }, sender: { $in: friendIds }, sentViaBot: { $ne: true } } },
       { $group: { _id: '$sender', messageCount: { $sum: 1 } } },
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u' } },
       { $unwind: '$u' },

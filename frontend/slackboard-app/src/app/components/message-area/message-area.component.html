@@ -47,7 +47,7 @@
 
       <div class="flex-1 min-w-0">
         <div *ngIf="!shouldGroupWithPrevious(i)" class="flex items-baseline gap-2 mb-0.5">
-          <span class="font-semibold text-sm text-ink-950">{{ message.sender?.username || 'Usuario' }}</span>
+          <span class="font-semibold text-sm text-ink-950 cursor-pointer hover:underline" (click)="openProfilePanel(message.sender?._id, message.sender?.username, message.sender?.avatar)">{{ message.sender?.username || 'Usuario' }}</span>
           <span class="text-[11px] font-mono text-ink-950/35">{{ formatTime(message.createdAt) }}</span>
           <span *ngIf="message.isEdited" class="text-[11px] text-ink-950/30">(editado)</span>
         </div>
@@ -232,6 +232,17 @@
   (close)="closeThreadPanel()"
   class="thread-panel-container"
 ></app-thread-panel>
+
+<!-- User Profile Panel (lateral) -->
+<app-user-profile-panel
+  *ngIf="showProfilePanel"
+  [isOpen]="showProfilePanel"
+  [userId]="profileUserId"
+  [username]="profileUsername"
+  [avatar]="profileAvatar"
+  (close)="closeProfilePanel()"
+  class="thread-panel-container"
+></app-user-profile-panel>
 </div>
 
 <!-- Poll Modal -->

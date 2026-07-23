@@ -48,6 +48,12 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   showThreadPanel = false;
   activeThreadId: string | null = null;
 
+  // User profile panel state
+  showProfilePanel = false;
+  profileUserId: string | null = null;
+  profileUsername: string | null = null;
+  profileAvatar: string | null = null;
+
   readonly emojiCategories = [
     { label: 'Frecuentes', emojis: ['😀', '😂', '😍', '🥰', '😎', '🤔', '😅', '👍', '❤️', '🔥', '✨', '🎉', '👏', '💪', '🙌', '💯'] },
     { label: 'Caras', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🫢', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑'] },
@@ -488,6 +494,20 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
   closeThreadPanel() {
     this.showThreadPanel = false;
     this.activeThreadId = null;
+  }
+
+  openProfilePanel(userId: string, username: string, avatar: string) {
+    this.profileUserId = userId;
+    this.profileUsername = username;
+    this.profileAvatar = avatar;
+    this.showProfilePanel = true;
+  }
+
+  closeProfilePanel() {
+    this.showProfilePanel = false;
+    this.profileUserId = null;
+    this.profileUsername = null;
+    this.profileAvatar = null;
   }
 
   onKeyDown(event: KeyboardEvent) {

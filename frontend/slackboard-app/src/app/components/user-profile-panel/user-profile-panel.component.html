@@ -1,0 +1,54 @@
+<div class="profile-panel" *ngIf="isOpen">
+  <div class="panel-header">
+    <h3>Perfil</h3>
+    <button (click)="onClose()" class="panel-close" title="Cerrar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <div class="panel-body" *ngIf="!loading">
+    <!-- Avatar + name -->
+    <div class="profile-header">
+      <img [src]="avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + username" class="profile-avatar">
+      <p class="profile-name">{{ username }}</p>
+    </div>
+
+    <!-- Friendship actions -->
+    <div class="profile-actions">
+      <!-- Already friends -->
+      <div *ngIf="friendship?.status === 'accepted'" class="action-row">
+        <span class="status-badge status-badge--friend">Amigos</span>
+        <button (click)="removeFriend()" [disabled]="actionLoading" class="btn btn--danger">Eliminar amigo</button>
+      </div>
+
+      <!-- Received request -->
+      <div *ngIf="friendship?.status === 'received'" class="action-row">
+        <span class="status-badge status-badge--pending">Solicitud recibida</span>
+        <div class="action-buttons">
+          <button (click)="acceptRequest()" [disabled]="actionLoading" class="btn btn--primary">Aceptar</button>
+          <button (click)="rejectRequest()" [disabled]="actionLoading" class="btn btn--ghost">Rechazar</button>
+        </div>
+      </div>
+
+      <!-- Sent request -->
+      <div *ngIf="friendship?.status === 'sent'" class="action-row">
+        <span class="status-badge status-badge--pending">Solicitud enviada</span>
+        <button (click)="cancelRequest()" [disabled]="actionLoading" class="btn btn--ghost">Cancelar</button>
+      </div>
+
+      <!-- No relationship -->
+      <div *ngIf="!friendship" class="action-row">
+        <button (click)="sendRequest()" [disabled]="actionLoading" class="btn btn--primary btn--full">
+          {{ actionLoading ? 'Enviando...' : 'Agregar amigo' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-body" *ngIf="loading">
+    <div class="loading-state">
+      <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+      <span>Cargando...</span>
+    </div>
+  </div>
+</div>

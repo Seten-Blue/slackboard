@@ -8,6 +8,7 @@ import { AuthComponent } from './components/auth/auth.component';
 import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
 import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
+import { FriendsComponent } from './components/friends/friends.component';
 import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [
@@ -20,6 +21,7 @@ const routes: Routes = [
   { path: 'trello', component: TrelloComponent, canActivate: [AuthGuard] },
   { path: 'ai', component: AiChatComponent, canActivate: [AuthGuard] },
   { path: 'profile', component: ProfileSettingsComponent, canActivate: [AuthGuard] },
+  { path: 'friends', component: FriendsComponent, canActivate: [AuthGuard] },
 ];
 
 @NgModule({
