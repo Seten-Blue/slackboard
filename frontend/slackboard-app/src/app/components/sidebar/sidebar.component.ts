@@ -132,6 +132,7 @@ export class SidebarComponent implements OnInit {
     const params = new URLSearchParams(window.location.search);
     const discordLinkedParam = params.get('discordLinked');
     const slackLinkedParam = params.get('slackLinked');
+    const trelloLinkedParam = params.get('trelloLinked');
 
     if (discordLinkedParam && discordLinkedParam === 'success') {
       this.showLinkModal = true;
@@ -141,7 +142,11 @@ export class SidebarComponent implements OnInit {
       this.showSlackModal = true;
     }
 
-    if (discordLinkedParam || slackLinkedParam) {
+    if (trelloLinkedParam && trelloLinkedParam === 'success') {
+      // Trello linked — Trello component will re-check status automatically
+    }
+
+    if (discordLinkedParam || slackLinkedParam || trelloLinkedParam) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }

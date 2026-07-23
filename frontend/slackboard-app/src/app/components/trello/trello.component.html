@@ -20,31 +20,15 @@
         {{ setupError }}
       </div>
 
-      <div class="space-y-3.5">
-        <div>
-          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">API Key</label>
-          <input type="text" [(ngModel)]="setupApiKey"
-                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-[#0079BF]/60 text-sm text-white placeholder:text-white/30 transition-all"
-                 placeholder="Tu API Key de Trello" />
-        </div>
-        <div>
-          <label class="text-[11px] uppercase tracking-wider font-mono text-white/40">Token</label>
-          <input type="text" [(ngModel)]="setupToken"
-                 class="w-full mt-1.5 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-[#0079BF]/60 text-sm text-white placeholder:text-white/30 transition-all"
-                 placeholder="Tu Token de Trello" />
-        </div>
-        <button (click)="linkTrello()" [disabled]="setupLoading"
-                class="w-full py-3 rounded-xl bg-[#0079BF] text-white font-medium text-sm hover:bg-[#0079BF]/90 disabled:opacity-50 transition-all mt-2">
-          {{ setupLoading ? 'Vinculando...' : 'Vincular cuenta' }}
-        </button>
-      </div>
+      <button (click)="linkTrello()" [disabled]="setupLoading"
+              class="w-full py-3 rounded-xl bg-[#0079BF] text-white font-medium text-sm hover:bg-[#0079BF]/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+        {{ setupLoading ? 'Conectando con Trello...' : 'Vincular cuenta de Trello' }}
+      </button>
 
-      <div class="mt-5 pt-5 border-t border-white/10 text-center">
-        <p class="text-xs text-white/40">
-          Obtene tu API Key en
-          <a href="https://trello.com/power-ups/admin" target="_blank" class="text-[#0079BF] hover:underline">trello.com/power-ups/admin</a>
-        </p>
-      </div>
+      <p class="mt-4 text-xs text-white/40 text-center">
+        Se abrira una ventana de Trello para autorizar el acceso.
+        Tu token nunca se comparte con terceros.
+      </p>
     </div>
   </div>
 

@@ -86,8 +86,6 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
 
   trelloLinked = false;
   showSetup = false;
-  setupApiKey = '';
-  setupToken = '';
   setupLoading = false;
   setupError: string | null = null;
 
@@ -163,14 +161,50 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   linkTrello() {
-    if (!this.setupApiKey.trim() || !this.setupToken.trim()) {
-      this.setupError = 'Se requiere API Key y Token de Trello';
-      return;
-    }
     this.setupLoading = true;
     this.setupError = null;
-    this.authService.linkTrello(this.setupApiKey.trim(), this.setupToken.trim()).subscribe({
-      next: () => {
+    this.authService.startTrelloLink().subscribe({
+      next: (res) => {
+        if (res.url) {
+          const popup = window.open(res.url, 'trello-auth', 'width=600,height=700,left=200,top=100');
+
+          // Listen for postMessage from Trello
+          const messageHandler = (event: MessageEvent) => {
+            // Trello sends the token as a string in postMessage
+            const token = event.data;
+            if (typeof token === 'string' && token.length > 10) {
+              window.removeEventListener('message', messageHandler);
+              popup?.close();
+              this.finishTrelloLink(token);
+            }
+          };
+          window.addEventListener('message', messageHandler);
+
+          // Fallback: check if popup closed without sending message
+          const checkInterval = setInterval(() => {
+            if (popup?.closed) {
+              clearInterval(checkInterval);
+              window.removeEventListener('message', messageHandler);
+              this.setupLoading = false;
+              // If we got here without a token, just re-check status
+              this.checkTrelloStatus();
+            }
+          }, 1000);
+        } else {
+          this.setupLoading = false;
+          this.setupError = res.message || 'No se pudo iniciar la vinculacion de Trello';
+        }
+      },
+      error: (err) => {
+        this.setupLoading = false;
+        this.setupError = err?.error?.message || 'Error al iniciar la vinculacion de Trello';
+      }
+    });
+  }
+
+  private finishTrelloLink(token: string) {
+    this.authService.finishTrelloLink(token).subscribe({
+      next: (res) => {
         this.trelloLinked = true;
         this.showSetup = false;
         this.setupLoading = false;
@@ -178,7 +212,7 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: (err) => {
         this.setupLoading = false;
-        this.setupError = err?.error?.message || 'Error al vincular Trello';
+        this.setupError = err?.error?.message || 'Error al guardar el token de Trello';
       }
     });
   }

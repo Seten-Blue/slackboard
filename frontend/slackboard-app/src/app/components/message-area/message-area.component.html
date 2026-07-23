@@ -38,7 +38,7 @@
       <div class="w-9 flex-shrink-0">
         <img *ngIf="!shouldGroupWithPrevious(i)"
           [src]="message.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
-          [alt]="message.sender?.username" class="w-9 h-9 rounded-lg">
+          [alt]="message.sender?.username" class="w-9 h-9 rounded-lg object-cover">
         <span *ngIf="shouldGroupWithPrevious(i)"
           class="hidden group-hover:block text-[10px] font-mono text-ink-950/30 text-center leading-9">
           {{ formatTime(message.createdAt) }}

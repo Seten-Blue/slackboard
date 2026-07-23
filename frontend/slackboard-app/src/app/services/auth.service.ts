@@ -141,16 +141,20 @@ export class AuthService {
     this.currentUserSubject.next(null);
   }
 
-  linkTrello(trelloApiKey: string, trelloToken: string): Observable<any> {
-    return this.http.put(`${this.apiUrl}/auth/trello`, { trelloApiKey, trelloToken });
+  getTrelloStatus(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/auth/trello/status`);
+  }
+
+  startTrelloLink(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/auth/trello/start`);
+  }
+
+  finishTrelloLink(token: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/auth/trello/finish`, { token });
   }
 
   unlinkTrello(): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/auth/trello`);
-  }
-
-  getTrelloStatus(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/auth/trello/status`);
+    return this.http.delete(`${this.apiUrl}/auth/trello/unlink`);
   }
 
   private setSession(response: AuthResponse): void {

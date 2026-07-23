@@ -9,7 +9,7 @@
   <div class="panel-body" *ngIf="!loading">
     <!-- Profile header -->
     <div class="profile-header">
-      <img [src]="avatar || userProfile?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + username" class="profile-avatar">
+      <img [src]="avatar || userProfile?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + username" class="profile-avatar object-cover">
       <p class="profile-name">{{ userProfile?.nombre ? userProfile.nombre + ' ' + (userProfile.apellido || '') : username }}</p>
       <p class="profile-username" *ngIf="userProfile?.nombre">@{{ userProfile?.username || username }}</p>
       <div class="status-dot" [class.online]="userProfile?.status === 'online'">

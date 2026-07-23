@@ -125,17 +125,17 @@ export class ProfileSettingsComponent implements OnInit {
 
     this.authService.updateProfile({
       username: this.username.trim(),
-      avatar: this.avatar.trim() || undefined,
-      nombre: this.nombre.trim() || undefined,
-      apellido: this.apellido.trim() || undefined,
-      telefono: this.telefono.trim() || undefined,
-      idioma: this.idioma.trim() || undefined,
-      bio: this.bio.trim() || undefined,
-      ubicacion: this.ubicacion.trim() || undefined,
-      intereses: this.intereses.length > 0 ? this.intereses : undefined,
-      github: this.github.trim() || undefined,
-      linkedin: this.linkedin.trim() || undefined,
-      website: this.website.trim() || undefined,
+      avatar: this.avatar.trim() || '',
+      nombre: this.nombre.trim() || '',
+      apellido: this.apellido.trim() || '',
+      telefono: this.telefono.trim() || '',
+      idioma: this.idioma.trim() || '',
+      bio: this.bio.trim() || '',
+      ubicacion: this.ubicacion.trim() || '',
+      intereses: this.intereses,
+      github: this.github.trim() || '',
+      linkedin: this.linkedin.trim() || '',
+      website: this.website.trim() || '',
     }).subscribe({
       next: (response) => {
         this.loading = false;

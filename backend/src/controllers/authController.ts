@@ -145,6 +145,8 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     if (linkedin !== undefined) updateData.linkedin = linkedin || null;
     if (website !== undefined) updateData.website = website || null;
 
+    console.log('📝 updateProfile:', JSON.stringify(updateData, null, 2));
+
     const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });

@@ -2,6 +2,9 @@ import express from 'express';
 import { register, login, me, updateProfile, forgotPassword, resetPassword, googleAuth } from '../controllers/authController';
 import { requireAuth } from '../middleware/auth';
 import User from '../models/User';
+import trelloService from '../services/trelloService';
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
 
 const router = express.Router();
 
@@ -24,34 +27,80 @@ router.get('/user/:id', async (req: any, res: any) => {
   }
 });
 
-router.put('/trello', requireAuth, async (req: any, res: any) => {
+// ===== Trello per-user auth (1/authorize + postMessage) =====
+
+router.get('/trello/status', requireAuth, async (req: any, res: any) => {
   try {
-    const { trelloApiKey, trelloToken } = req.body;
-    if (!trelloApiKey || !trelloToken) {
-      return res.status(400).json({ success: false, message: 'Se requiere trelloApiKey y trelloToken' });
-    }
-    await User.findByIdAndUpdate(req.userId, { trelloApiKey, trelloToken });
-    res.json({ success: true, message: 'Trello vinculado correctamente' });
+    const user = await User.findById(req.userId).select('trelloToken');
+    res.json({
+      success: true,
+      data: {
+        linked: !!(user as any)?.trelloToken,
+        configured: trelloService.isConfigured(),
+        apiKey: trelloService.getApiKey(),
+      },
+    });
   } catch (error: any) {
+    res.status(500).json({ success: false, message: 'Error al verificar Trello' });
+  }
+});
+
+router.get('/trello/start', requireAuth, async (req: any, res: any) => {
+  if (!trelloService.isConfigured()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Trello no esta configurado. Falta TRELLO_API_KEY en .env del backend.',
+    });
+  }
+
+  const apiKey = trelloService.getApiKey();
+  const authUrl = `https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&key=${apiKey}&return_url=${encodeURIComponent(FRONTEND_URL)}&callback_method=postMessage`;
+
+  res.json({ success: true, url: authUrl });
+});
+
+router.post('/trello/finish', requireAuth, async (req: any, res: any) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Se requiere el token de Trello' });
+    }
+
+    // Verify the token is valid by calling Trello API
+    const verifyUrl = `https://api.trello.com/1/members/me?key=${trelloService.getApiKey()}&token=${token}`;
+    const response = await fetch(verifyUrl);
+    if (!response.ok) {
+      return res.status(400).json({ success: false, message: 'El token de Trello no es valido' });
+    }
+
+    const trelloUser = await response.json();
+
+    // Save only the token (API key is global in .env)
+    await User.findByIdAndUpdate(req.userId, {
+      trelloToken: token,
+      trelloApiKey: trelloService.getApiKey(),
+    });
+
+    res.json({
+      success: true,
+      message: 'Trello vinculado correctamente',
+      data: { username: trelloUser.username },
+    });
+  } catch (error: any) {
+    console.error('Error finalizando Trello auth:', error.message);
     res.status(500).json({ success: false, message: 'Error al vincular Trello' });
   }
 });
 
-router.delete('/trello', requireAuth, async (req: any, res: any) => {
+router.delete('/trello/unlink', requireAuth, async (req: any, res: any) => {
   try {
-    await User.findByIdAndUpdate(req.userId, { trelloApiKey: null, trelloToken: null });
+    await User.findByIdAndUpdate(req.userId, {
+      trelloToken: null,
+      trelloApiKey: null,
+    });
     res.json({ success: true, message: 'Trello desvinculado' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al desvincular Trello' });
-  }
-});
-
-router.get('/trello/status', requireAuth, async (req: any, res: any) => {
-  try {
-    const user = await User.findById(req.userId).select('trelloApiKey trelloToken');
-    res.json({ success: true, data: { linked: !!(user as any)?.trelloApiKey && !!(user as any)?.trelloToken } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: 'Error al verificar Trello' });
   }
 });
 
