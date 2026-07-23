@@ -15,6 +15,7 @@ export class SocketService {
   private messageReaction$ = new Subject<any>();
   private userTyping$ = new Subject<any>();
   private threadReply$ = new Subject<any>();
+  private pollVoted$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
   private pendingJoins: string[] = [];
@@ -61,6 +62,7 @@ export class SocketService {
     this.socket.on('message-reaction', (data: any) => this.messageReaction$.next(data));
     this.socket.on('user-typing', (data: any) => this.userTyping$.next(data));
     this.socket.on('thread:reply', (data: any) => this.threadReply$.next(data));
+    this.socket.on('poll-voted', (data: any) => this.pollVoted$.next(data));
   }
 
   private flushPendingJoins() {
@@ -115,6 +117,10 @@ export class SocketService {
 
   onThreadReply(): Observable<any> {
     return this.threadReply$.asObservable();
+  }
+
+  onPollVoted(): Observable<any> {
+    return this.pollVoted$.asObservable();
   }
 
   onConnected(): Observable<any> {

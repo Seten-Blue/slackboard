@@ -204,7 +204,14 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    this.subscriptions.push(newMessageSub, typingSub, updatedSub, deletedSub, reactionSub);
+    const pollVotedSub = this.socketService.onPollVoted().subscribe((data: any) => {
+      const index = this.messages.findIndex(m => m._id === data.messageId);
+      if (index !== -1) {
+        this.messages[index] = { ...this.messages[index], pollData: data.pollData };
+      }
+    });
+
+    this.subscriptions.push(newMessageSub, typingSub, updatedSub, deletedSub, reactionSub, pollVotedSub);
   }
 
   loadMessages() {

@@ -66,6 +66,7 @@ class discordService {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent, // privileged: debe activarse en el Developer Portal (pestana Bot)
         GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMessagePolls,
         GatewayIntentBits.DirectMessages,
       ],
       partials: [Partials.Channel, Partials.Message, Partials.Reaction],
@@ -105,6 +106,19 @@ class discordService {
         console.error('❌ Error procesando remocion de reaccion de Discord:', err.message)
       )
     );
+
+    // Poll votes: use raw event because messagePollVoteAdd doesn't include message_id
+    this.client.on('raw' as any, (packet: any) => {
+      if (packet.t === 'MESSAGE_POLL_ANSWER_ADD') {
+        this.handlePollVoteRaw(packet.d, 'add').catch((err: any) =>
+          console.error('❌ Error procesando voto de poll de Discord:', err.message)
+        );
+      } else if (packet.t === 'MESSAGE_POLL_ANSWER_REMOVE') {
+        this.handlePollVoteRaw(packet.d, 'remove').catch((err: any) =>
+          console.error('❌ Error procesando remoción de voto de poll de Discord:', err.message)
+        );
+      }
+    });
 
     this.client.on('threadCreate', (thread) =>
       this.handleThreadCreate(thread).catch((err) =>
@@ -410,8 +424,9 @@ class discordService {
     const existing: any = await MessageModel.findOne({ discordMessageId: reaction.message.id });
     if (!existing) return;
 
-    // Tus reacciones son {emoji, users: ObjectId[]} de TU User, no del id de
-    // Discord directo, asi que primero hay que resolver/crear el User.
+    // Skip poll messages — poll votes are handled by handlePollVote
+    if (existing.type === 'poll') return;
+
     const mongoUser = await this.resolveOrCreateDiscordUser(discordUser);
     const emoji = reaction.emoji.name || reaction.emoji.toString();
 
@@ -429,7 +444,6 @@ class discordService {
     } else if (entry) {
       const mongoUserId = String(mongoUser._id);
       entry.users = entry.users.filter((u: any) => u.toString() !== mongoUserId);
-      // si el emoji se queda sin usuarios, se elimina la entrada completa
       existing.reactions = existing.reactions.filter((r: any) => r.users.length > 0);
     }
 
@@ -441,6 +455,90 @@ class discordService {
         reactions: existing.reactions,
       });
     }
+  }
+
+  // ============ POLL VOTES: Sincronización desde Discord nativo ============
+
+  // Raw gateway payload: { user_id, answer: { answer_id, poll_media }, message_id }
+  private async handlePollVoteRaw(data: any, action: 'add' | 'remove') {
+    if (!data) return;
+
+    const userId = data.user_id;
+    const messageId = data.message_id;
+    const answerData = data.answer;
+    if (!userId || !messageId || !answerData) return;
+
+    // Ignore bot votes
+    const discordUserObj = await this.getClient().users.fetch(userId).catch(() => null);
+    if (!discordUserObj || discordUserObj.bot) return;
+
+    const existing: any = await MessageModel.findOne({ discordMessageId: messageId });
+    if (!existing || existing.type !== 'poll' || !existing.pollData) {
+      console.log(`[DiscordService] Poll vote ${action}: message ${messageId} not found or not a poll`);
+      return;
+    }
+
+    const mongoUser = await this.resolveOrCreateDiscordUser(discordUserObj);
+    const mongoUserId = String(mongoUser._id);
+    const pollData = existing.pollData as any;
+
+    // Map Discord answer_id to option index
+    const answerId = String(answerData.answer_id || '');
+    let optionIndex = -1;
+
+    if (pollData.discordAnswerIds && Array.isArray(pollData.discordAnswerIds)) {
+      optionIndex = pollData.discordAnswerIds.indexOf(answerId);
+    }
+
+    // Fallback: match by answer text
+    if (optionIndex === -1 && answerData.poll_media?.text) {
+      optionIndex = pollData.options.findIndex((opt: any) =>
+        (opt.text || '').trim().toLowerCase() === answerData.poll_media.text.trim().toLowerCase()
+      );
+    }
+
+    // Fallback: match by 1-indexed position (Discord answer_ids start at 1)
+    if (optionIndex === -1 && answerId) {
+      const numericId = parseInt(answerId, 10);
+      if (!isNaN(numericId) && numericId >= 1 && numericId <= pollData.options.length) {
+        optionIndex = numericId - 1;
+      }
+    }
+
+    if (optionIndex === -1 || optionIndex >= pollData.options.length) {
+      console.log(`[DiscordService] Poll vote ${action}: could not map answer_id=${answerId} to option`);
+      return;
+    }
+
+    const option = pollData.options[optionIndex];
+
+    if (action === 'add') {
+      if (pollData.allowMultiple) {
+        const alreadyVoted = option.voters.some((v: any) => v.toString() === mongoUserId);
+        if (!alreadyVoted) option.voters.push(mongoUser._id);
+      } else {
+        for (const opt of pollData.options) {
+          const idx = opt.voters.findIndex((v: any) => v.toString() === mongoUserId);
+          if (idx !== -1) opt.voters.splice(idx, 1);
+        }
+        const alreadyVoted = option.voters.some((v: any) => v.toString() === mongoUserId);
+        if (!alreadyVoted) option.voters.push(mongoUser._id);
+      }
+    } else {
+      option.voters = option.voters.filter((v: any) => v.toString() !== mongoUserId);
+    }
+
+    existing.markModified('pollData');
+    await existing.save();
+
+    if (this.io) {
+      this.io.to(existing.channel.toString()).emit('poll-voted', {
+        messageId: existing._id,
+        pollData: existing.pollData,
+      });
+    }
+
+    console.log(`[DiscordService] Poll vote ${action}: user=${mongoUserId}, option=${optionIndex} ("${option.text}"), question="${pollData.question}"`);
   }
 
   // ============ THREADS: Sincronización desde Discord ============
@@ -709,8 +807,24 @@ class discordService {
         const sent = await this.getClient().rest.post(
           Routes.channelMessages(channelDoc.discordChannelId),
           { body },
-        );
-        return (sent as any).id;
+        ) as any;
+
+        // Store Discord answer IDs for mapping poll votes back to option indices
+        if (sent?.poll?.answers && sent.poll.answers.length > 0) {
+          const answerIdMap: string[] = sent.poll.answers.map((a: any) => String(a.answer_id || a.id));
+          const channelMsg = await MessageModel.findOne({
+            channel: internalChannelId,
+            type: 'poll',
+            'pollData.question': pollData.question,
+          }).sort({ createdAt: -1 });
+          if (channelMsg) {
+            (channelMsg.pollData as any).discordAnswerIds = answerIdMap;
+            channelMsg.markModified('pollData');
+            await channelMsg.save();
+          }
+        }
+
+        return sent.id;
       } catch (pollErr: any) {
         console.warn(`⚠️ No se pudo enviar poll nativo de Discord (${pollErr.message}), enviando como embed`);
         const fallbackText = this.buildPollFallbackText(pollData);

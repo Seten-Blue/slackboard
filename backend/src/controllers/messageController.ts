@@ -100,16 +100,26 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
           const discordservice = require('../services/discordservice').default;
           if (discordservice.isConfigured()) {
             if (pollData || threadData) {
-              const discordThreadId = await discordservice.sendStructuredMessage(
+              console.log(`[DEBUG] sendStructuredMessage llamado para ${pollData ? 'POLL' : 'THREAD'}`);
+              const discordMsgId = await discordservice.sendStructuredMessage(
                 String(channelExists._id),
                 senderUsername,
                 senderAvatar,
                 pollData || null,
                 threadData || null,
               );
-              // Guardar discordThreadId si se creó un thread en Discord
-              if (discordThreadId && threadData) {
-                await Message.findByIdAndUpdate(message._id, { discordThreadId });
+              console.log(`[DEBUG] sendStructuredMessage retornó: ${discordMsgId}`);
+              if (discordMsgId) {
+                if (threadData) {
+                  await Message.findByIdAndUpdate(message._id, { discordThreadId: discordMsgId });
+                  console.log(`[DEBUG] Guardado discordThreadId: ${discordMsgId}`);
+                }
+                if (pollData) {
+                  await Message.findByIdAndUpdate(message._id, { discordMessageId: discordMsgId });
+                  console.log(`[DEBUG] Guardado discordMessageId: ${discordMsgId}`);
+                }
+              } else {
+                console.warn(`[DEBUG] sendStructuredMessage retornó null/undefined`);
               }
             } else {
               await discordservice.sendMessage(String(channelExists._id), content, senderUsername, senderAvatar, attachments);
@@ -257,6 +267,31 @@ export const addReaction = async (req: AuthRequest, res: Response) => {
     const updatedMessage = await Message.findById(messageId)
       .populate('sender', 'username email avatar status');
 
+    // Sync reaction to Discord
+    if ((message as any).discordMessageId && message.channel) {
+      try {
+        const discordservice = require('../services/discordservice').default;
+        if (discordservice.isConfigured()) {
+          await discordservice.addReactionToMessage(
+            String(message.channel),
+            (message as any).discordMessageId,
+            emoji,
+          );
+        }
+      } catch (discordErr: any) {
+        console.error('⚠️ Error sincronizando reacción a Discord:', discordErr.message);
+      }
+    }
+
+    // Emit socket for real-time update
+    const io = req.app.get('io');
+    if (io && updatedMessage) {
+      io.to(String(message.channel)).emit('message-reaction', {
+        messageId: updatedMessage._id,
+        reactions: (updatedMessage as any).reactions,
+      });
+    }
+
     res.json({
       success: true,
       message: 'Reaccion actualizada',
@@ -310,24 +345,47 @@ export const votePoll = async (req: AuthRequest, res: Response) => {
         option.voters.push(userId);
       }
     } else {
-      let hadVotedBefore = false;
       for (const opt of pollData.options) {
         const idx = opt.voters.findIndex((v: any) => v.toString() === userId);
         if (idx !== -1) {
           opt.voters.splice(idx, 1);
-          hadVotedBefore = true;
         }
       }
-      if (!hadVotedBefore || true) {
-        pollData.options[optionIndex].voters.push(userId);
-      }
+      pollData.options[optionIndex].voters.push(userId);
     }
 
     message.markModified('pollData');
     await message.save();
 
+    // Sync vote to Discord: add reaction with the option's emoji on the poll message
+    const option = pollData.options[optionIndex];
+    const optionEmoji = (option.emoji || '').trim() || String(optionIndex + 1);
+    console.log(`[DEBUG] votePoll: discordMessageId=${(message as any).discordMessageId}, channel=${message.channel}, emoji=${optionEmoji}`);
+    if ((message as any).discordMessageId && message.channel) {
+      try {
+        const discordservice = require('../services/discordservice').default;
+        if (discordservice.isConfigured()) {
+          await discordservice.addReactionToMessage(
+            String(message.channel),
+            (message as any).discordMessageId,
+            optionEmoji,
+          );
+        }
+      } catch (discordErr: any) {
+        console.error('⚠️ Error sincronizando voto a Discord:', discordErr.message);
+      }
+    }
+
     const populated = await Message.findById(messageId)
       .populate('sender', 'username email avatar status');
+
+    const io = req.app.get('io');
+    if (io && populated) {
+      io.to(String(message.channel)).emit('poll-voted', {
+        messageId: populated._id,
+        pollData: (populated as any).pollData,
+      });
+    }
 
     res.json({ success: true, data: populated });
   } catch (error: any) {
