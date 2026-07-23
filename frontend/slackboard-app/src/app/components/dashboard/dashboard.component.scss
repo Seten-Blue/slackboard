@@ -1,0 +1,9 @@
+:host {
+  display: block;
+  height: 100%;
+  overflow: hidden;
+}
+
+:host ::ng-deep div::-webkit-scrollbar {
+  display: none;
+}

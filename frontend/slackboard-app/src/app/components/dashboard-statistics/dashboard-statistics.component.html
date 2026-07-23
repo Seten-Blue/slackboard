@@ -1,0 +1,127 @@
+<div *ngIf="loading" class="flex items-center justify-center h-64">
+  <div class="flex items-center gap-2 text-ink-950/40 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
+    Cargando estadisticas…
+  </div>
+</div>
+
+<div *ngIf="!loading && data" class="space-y-6">
+  <!-- Overview -->
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl border border-ink-950/5 p-4">
+      <div class="flex items-center gap-2 mb-2"><span class="text-sm">💬</span><span class="text-xs font-medium text-ink-950/50">Mensajes (30d)</span></div>
+      <p class="text-2xl font-bold text-ink-950">{{ getTotalMessages() }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-ink-950/5 p-4">
+      <div class="flex items-center gap-2 mb-2"><span class="text-sm">📂</span><span class="text-xs font-medium text-ink-950/50">Canales activos</span></div>
+      <p class="text-2xl font-bold text-ink-950">{{ data.retention?.totalChannels || 0 }}</p>
+      <p class="text-xs text-ink-950/40 mt-1">{{ data.retention?.rate || 0 }}% con actividad (7d)</p>
+    </div>
+    <div class="bg-white rounded-xl border border-ink-950/5 p-4">
+      <div class="flex items-center gap-2 mb-2"><span class="text-sm">⭐</span><span class="text-xs font-medium text-ink-950/50">Retencion</span></div>
+      <p class="text-2xl font-bold text-ink-950">{{ data.retention?.rate || 0 }}%</p>
+      <p class="text-xs text-ink-950/40 mt-1">{{ data.retention?.activeChannels || 0 }}/{{ data.retention?.totalChannels || 0 }} canales</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Message evolution -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4">💬 Evolucion de mensajes</h3>
+      <div style="height: 220px;">
+        <canvas baseChart [type]="'line'" [data]="msgEvolutionChart.data" [options]="msgEvolutionChart.options"></canvas>
+      </div>
+    </div>
+
+    <!-- User growth -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4">📈 Crecimiento de usuarios</h3>
+      <div style="height: 220px;">
+        <canvas baseChart [type]="'line'" [data]="userGrowthChart.data" [options]="userGrowthChart.options"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+    <h3 class="text-sm font-semibold text-ink-950 mb-4">📊 Horas de mayor actividad (30 dias)</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-[10px]">
+        <thead>
+          <tr>
+            <th class="text-left text-ink-950/40 pr-2 py-1"></th>
+            <th *ngFor="let h of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]" class="text-center text-ink-950/40 px-0.5 py-1">{{ h }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let day of [1,2,3,4,5,6,7]">
+            <td class="text-ink-950/40 pr-2 py-0.5 whitespace-nowrap">{{ dayName(day) }}</td>
+            <td *ngFor="let h of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]"
+                class="px-0.5 py-0.5">
+              <div class="w-4 h-4 rounded-sm mx-auto" [style.background]="heatmapColor(getHeatmapVal(day, h), getHeatmapMax())"></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Top users -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4">👑 Usuarios mas activos</h3>
+      <div class="space-y-2">
+        <div *ngFor="let u of data.topUsers; let i = index" class="flex items-center gap-3 py-1.5">
+          <span class="text-sm font-bold text-ink-950/30 w-5 text-right">{{ i + 1 }}</span>
+          <img [src]="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="w-7 h-7 rounded-lg">
+          <span class="text-sm text-ink-950 flex-1">{{ u.username }}</span>
+          <span class="text-sm font-semibold text-ink-950">{{ u.messageCount }}</span>
+          <span class="text-xs text-ink-950/40">msgs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top channels -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4">⭐ Canales mas utilizados</h3>
+      <div class="space-y-2">
+        <div *ngFor="let c of data.topChannels; let i = index" class="flex items-center gap-3 py-1.5">
+          <span class="text-sm font-bold text-ink-950/30 w-5 text-right">{{ i + 1 }}</span>
+          <span class="text-sm text-ink-950 flex-1">#{{ c.name }}</span>
+          <span class="text-[10px] bg-ink-950/5 px-2 py-0.5 rounded-full text-ink-950/50">{{ c.platform }}</span>
+          <span class="text-sm font-semibold text-ink-950">{{ c.count }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reactions -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4">😀 Reacciones mas usadas</h3>
+      <div class="space-y-1.5">
+        <div *ngFor="let r of data.reactionDistribution" class="flex items-center gap-2">
+          <span class="text-lg w-8 text-center">{{ r.emoji }}</span>
+          <div class="flex-1 bg-ink-950/5 rounded-full h-2">
+            <div class="bg-signal h-2 rounded-full" [style.width.%]="getReactionPercent(r.count)"></div>
+          </div>
+          <span class="text-xs text-ink-950/50 w-8 text-right">{{ r.count }}</span>
+        </div>
+        <p *ngIf="!data.reactionDistribution?.length" class="text-sm text-ink-950/40 py-4 text-center">Sin reacciones</p>
+      </div>
+    </div>
+
+    <!-- File types -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4">📎 Tipos de archivos</h3>
+      <div class="space-y-1.5">
+        <div *ngFor="let f of data.fileTypeDistribution" class="flex items-center gap-2">
+          <span class="text-xs font-mono bg-ink-950/5 px-2 py-0.5 rounded text-ink-950/60">.{{ f.type }}</span>
+          <div class="flex-1 bg-ink-950/5 rounded-full h-2">
+            <div class="bg-indigo-400 h-2 rounded-full" [style.width.%]="getFilePercent(f.count)"></div>
+          </div>
+          <span class="text-xs text-ink-950/50 w-8 text-right">{{ f.count }}</span>
+        </div>
+        <p *ngIf="!data.fileTypeDistribution?.length" class="text-sm text-ink-950/40 py-4 text-center">Sin archivos</p>
+      </div>
+    </div>
+  </div>
+</div>

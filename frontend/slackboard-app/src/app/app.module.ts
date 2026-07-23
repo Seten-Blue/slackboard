@@ -26,6 +26,9 @@ import { PollRendererComponent } from './components/poll-renderer/poll-renderer.
 import { ThreadModalComponent } from './components/thread-modal/thread-modal.component';
 import { ThreadRendererComponent } from './components/thread-renderer/thread-renderer.component';
 import { ThreadPanelComponent } from './components/thread-panel/thread-panel.component';
+import { DashboardActivityComponent } from './components/dashboard-activity/dashboard-activity.component';
+import { DashboardTrafficComponent } from './components/dashboard-traffic/dashboard-traffic.component';
+import { DashboardStatisticsComponent } from './components/dashboard-statistics/dashboard-statistics.component';
 
 @NgModule({
   declarations: [
@@ -47,7 +50,10 @@ import { ThreadPanelComponent } from './components/thread-panel/thread-panel.com
     PollRendererComponent,
     ThreadModalComponent,
     ThreadRendererComponent,
-    ThreadPanelComponent
+    ThreadPanelComponent,
+    DashboardActivityComponent,
+    DashboardTrafficComponent,
+    DashboardStatisticsComponent
   ],
   imports: [
     BrowserModule,

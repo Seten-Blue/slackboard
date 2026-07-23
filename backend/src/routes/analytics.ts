@@ -1,23 +1,26 @@
 import express from 'express';
+import { requireAuth } from '../middleware/auth';
 import {
   getGeneralStats,
   getStatsByDate,
   getMessageTrends,
   generateDailyReport,
+  getActivity,
+  getTraffic,
+  getStatistics,
 } from '../controllers/analyticsController';
 
 const router = express.Router();
 
-// GET /api/analytics - Obtener estadisticas generales
+// Dashboard submodules (user-scoped, require auth)
+router.get('/activity', requireAuth, getActivity);
+router.get('/traffic', requireAuth, getTraffic);
+router.get('/stats', requireAuth, getStatistics);
+
+// Legacy (global, no auth needed for backward compat)
 router.get('/', getGeneralStats);
-
-// GET /api/analytics/by-date - Obtener estadisticas por fecha
 router.get('/by-date', getStatsByDate);
-
-// GET /api/analytics/trends - Obtener tendencias de mensajes
 router.get('/trends', getMessageTrends);
-
-// POST /api/analytics/generate-report - Generar reporte diario
 router.post('/generate-report', generateDailyReport);
 
 export default router;

@@ -171,8 +171,7 @@ export class SidebarComponent implements OnInit {
 
   selectDashboardItem(id: string): void {
     this.activeDashboardItem = id;
-    // TODO: cuando el Dashboard tenga tabs reales, navegar con queryParams:
-    // this.router.navigate(['/dashboard'], { queryParams: { view: id } });
+    this.router.navigate(['/dashboard'], { queryParams: { view: id } });
   }
 
   // ============ SWITCHER DE PLATAFORMA ============

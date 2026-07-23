@@ -11,6 +11,20 @@ export class AnalyticsService {
 
   constructor(private http: HttpClient) {}
 
+  // Dashboard submodules
+  getActivity(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/analytics/activity`);
+  }
+
+  getTraffic(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/analytics/traffic`);
+  }
+
+  getStats(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/analytics/stats`);
+  }
+
+  // Legacy
   getGeneralStats(): Observable<any> {
     return this.http.get(`${this.apiUrl}/analytics`);
   }

@@ -20,6 +20,7 @@ import whatsappRouter from './routes/whatsapp';
 import { ensureAIChannel } from './services/aiService';
 import discordservice from './services/discordservice';
 import authRouter from './routes/auth';
+import friendshipRouter from './routes/friendship';
 // Configurar variables de entorno
 dotenv.config();  
 
@@ -113,6 +114,7 @@ app.use('/api/upload', uploadRouter);
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/friendship', friendshipRouter);
 
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
