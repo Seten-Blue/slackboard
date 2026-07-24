@@ -3,9 +3,11 @@ import mongoose from 'mongoose';
 import Task from '../models/Task';
 import User from '../models/User';
 import Channel from '../models/Channel';
+import Message from '../models/Message';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from './auditLogController';
 import discordservice from '../services/discordservice';
+import slackService from '../services/slackService';
 
 export const createTask = async (req: AuthRequest, res: Response) => {
   try {
@@ -80,17 +82,51 @@ export const createTask = async (req: AuthRequest, res: Response) => {
 
     const targetChannel = channelId;
     if (targetChannel) {
-      try {
-        const chDoc: any = await Channel.findById(targetChannel);
-        if (chDoc?.discordChannelId) {
+      const chDoc: any = await Channel.findById(targetChannel);
+
+      const chatContent = [
+        `${emoji} **Nueva tarea: ${title}**`,
+        description ? `> ${description.substring(0, 120)}${description.length > 120 ? '...' : ''}` : '',
+        `📋 Estado: Pendiente  |  Prioridad: ${(priority || 'medium').toUpperCase()}`,
+        assigneeUser ? `👤 Asignada a: **${assigneeUser.username}**` : '👤 Sin asignar',
+        dueDate ? `📅 Fecha limite: ${new Date(dueDate).toLocaleDateString('es-ES')}` : '',
+      ].filter(Boolean).join('\n');
+
+      const chatMsg = await Message.create({
+        content: chatContent,
+        channel: targetChannel,
+        sender: userId,
+        type: 'text',
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        const populatedMsg = await Message.findById(chatMsg._id)
+          .populate('sender', 'username email avatar status role');
+        io.to(targetChannel.toString()).emit('new-message', {
+          channelId: targetChannel.toString(),
+          message: populatedMsg,
+        });
+      }
+
+      if (chDoc?.discordChannelId) {
+        try {
           const discordMsgId = await discordservice.sendMessage(targetChannel.toString(), taskText);
           if (discordMsgId) {
             task.discordNotificationMessageId = discordMsgId;
             await task.save();
           }
+        } catch (err: any) {
+          console.warn('No se pudo enviar tarea a Discord:', err.message);
         }
-      } catch (discordErr: any) {
-        console.warn('No se pudo enviar tarea a Discord:', discordErr.message);
+      }
+
+      if (chDoc?.slackChannelId) {
+        try {
+          await slackService.sendMessage(chDoc.name, taskText);
+        } catch (err: any) {
+          console.warn('No se pudo enviar tarea a Slack:', err.message);
+        }
       }
     }
 
@@ -378,13 +414,37 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
       const statusText = `${statusEmoji[status] || '📋'} **${task.title}** cambió a: **${status.replace('_', ' ')}**`;
       const targetChannelId = (task as any).assignmentChannel || task.channel;
       if (targetChannelId) {
-        try {
-          const chDoc: any = await Channel.findById(targetChannelId);
-          if (chDoc?.discordChannelId) {
+        const chatMsg = await Message.create({
+          content: statusText,
+          channel: targetChannelId,
+          sender: userId,
+          type: 'text',
+        });
+
+        const io = req.app.get('io');
+        if (io) {
+          const populatedMsg = await Message.findById(chatMsg._id)
+            .populate('sender', 'username email avatar status role');
+          io.to(targetChannelId.toString()).emit('new-message', {
+            channelId: targetChannelId.toString(),
+            message: populatedMsg,
+          });
+        }
+
+        const chDoc: any = await Channel.findById(targetChannelId);
+        if (chDoc?.discordChannelId) {
+          try {
             await discordservice.sendMessage(targetChannelId.toString(), statusText);
+          } catch (err: any) {
+            console.warn('No se pudo notificar cambio de estado a Discord:', err.message);
           }
-        } catch (discordErr: any) {
-          console.warn('No se pudo notificar cambio de estado a Discord:', discordErr.message);
+        }
+        if (chDoc?.slackChannelId) {
+          try {
+            await slackService.sendMessage(chDoc.name, statusText);
+          } catch (err: any) {
+            console.warn('No se pudo notificar cambio de estado a Slack:', err.message);
+          }
         }
       }
     }
