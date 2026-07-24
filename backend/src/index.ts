@@ -21,6 +21,12 @@ import { ensureAIChannel } from './services/aiService';
 import discordservice from './services/discordservice';
 import authRouter from './routes/auth';
 import friendshipRouter from './routes/friendship';
+import reportsRouter from './routes/reports';
+import performanceRouter from './routes/performance';
+import tasksRouter from './routes/tasks';
+import surveysRouter from './routes/surveys';
+import auditLogRouter from './routes/auditLog';
+import aiMetricsRouter from './routes/aiMetrics';
 // Configurar variables de entorno
 dotenv.config();  
 
@@ -115,6 +121,12 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/friendship', friendshipRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/performance', performanceRouter);
+app.use('/api/tasks', tasksRouter);
+app.use('/api/surveys', surveysRouter);
+app.use('/api/audit', auditLogRouter);
+app.use('/api/ai-metrics', aiMetricsRouter);
 
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {

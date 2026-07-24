@@ -1,0 +1,351 @@
+<div *ngIf="loading" class="flex items-center justify-center h-64">
+  <div class="flex items-center gap-2 text-white/30 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-signal animate-pulse"></span>
+    Cargando metricas de IA...
+  </div>
+</div>
+
+<div *ngIf="!loading" class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="font-display font-bold text-lg text-white">Metricas de IA</h1>
+      <p class="text-sm text-white/40 mt-0.5">Analisis de uso, costos y rendimiento de modelos</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex bg-white/[0.06] rounded-xl p-1 border border-white/10">
+        <button
+          (click)="activeTab = 'overview'"
+          [class]="activeTab === 'overview' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Resumen
+        </button>
+        <button
+          (click)="activeTab = 'costs'"
+          [class]="activeTab === 'costs' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Costos
+        </button>
+        <button
+          (click)="activeTab = 'models'"
+          [class]="activeTab === 'models' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Modelos
+        </button>
+      </div>
+      <button (click)="loadAll()"
+        class="px-3 py-1.5 text-xs font-medium text-white/60 bg-white/[0.06] border border-white/10 rounded-lg hover:bg-white/[0.1] transition-colors">
+        Actualizar
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== OVERVIEW TAB ==================== -->
+  <div *ngIf="activeTab === 'overview'" class="space-y-6">
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#128269;</span>
+          <span class="text-xs font-medium text-white/50">Total consultas</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatTokens(totalQueries) }}</p>
+        <p class="text-[10px] text-white/30 mt-1">Preguntas realizadas a IA</p>
+      </div>
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#9997;</span>
+          <span class="text-xs font-medium text-white/50">Tokens totales</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatTokens(totalTokens) }}</p>
+        <p class="text-[10px] text-white/30 mt-1">Input + Output combinados</p>
+      </div>
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#128176;</span>
+          <span class="text-xs font-medium text-white/50">Costo total</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatCost(totalCost) }}</p>
+        <p class="text-[10px] text-white/30 mt-1">Gasto acumulado USD</p>
+      </div>
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#9201;</span>
+          <span class="text-xs font-medium text-white/50">Tiempo respuesta</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatMs(avgResponseTime) }}</p>
+        <p class="text-[10px] text-white/30 mt-1">Promedio por consulta</p>
+      </div>
+    </div>
+
+    <!-- Success Rate + Tokens Chart Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- Success Rate -->
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <h3 class="text-xs font-medium text-white/50 mb-4">Tasa de exito</h3>
+        <div class="flex items-center gap-4">
+          <p class="text-3xl font-bold text-white">{{ successRate }}%</p>
+          <div class="flex-1">
+            <div class="w-full bg-white/[0.06] rounded-full h-2">
+              <div class="h-2 rounded-full transition-all" [style.width.%]="successRate" [style.background]="successRateColor(successRate)"></div>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+              <span class="text-[10px] text-white/30">0%</span>
+              <span class="text-[10px]" [style.color]="successRateColor(successRate)">
+                {{ successRate >= 95 ? 'Excelente' : successRate >= 80 ? 'Regular' : 'Bajo' }}
+              </span>
+              <span class="text-[10px] text-white/30">100%</span>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="!successRate && successRate !== 0" class="flex items-center justify-center py-6">
+          <p class="text-xs text-white/20">Sin datos de exito</p>
+        </div>
+      </div>
+
+      <!-- Tokens per Day Chart -->
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5 lg:col-span-2">
+        <h3 class="text-xs font-medium text-white/50 mb-3">Tokens por dia</h3>
+        <div *ngIf="tokensChartData" style="height: 180px;">
+          <canvas baseChart [type]="'line'" [data]="tokensChartData" [options]="lineChartOptions"></canvas>
+        </div>
+        <div *ngIf="!tokensChartData" class="flex items-center justify-center h-[180px]">
+          <p class="text-xs text-white/20">Sin datos de consumo</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Queries -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xs font-medium text-white/50">Consultas recientes</h3>
+        <span class="text-[10px] text-white/30 bg-white/[0.06] px-2 py-0.5 rounded-full">{{ recentMetrics.length }}</span>
+      </div>
+      <div *ngIf="recentMetrics.length" class="space-y-1">
+        <div *ngFor="let m of recentMetrics" class="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-white/[0.03] transition-colors">
+          <span class="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-signal shrink-0">
+            {{ (m.model || 'AI').charAt(0) | uppercase }}
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-white/80 truncate">{{ m.query || m.text || 'Consulta sin texto' }}</p>
+            <div class="flex items-center gap-3 mt-0.5">
+              <span class="text-[10px] text-signal">{{ m.model || 'desconocido' }}</span>
+              <span class="text-[10px] text-white/30">{{ formatTokens(m.tokensUsed || m.tokens || 0) }} tokens</span>
+              <span class="text-[10px] text-white/30">{{ formatMs(m.responseTime || m.duration || 0) }}</span>
+            </div>
+          </div>
+          <span class="text-[10px] text-white/20 shrink-0">{{ timeAgo(m.createdAt || m.timestamp) }}</span>
+        </div>
+      </div>
+      <div *ngIf="!recentMetrics.length" class="flex items-center justify-center py-10">
+        <p class="text-sm text-white/20">No hay consultas registradas aun</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== COSTS TAB ==================== -->
+  <div *ngIf="activeTab === 'costs'" class="space-y-6">
+
+    <!-- Cost Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#128176;</span>
+          <span class="text-xs font-medium text-white/50">Costo total</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatCost(totalCost) }}</p>
+      </div>
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#128200;</span>
+          <span class="text-xs font-medium text-white/50">Costo / consulta</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatCost(totalQueries ? totalCost / totalQueries : 0) }}</p>
+      </div>
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#9997;</span>
+          <span class="text-xs font-medium text-white/50">Costo / 1K tokens</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatCost(totalTokens ? (totalCost / totalTokens) * 1000 : 0) }}</p>
+      </div>
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm text-signal">&#128202;</span>
+          <span class="text-xs font-medium text-white/50">Modelos activos</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ models.length }}</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Cost by Model Table -->
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <h3 class="text-xs font-medium text-white/50 mb-4">Costo por modelo</h3>
+        <div *ngIf="modelCostBreakdown.length" class="space-y-2">
+          <div *ngFor="let m of modelCostBreakdown" class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+            <span class="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0"
+                  [style.background]="'rgba(139,124,246,0.15)'" [style.color]="'#8b7cf6'">
+              {{ (m._id || 'AI').charAt(0) | uppercase }}
+            </span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-white truncate">{{ m._id || 'Desconocido' }}</p>
+              <p class="text-[10px] text-white/30">{{ m.totalQueries || 0 }} consultas</p>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-sm font-semibold text-white">{{ formatCost(m.totalCost || 0) }}</p>
+              <p class="text-[10px] text-white/30">{{ formatCost(m.costPerQuery || 0) }}/consulta</p>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="!modelCostBreakdown.length" class="flex items-center justify-center py-10">
+          <p class="text-sm text-white/20">Sin datos de costos por modelo</p>
+        </div>
+      </div>
+
+      <!-- Cost by Department -->
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <h3 class="text-xs font-medium text-white/50 mb-4">Costo por departamento</h3>
+        <div *ngIf="departments.length" class="space-y-2">
+          <div *ngFor="let d of departments" class="flex items-center gap-3 py-2">
+            <span class="w-6 h-6 rounded-md bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-signal shrink-0">
+              {{ (d._id || 'D').charAt(0) | uppercase }}
+            </span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-white/80 truncate">{{ d._id || 'Sin departamento' }}</p>
+              <div class="w-full bg-white/[0.06] rounded-full h-1.5 mt-1">
+                <div class="bg-signal h-1.5 rounded-full transition-all" [style.width.%]="d.totalQueries ? (d.totalQueries / (departments[0]?.totalQueries || 1)) * 100 : 0"></div>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-xs font-medium text-white">{{ d.totalQueries || 0 }}</p>
+              <p class="text-[10px] text-white/30">{{ formatCost(d.totalCost || 0) }}</p>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="!departments.length" class="flex items-center justify-center py-10">
+          <p class="text-sm text-white/20">Sin datos por departamento</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cost Over Time -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <h3 class="text-xs font-medium text-white/50 mb-3">Costo a lo largo del tiempo</h3>
+      <div *ngIf="costChartData" style="height: 220px;">
+        <canvas baseChart [type]="'line'" [data]="costChartData" [options]="lineChartOptions"></canvas>
+      </div>
+      <div *ngIf="!costChartData" class="flex items-center justify-center h-[220px]">
+        <p class="text-sm text-white/20">Sin datos de costos historicos</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODELS TAB ==================== -->
+  <div *ngIf="activeTab === 'models'" class="space-y-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Model Comparison Table -->
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5 lg:col-span-2">
+        <h3 class="text-xs font-medium text-white/50 mb-4">Comparativa de modelos</h3>
+        <div *ngIf="models.length" class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="border-b border-white/10">
+                <th class="text-[10px] uppercase tracking-wider text-white/30 font-medium pb-3 pr-4">Modelo</th>
+                <th class="text-[10px] uppercase tracking-wider text-white/30 font-medium pb-3 pr-4 text-right">Consultas</th>
+                <th class="text-[10px] uppercase tracking-wider text-white/30 font-medium pb-3 pr-4 text-right">Tokens</th>
+                <th class="text-[10px] uppercase tracking-wider text-white/30 font-medium pb-3 pr-4 text-right">Tiempo avg</th>
+                <th class="text-[10px] uppercase tracking-wider text-white/30 font-medium pb-3 pr-4 text-right">Costo</th>
+                <th class="text-[10px] uppercase tracking-wider text-white/30 font-medium pb-3 text-right">Exito</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let m of models" class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                <td class="py-3 pr-4">
+                  <div class="flex items-center gap-2">
+                    <span class="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-signal shrink-0">
+                      {{ (m._id || 'AI').charAt(0) | uppercase }}
+                    </span>
+                    <span class="text-sm font-medium text-white truncate">{{ m._id || 'Desconocido' }}</span>
+                  </div>
+                </td>
+                <td class="py-3 pr-4 text-right">
+                  <span class="text-sm text-white/80">{{ formatTokens(m.totalQueries || 0) }}</span>
+                </td>
+                <td class="py-3 pr-4 text-right">
+                  <span class="text-sm text-white/80">{{ formatTokens(m.totalTokens || 0) }}</span>
+                </td>
+                <td class="py-3 pr-4 text-right">
+                  <span class="text-sm text-white/80">{{ formatMs(m.avgResponseTime || 0) }}</span>
+                </td>
+                <td class="py-3 pr-4 text-right">
+                  <span class="text-sm text-white/80">{{ formatCost(m.totalCost || 0) }}</span>
+                </td>
+                <td class="py-3 text-right">
+                  <span class="text-sm font-medium" [style.color]="successRateColor(m.successRate ?? 0)">
+                    {{ m.successRate ?? 0 }}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="!models.length" class="flex items-center justify-center py-10">
+          <p class="text-sm text-white/20">No hay modelos registrados aun</p>
+        </div>
+      </div>
+
+      <!-- Model Distribution Doughnut -->
+      <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <h3 class="text-xs font-medium text-white/50 mb-4">Distribucion por modelo</h3>
+        <div *ngIf="modelComparisonData" style="height: 260px;" class="flex items-center justify-center">
+          <canvas baseChart [type]="'doughnut'" [data]="modelComparisonData" [options]="doughnutOptions"></canvas>
+        </div>
+        <div *ngIf="!modelComparisonData" class="flex items-center justify-center h-[260px]">
+          <p class="text-sm text-white/20">Sin datos de distribucion</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Detail Cards -->
+    <div *ngIf="models.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div *ngFor="let m of models"
+           class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:border-white/20 transition-all">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-sm font-bold text-signal">
+            {{ (m._id || 'AI').charAt(0) | uppercase }}
+          </span>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-white truncate">{{ m._id || 'Desconocido' }}</p>
+            <p class="text-[10px] text-white/30">{{ m.totalQueries || 0 }} consultas</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-2.5 rounded-xl bg-white/[0.03]">
+            <p class="text-[10px] text-white/30 uppercase tracking-wider">Tokens</p>
+            <p class="text-sm font-bold text-white mt-0.5">{{ formatTokens(m.totalTokens || 0) }}</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-white/[0.03]">
+            <p class="text-[10px] text-white/30 uppercase tracking-wider">Costo</p>
+            <p class="text-sm font-bold text-white mt-0.5">{{ formatCost(m.totalCost || 0) }}</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-white/[0.03]">
+            <p class="text-[10px] text-white/30 uppercase tracking-wider">Tiempo avg</p>
+            <p class="text-sm font-bold text-white mt-0.5">{{ formatMs(m.avgResponseTime || 0) }}</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-white/[0.03]">
+            <p class="text-[10px] text-white/30 uppercase tracking-wider">Exito</p>
+            <p class="text-sm font-bold mt-0.5" [style.color]="successRateColor(m.successRate ?? 0)">{{ m.successRate ?? 0 }}%</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

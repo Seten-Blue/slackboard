@@ -54,9 +54,12 @@ export class SidebarComponent implements OnInit {
   dashboardSubItems: DashboardSubItem[] = [
     { id: 'activity', label: 'Actividad' },
     { id: 'traffic', label: 'Trafico' },
-    { id: 'stats', label: 'Estadisticas' }
+    { id: 'stats', label: 'Estadisticas' },
+    { id: 'tasks', label: 'Tareas' },
+    { id: 'surveys', label: 'Encuestas' }
   ];
   activeDashboardItem = 'stats';
+  activeAnalyticsItem = '';
 
   crmSubItems: DashboardSubItem[] = [
     { id: 'clients', label: 'Clientes' },
@@ -66,7 +69,9 @@ export class SidebarComponent implements OnInit {
 
   analyticsSubItems: DashboardSubItem[] = [
     { id: 'reports', label: 'Reportes' },
-    { id: 'performance', label: 'Rendimiento' }
+    { id: 'audit', label: 'Auditoria' },
+    { id: 'performance', label: 'Rendimiento' },
+    { id: 'ai-metrics', label: 'Metricas IA' }
   ];
 
   // ============ SWITCHER DE PLATAFORMA ============
@@ -193,6 +198,11 @@ export class SidebarComponent implements OnInit {
 
   selectDashboardItem(id: string): void {
     this.activeDashboardItem = id;
+    this.router.navigate(['/dashboard'], { queryParams: { view: id } });
+  }
+
+  selectAnalyticsItem(id: string): void {
+    this.activeAnalyticsItem = id;
     this.router.navigate(['/dashboard'], { queryParams: { view: id } });
   }
 

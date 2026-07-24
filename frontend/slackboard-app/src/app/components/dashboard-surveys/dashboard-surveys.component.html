@@ -1,0 +1,579 @@
+<div class="h-full overflow-y-auto p-6 space-y-6" style="scrollbar-width: none; -ms-overflow-style: none;">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="font-display font-bold text-lg text-white">Encuestas</h1>
+      <p class="text-sm text-white/50 mt-0.5">Crea, administra y visualiza resultados de encuestas</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex bg-white/[0.06] rounded-xl p-1 border border-white/10">
+        <button
+          (click)="activeTab = 'surveys'"
+          [class]="activeTab === 'surveys' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Encuestas
+        </button>
+        <button
+          (click)="activeTab = 'stats'"
+          [class]="activeTab === 'stats' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Estadisticas
+        </button>
+      </div>
+      <button
+        (click)="showCreateModal = true"
+        class="px-4 py-2 bg-signal hover:bg-signal/80 text-white text-sm font-medium rounded-xl transition-colors">
+        + Nueva Encuesta
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="flex items-center justify-center h-64">
+    <div class="flex items-center gap-2 text-white/30 text-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-signal animate-pulse"></span>
+      Cargando encuestas…
+    </div>
+  </div>
+
+  <!-- ===== SURVEYS TAB ===== -->
+  <div *ngIf="!loading && activeTab === 'surveys'">
+
+    <!-- Empty state -->
+    <div *ngIf="surveys.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center mb-4">
+        <span class="text-2xl">📋</span>
+      </div>
+      <p class="text-white/60 font-medium">Sin encuestas aun</p>
+      <p class="text-white/30 text-sm mt-1">Crea tu primera encuesta para recopilar feedback de tus canales</p>
+      <button (click)="showCreateModal = true" class="mt-4 px-4 py-2 bg-signal/10 hover:bg-signal/20 text-signal text-sm font-medium rounded-xl transition-colors border border-signal/20">
+        + Crear encuesta
+      </button>
+    </div>
+
+    <!-- Survey cards -->
+    <div *ngIf="surveys.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div *ngFor="let survey of surveys"
+        class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:border-white/20 transition-all group">
+
+        <!-- Card header -->
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-semibold text-white truncate">{{ survey.title }}</h3>
+            <p *ngIf="survey.description" class="text-xs text-white/30 mt-0.5 line-clamp-2">{{ survey.description }}</p>
+          </div>
+          <span [class]="'flex-shrink-0 ml-2 flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full border ' + statusColor(survey.status)">
+            <span [class]="'w-1.5 h-1.5 rounded-full ' + statusDot(survey.status)"></span>
+            {{ statusLabel(survey.status) }}
+          </span>
+        </div>
+
+        <!-- Meta row -->
+        <div class="flex items-center gap-3 mb-4 text-[11px] text-white/40">
+          <span class="flex items-center gap-1">
+            <span class="text-signal">◉</span>
+            {{ survey.questions?.length || 0 }} pregunta(s)
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="text-emerald-400">↗</span>
+            {{ survey.responseCount || 0 }} respuestas
+          </span>
+          <span *ngIf="survey.expiresAt" class="flex items-center gap-1">
+            <span class="text-amber-400">◷</span>
+            {{ formatDate(survey.expiresAt) }}
+          </span>
+        </div>
+
+        <!-- Questions preview -->
+        <div *ngIf="survey.questions?.length" class="space-y-1 mb-4">
+          <ng-container *ngFor="let q of survey.questions; let qi = index">
+          <div *ngIf="qi < 3"
+            class="flex items-center gap-2 py-1 text-[11px] text-white/40">
+            <span class="text-white/20 w-3">{{ qi + 1 }}.</span>
+            <span class="truncate flex-1">{{ q.text || 'Sin texto' }}</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/30 flex-shrink-0">{{ typeLabel(q.type) }}</span>
+          </div>
+          </ng-container>
+          <p *ngIf="survey.questions.length > 3" class="text-[10px] text-white/20 pl-5">
+            +{{ survey.questions.length - 3 }} mas
+          </p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-1 pt-3 border-t border-white/[0.06]">
+          <button *ngIf="survey.status !== 'active'" (click)="activateSurvey(survey._id)"
+            class="flex-1 px-2 py-1.5 text-[11px] text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors font-medium">
+            Activar
+          </button>
+          <button *ngIf="survey.status === 'active'" (click)="closeSurvey(survey._id)"
+            class="flex-1 px-2 py-1.5 text-[11px] text-amber-400/60 hover:text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors font-medium">
+            Cerrar
+          </button>
+          <button *ngIf="survey.status === 'active'" (click)="openRespond(survey)"
+            class="px-2 py-1.5 text-[11px] text-signal/60 hover:text-signal hover:bg-signal/10 rounded-lg transition-colors font-medium">
+            Responder
+          </button>
+          <button (click)="loadResults(survey)"
+            class="px-2 py-1.5 text-[11px] text-white/40 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors font-medium">
+            Resultados
+          </button>
+          <button (click)="deleteSurvey(survey._id)"
+            class="px-2 py-1.5 text-[11px] text-red-400/40 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+            title="Eliminar">
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== STATS TAB ===== -->
+  <div *ngIf="!loading && activeTab === 'stats'">
+    <div *ngIf="!stats" class="flex flex-col items-center justify-center h-64 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center mb-4">
+        <span class="text-2xl">📊</span>
+      </div>
+      <p class="text-white/60 font-medium">Sin estadisticas disponibles</p>
+      <p class="text-white/30 text-sm mt-1">Crea encuestas y recibe respuestas para ver estadisticas</p>
+    </div>
+
+    <div *ngIf="stats" class="space-y-6">
+      <!-- Summary cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-2 h-2 rounded-full bg-signal"></span>
+            <span class="text-xs font-medium text-white/50">Total encuestas</span>
+          </div>
+          <p class="text-2xl font-bold text-white">{{ stats.totalSurveys || surveys.length }}</p>
+        </div>
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-medium text-white/50">Activas</span>
+          </div>
+          <p class="text-2xl font-bold text-white">{{ stats.activeSurveys || activeSurveysCount() }}</p>
+        </div>
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-sm">📝</span>
+            <span class="text-xs font-medium text-white/50">Total respuestas</span>
+          </div>
+          <p class="text-2xl font-bold text-white">{{ stats.totalResponses || totalResponses() }}</p>
+        </div>
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-sm">📈</span>
+            <span class="text-xs font-medium text-white/50">Tasa completado</span>
+          </div>
+          <p class="text-2xl font-bold text-white">{{ stats.completionRate || completionRate() }}%</p>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Status distribution -->
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-white mb-4">Distribucion por estado</h3>
+          <div style="height: 220px;">
+            <canvas baseChart [type]="'doughnut'" [data]="statsOverviewChart.data" [options]="statsOverviewChart.options"></canvas>
+          </div>
+        </div>
+
+        <!-- Responses over time -->
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-white mb-4">Respuestas recientes</h3>
+          <div style="height: 220px;">
+            <canvas baseChart [type]="'bar'" [data]="statsResponsesChart.data" [options]="statsResponsesChart.options"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent surveys table -->
+      <div *ngIf="stats.recentSurveys?.length" class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+        <h3 class="text-sm font-semibold text-white mb-4">Encuestas recientes</h3>
+        <div class="space-y-2">
+          <div *ngFor="let s of stats.recentSurveys" class="flex items-center gap-3 py-2 border-b border-white/[0.04] last:border-0">
+            <span [class]="'w-2 h-2 rounded-full flex-shrink-0 ' + statusDot(s.status)"></span>
+            <span class="text-sm text-white flex-1 truncate">{{ s.title }}</span>
+            <span class="text-xs text-white/40">{{ s.questions?.length || 0 }} preguntas</span>
+            <span class="text-xs text-white/40">{{ s.responseCount || 0 }} respuestas</span>
+            <span [class]="'text-[10px] font-medium px-2 py-0.5 rounded-full border ' + statusColor(s.status)">
+              {{ statusLabel(s.status) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CREATE SURVEY MODAL ===== -->
+<div *ngIf="showCreateModal"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  (click)="showCreateModal = false">
+
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl" (click)="$event.stopPropagation()"
+    style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="font-display font-bold text-lg text-white">Nueva Encuesta</h2>
+        <button (click)="showCreateModal = false" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Titulo</label>
+          <input type="text" [(ngModel)]="newSurvey.title"
+            placeholder="Ej: Encuesta de satisfaccion del equipo"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Descripcion</label>
+          <textarea [(ngModel)]="newSurvey.description"
+            placeholder="Descripcion opcional de la encuesta..."
+            rows="2"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all resize-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha de expiracion (opcional)</label>
+          <input type="datetime-local" [(ngModel)]="newSurvey.expiresAt"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+
+        <!-- Questions -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-xs font-medium text-white/50">Preguntas</label>
+            <button (click)="addQuestion()"
+              class="text-[11px] text-signal hover:text-signal/80 font-medium transition-colors">
+              + Agregar pregunta
+            </button>
+          </div>
+
+          <div *ngIf="newSurvey.questions.length === 0" class="bg-white/[0.04] border border-dashed border-white/10 rounded-xl p-6 text-center">
+            <p class="text-sm text-white/30">No hay preguntas. Haz clic en "Agregar pregunta" para comenzar.</p>
+          </div>
+
+          <div *ngFor="let q of newSurvey.questions; let qi = index"
+            class="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-3 space-y-3">
+
+            <div class="flex items-start gap-3">
+              <span class="text-xs font-bold text-white/20 mt-2.5">{{ qi + 1 }}</span>
+              <div class="flex-1 space-y-3">
+                <input type="text" [(ngModel)]="q.text"
+                  placeholder="Texto de la pregunta..."
+                  class="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 transition-all" />
+
+                <div class="flex items-center gap-2">
+                  <label class="text-[10px] text-white/30">Tipo:</label>
+                  <select [(ngModel)]="q.type"
+                    class="px-2 py-1 bg-white/[0.06] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-signal/50 transition-all appearance-none">
+                    <option value="single_choice" class="bg-[#1a1a2e]">Opcion unica</option>
+                    <option value="multiple_choice" class="bg-[#1a1a2e]">Opcion multiple</option>
+                    <option value="text" class="bg-[#1a1a2e]">Texto libre</option>
+                    <option value="rating" class="bg-[#1a1a2e]">Calificacion (1-5)</option>
+                    <option value="yes_no" class="bg-[#1a1a2e]">Si / No</option>
+                  </select>
+                  <label class="flex items-center gap-1.5 ml-auto text-[10px] text-white/30">
+                    <input type="checkbox" [(ngModel)]="q.required" class="accent-signal" />
+                    Requerida
+                  </label>
+                </div>
+
+                <!-- Options editor for choice types -->
+                <div *ngIf="q.type === 'single_choice' || q.type === 'multiple_choice'" class="space-y-2 pl-2">
+                  <div class="flex items-center gap-2" *ngFor="let opt of q.options; let oi = index">
+                    <span *ngIf="q.type === 'single_choice'" class="text-white/15 text-[10px]">◉</span>
+                    <span *ngIf="q.type === 'multiple_choice'" class="text-white/15 text-[10px]">☑</span>
+                    <input type="text" [(ngModel)]="q.options[oi]"
+                      [placeholder]="'Opcion ' + (oi + 1)"
+                      class="flex-1 px-2 py-1.5 bg-white/[0.06] border border-white/10 rounded-lg text-xs text-white placeholder-white/20 focus:outline-none focus:border-signal/50 transition-all" />
+                    <button *ngIf="q.options.length > 2" (click)="removeOption(qi, oi)"
+                      class="w-5 h-5 rounded text-white/20 hover:text-red-400 hover:bg-red-400/10 flex items-center justify-center text-[10px] transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                  <button (click)="addOption(qi)"
+                    class="text-[10px] text-white/30 hover:text-signal transition-colors">
+                    + Opcion
+                  </button>
+                </div>
+
+                <!-- Rating hint -->
+                <div *ngIf="q.type === 'rating'" class="pl-2 text-[10px] text-white/20">
+                  Los usuarios calificaran del 1 al 5
+                </div>
+
+                <!-- Yes/No hint -->
+                <div *ngIf="q.type === 'yes_no'" class="pl-2 text-[10px] text-white/20">
+                  Los usuarios respondersan Si o No
+                </div>
+
+                <!-- Text hint -->
+                <div *ngIf="q.type === 'text'" class="pl-2 text-[10px] text-white/20">
+                  Los usuarios escribiran una respuesta libre
+                </div>
+              </div>
+
+              <button (click)="removeQuestion(qi)"
+                class="w-6 h-6 rounded text-white/20 hover:text-red-400 hover:bg-red-400/10 flex items-center justify-center text-xs transition-colors flex-shrink-0 mt-2">
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/[0.06]">
+        <button (click)="showCreateModal = false"
+          class="px-4 py-2 text-sm text-white/50 hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button (click)="createSurvey()"
+          [disabled]="!newSurvey.title || !newSurvey.questions.length || creating"
+          class="px-5 py-2 bg-signal hover:bg-signal/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors">
+          {{ creating ? 'Creando…' : 'Crear Encuesta' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESULTS MODAL ===== -->
+<div *ngIf="showResultsModal && selectedSurvey"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  (click)="closeAll()">
+
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto shadow-2xl" (click)="$event.stopPropagation()"
+    style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+
+    <!-- Results header -->
+    <div class="sticky top-0 z-10 bg-[#1a1a2e]/90 backdrop-blur-xl border-b border-white/[0.06] px-6 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="font-display font-bold text-lg text-white">{{ selectedSurvey.title }}</h2>
+        <div class="flex items-center gap-2 mt-1">
+          <span [class]="'text-[10px] font-medium px-2 py-0.5 rounded-full border ' + statusColor(selectedSurvey.status)">
+            {{ statusLabel(selectedSurvey.status) }}
+          </span>
+          <span class="text-[10px] text-white/30">
+            {{ results?.responseCount || selectedSurvey.responseCount || 0 }} respuestas
+          </span>
+        </div>
+      </div>
+      <button (click)="closeAll()" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+    </div>
+
+    <div class="p-6 space-y-6">
+
+      <!-- Loading results -->
+      <div *ngIf="!results" class="flex items-center justify-center h-32">
+        <div class="flex items-center gap-2 text-white/30 text-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-signal animate-pulse"></span>
+          Cargando resultados…
+        </div>
+      </div>
+
+      <div *ngIf="results">
+        <!-- Overall stats -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06] text-center">
+            <p class="text-lg font-bold text-white">{{ results.responseCount || 0 }}</p>
+            <p class="text-[10px] text-white/30">Respuestas totales</p>
+          </div>
+          <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06] text-center">
+            <p class="text-lg font-bold text-white">{{ selectedSurvey.questions?.length || 0 }}</p>
+            <p class="text-[10px] text-white/30">Preguntas</p>
+          </div>
+          <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06] text-center">
+            <p class="text-lg font-bold text-signal">{{ results.avgCompletionTime || '—' }}</p>
+            <p class="text-[10px] text-white/30">Tiempo promedio</p>
+          </div>
+        </div>
+
+        <!-- Per-question results -->
+        <div *ngFor="let q of results.questions; let qi = index"
+          class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06] mb-4">
+
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <span class="text-[10px] text-signal font-medium">Pregunta {{ qi + 1 }}</span>
+              <h4 class="text-sm font-medium text-white mt-0.5">{{ q.text || selectedSurvey.questions[qi]?.text }}</h4>
+              <span class="text-[10px] text-white/30 mt-0.5 inline-block">{{ typeLabel(q.type) }} · {{ q.responseCount || 0 }} respuestas</span>
+            </div>
+            <span *ngIf="selectedSurvey.questions[qi]?.required" class="text-[9px] text-amber-400/60 bg-amber-400/10 px-1.5 py-0.5 rounded">Requerida</span>
+          </div>
+
+          <!-- Choice results: doughnut chart -->
+          <div *ngIf="isChoiceType(q.type) && q.distribution" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div style="height: 180px;">
+              <canvas baseChart [type]="'doughnut'"
+                *ngIf="questionCharts[qi]"
+                [data]="questionCharts[qi]!.data"
+                [options]="questionCharts[qi]!.options"></canvas>
+            </div>
+            <div class="space-y-2">
+              <div *ngFor="let d of q.distribution" class="flex items-center gap-2">
+                <span class="text-xs text-white/60 flex-1 truncate">{{ d.option || d.label || d.value }}</span>
+                <div class="w-24 bg-white/[0.06] rounded-full h-1.5">
+                  <div class="bg-signal h-1.5 rounded-full" [style.width.%]="q.responseCount ? (d.count / q.responseCount * 100) : 0"></div>
+                </div>
+                <span class="text-xs text-white/40 w-12 text-right">{{ d.count }} ({{ q.responseCount ? (d.count / q.responseCount * 100 | number:'1.0-0') : 0 }}%)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rating results: bar chart -->
+          <div *ngIf="q.type === 'rating' && q.distribution">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-lg font-bold text-white">{{ q.avgRating || '—' }}</span>
+              <span class="text-xs text-white/40">promedio</span>
+              <span class="text-white/20 ml-1" *ngFor="let s of [1,2,3,4,5]">
+                {{ s <= (q.avgRating || 0) ? '★' : '☆' }}
+              </span>
+            </div>
+            <div style="height: 180px;">
+              <canvas baseChart [type]="'bar'"
+                *ngIf="ratingBarCharts[qi]"
+                [data]="ratingBarCharts[qi]!.data"
+                [options]="ratingBarCharts[qi]!.options"></canvas>
+            </div>
+          </div>
+
+          <!-- Text results -->
+          <div *ngIf="q.type === 'text' && q.textResponses" class="space-y-2 max-h-48 overflow-y-auto"
+            style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+            <div *ngFor="let resp of q.textResponses"
+              class="bg-white/[0.04] rounded-lg px-3 py-2 text-xs text-white/60">
+              "{{ resp }}"
+            </div>
+            <p *ngIf="q.textResponses.length === 0" class="text-xs text-white/30 text-center py-4">Sin respuestas de texto</p>
+          </div>
+
+          <!-- Yes/No results (bar fallback) -->
+          <div *ngIf="q.type === 'yes_no' && q.distribution" class="grid grid-cols-2 gap-3">
+            <div *ngFor="let d of q.distribution"
+              class="bg-white/[0.04] rounded-xl p-3 text-center border border-white/[0.06]">
+              <p class="text-2xl font-bold text-white">{{ d.count }}</p>
+              <p class="text-xs text-white/40 mt-1">{{ d.option || d.label || d.value }}</p>
+              <p class="text-[10px] text-white/20 mt-0.5">{{ q.responseCount ? (d.count / q.responseCount * 100 | number:'1.0-0') : 0 }}%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESPOND MODAL ===== -->
+<div *ngIf="showRespondModal && selectedSurvey"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  (click)="showRespondModal = false">
+
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" (click)="$event.stopPropagation()"
+    style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="font-display font-bold text-lg text-white">{{ selectedSurvey.title }}</h2>
+          <p *ngIf="selectedSurvey.description" class="text-xs text-white/40 mt-0.5">{{ selectedSurvey.description }}</p>
+        </div>
+        <button (click)="showRespondModal = false" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+      </div>
+
+      <div class="space-y-5">
+        <div *ngFor="let q of selectedSurvey.questions; let qi = index"
+          class="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+
+          <div class="flex items-start gap-2 mb-3">
+            <span class="text-xs font-bold text-signal mt-0.5">{{ qi + 1 }}</span>
+            <div class="flex-1">
+              <p class="text-sm text-white font-medium">{{ q.text }}</p>
+              <span class="text-[10px] text-white/30">{{ typeLabel(q.type) }}</span>
+              <span *ngIf="q.required" class="text-[9px] text-amber-400/60 ml-2">*Requerida</span>
+            </div>
+          </div>
+
+          <!-- Single choice -->
+          <div *ngIf="q.type === 'single_choice'" class="space-y-2 pl-5">
+            <label *ngFor="let opt of q.options; let oi = index"
+              class="flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer transition-colors"
+              [class]="responseAnswers[qi] === opt ? 'bg-signal/10 border border-signal/30' : 'hover:bg-white/[0.04] border border-transparent'">
+              <input type="radio" [name]="'q_' + qi" [value]="opt" [(ngModel)]="responseAnswers[qi]"
+                class="accent-signal" />
+              <span class="text-sm text-white/70">{{ opt }}</span>
+            </label>
+          </div>
+
+          <!-- Multiple choice -->
+          <div *ngIf="q.type === 'multiple_choice'" class="space-y-2 pl-5">
+            <p class="text-[10px] text-white/30 mb-2">Selecciona una o mas opciones</p>
+            <label *ngFor="let opt of q.options; let oi = index"
+              class="flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.04] border border-transparent">
+              <input type="checkbox" [value]="opt"
+                (change)="responseAnswers[qi] = responseAnswers[qi] || []; $any(responseAnswers[qi]).includes(opt) ? responseAnswers[qi].splice(responseAnswers[qi].indexOf(opt), 1) : responseAnswers[qi].push(opt)"
+                class="accent-signal" />
+              <span class="text-sm text-white/70">{{ opt }}</span>
+            </label>
+          </div>
+
+          <!-- Rating -->
+          <div *ngIf="q.type === 'rating'" class="pl-5">
+            <div class="flex items-center gap-1">
+              <button *ngFor="let star of [1,2,3,4,5]"
+                (click)="responseAnswers[qi] = star"
+                class="text-2xl transition-colors"
+                [class]="responseAnswers[qi] >= star ? 'text-amber-400' : 'text-white/15 hover:text-white/30'">
+                ★
+              </button>
+              <span *ngIf="responseAnswers[qi]" class="text-xs text-white/40 ml-2">{{ responseAnswers[qi] }}/5</span>
+            </div>
+          </div>
+
+          <!-- Yes/No -->
+          <div *ngIf="q.type === 'yes_no'" class="grid grid-cols-2 gap-3 pl-5">
+            <button (click)="responseAnswers[qi] = 'Si'"
+              [class]="responseAnswers[qi] === 'Si' ? 'bg-emerald-400/10 border-emerald-400/30 text-emerald-400' : 'bg-white/[0.04] border-white/10 text-white/50 hover:bg-white/[0.06]'"
+              class="py-3 rounded-xl border text-sm font-medium transition-all">
+              Si
+            </button>
+            <button (click)="responseAnswers[qi] = 'No'"
+              [class]="responseAnswers[qi] === 'No' ? 'bg-red-400/10 border-red-400/30 text-red-400' : 'bg-white/[0.04] border-white/10 text-white/50 hover:bg-white/[0.06]'"
+              class="py-3 rounded-xl border text-sm font-medium transition-all">
+              No
+            </button>
+          </div>
+
+          <!-- Text -->
+          <div *ngIf="q.type === 'text'" class="pl-5">
+            <textarea [(ngModel)]="responseAnswers[qi]"
+              placeholder="Escribe tu respuesta..."
+              rows="3"
+              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all resize-none"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/[0.06]">
+        <button (click)="showRespondModal = false"
+          class="px-4 py-2 text-sm text-white/50 hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button (click)="submitResponse()"
+          [disabled]="submitting"
+          class="px-5 py-2 bg-signal hover:bg-signal/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors">
+          {{ submitting ? 'Enviando…' : 'Enviar respuesta' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

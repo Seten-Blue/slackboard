@@ -1,0 +1,214 @@
+<div *ngIf="loading" class="flex items-center justify-center h-64">
+  <div class="flex items-center gap-2 text-white/40 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-signal animate-pulse"></span>
+    Cargando rendimiento…
+  </div>
+</div>
+
+<div *ngIf="!loading" class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-xl font-display font-bold text-white">Rendimiento</h2>
+      <p class="text-sm text-white/40 mt-0.5">Monitoreo en tiempo real del sistema</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="flex items-center gap-1.5 text-xs text-white/30">
+        <span class="w-1.5 h-1.5 rounded-full bg-signal animate-pulse"></span>
+        Auto-refresh 30s
+      </span>
+      <button (click)="loadAll()" class="px-3 py-1.5 text-xs font-medium text-white/60 bg-white/[0.06] border border-white/10 rounded-lg hover:bg-white/[0.1] transition-colors">
+        Actualizar
+      </button>
+    </div>
+  </div>
+
+  <!-- System Gauges -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- CPU Gauge -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col items-center">
+      <div class="gauge" [style.background]="gaugeBg(snapshot?.server?.cpu?.usagePercent || 0)">
+        <div class="gauge-inner">
+          <span class="text-2xl font-bold text-white">{{ snapshot?.server?.cpu?.usagePercent || 0 }}%</span>
+          <span class="text-[10px] text-white/40">CPU</span>
+        </div>
+      </div>
+      <div class="mt-4 text-center">
+        <p class="text-xs text-white/50 truncate max-w-[160px]">{{ snapshot?.server?.cpu?.model || 'N/A' }}</p>
+        <div class="flex items-center gap-3 mt-2 text-[10px] text-white/30">
+          <span>{{ snapshot?.server?.cpu?.cores || 0 }} nucleos</span>
+          <span>Load: {{ snapshot?.server?.cpu?.loadAvg?.[0]?.toFixed(1) || '0' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Memory Gauge -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col items-center">
+      <div class="gauge" [style.background]="gaugeBg(snapshot?.server?.memory?.usagePercent || 0)">
+        <div class="gauge-inner">
+          <span class="text-2xl font-bold text-white">{{ snapshot?.server?.memory?.usagePercent || 0 }}%</span>
+          <span class="text-[10px] text-white/40">RAM</span>
+        </div>
+      </div>
+      <div class="mt-4 text-center">
+        <p class="text-xs text-white/50">{{ formatBytes(snapshot?.server?.memory?.usedBytes || 0) }} / {{ formatBytes(snapshot?.server?.memory?.totalBytes || 0) }}</p>
+        <div class="flex items-center gap-3 mt-2 text-[10px] text-white/30">
+          <span>Proc: {{ formatBytes(snapshot?.server?.process?.rssBytes || 0) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disk Gauge -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col items-center">
+      <div class="gauge" [style.background]="gaugeBg(snapshot?.server?.disk?.usagePercent || 0)">
+        <div class="gauge-inner">
+          <span class="text-2xl font-bold text-white">{{ snapshot?.server?.disk?.usagePercent || 0 }}%</span>
+          <span class="text-[10px] text-white/40">Disco</span>
+        </div>
+      </div>
+      <div class="mt-4 text-center">
+        <p class="text-xs text-white/50">{{ formatKB(snapshot?.server?.disk?.usedKB || 0) }} / {{ formatKB(snapshot?.server?.disk?.totalKB || 0) }}</p>
+        <div class="flex items-center gap-3 mt-2 text-[10px] text-white/30">
+          <span>Libre: {{ formatKB(snapshot?.server?.disk?.freeKB || 0) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Server Info Row -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Uptime -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm">&#9201;</span>
+        <span class="text-xs font-medium text-white/50">Uptime del servidor</span>
+      </div>
+      <p class="text-3xl font-bold text-white">{{ formatUptime(snapshot?.server?.uptimeSeconds || 0) }}</p>
+      <p class="text-xs text-white/30 mt-1">Node {{ snapshot?.server?.nodeVersion || '' }}</p>
+    </div>
+
+    <!-- Database -->
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm">&#128451;</span>
+        <span class="text-xs font-medium text-white/50">Base de datos</span>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <p class="text-[10px] text-white/30 uppercase tracking-wider">Latencia</p>
+          <p class="text-lg font-bold text-white">{{ formatMs(snapshot?.database?.latencyMs || 0) }}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-white/30 uppercase tracking-wider">Colecciones</p>
+          <p class="text-lg font-bold text-white">{{ snapshot?.database?.collectionsCount || 0 }}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-white/30 uppercase tracking-wider">Documentos</p>
+          <p class="text-lg font-bold text-white">{{ snapshot?.database?.totalDocuments || 0 }}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-white/30 uppercase tracking-wider">Tamano</p>
+          <p class="text-lg font-bold text-white">{{ formatBytes(snapshot?.database?.databaseSizeBytes || 0) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <h3 class="text-xs font-medium text-white/50 mb-3">CPU (ultimas 24h)</h3>
+      <div class="chart-container" *ngIf="cpuChartData">
+        <canvas baseChart [type]="'line'" [data]="cpuChartData" [options]="chartOptions"></canvas>
+      </div>
+      <div *ngIf="!cpuChartData" class="chart-container flex items-center justify-center text-white/20 text-xs">Sin datos</div>
+    </div>
+
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <h3 class="text-xs font-medium text-white/50 mb-3">Memoria (ultimas 24h)</h3>
+      <div class="chart-container" *ngIf="memoryChartData">
+        <canvas baseChart [type]="'line'" [data]="memoryChartData" [options]="chartOptions"></canvas>
+      </div>
+      <div *ngIf="!memoryChartData" class="chart-container flex items-center justify-center text-white/20 text-xs">Sin datos</div>
+    </div>
+
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <h3 class="text-xs font-medium text-white/50 mb-3">Latencia DB (ultimas 24h)</h3>
+      <div class="chart-container" *ngIf="dbLatencyChartData">
+        <canvas baseChart [type]="'line'" [data]="dbLatencyChartData" [options]="chartOptions"></canvas>
+      </div>
+      <div *ngIf="!dbLatencyChartData" class="chart-container flex items-center justify-center text-white/20 text-xs">Sin datos</div>
+    </div>
+  </div>
+
+  <!-- Integrations Grid -->
+  <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+    <h3 class="text-xs font-medium text-white/50 mb-4">Integraciones</h3>
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      <div *ngFor="let integ of (snapshot?.integrations || [])"
+           class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+        <span class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+              [style.background]="'rgba(255,255,255,0.06)'"
+              [style.color]="statusColor(integ.configured)">
+          {{ integrationIcon(integ.name) }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full" [style.background]="statusColor(integ.configured)"></span>
+            <p class="text-xs font-medium text-white">{{ integ.name }}</p>
+          </div>
+          <p class="text-[10px] text-white/30 mt-0.5">{{ integ.latencyMs ? formatMs(integ.latencyMs) : '—' }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebSocket Stats -->
+  <div class="grid grid-cols-1 gap-4">
+    <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm">&#9889;</span>
+        <span class="text-xs font-medium text-white/50">WebSocket</span>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <p class="text-[10px] text-white/30 uppercase tracking-wider">Conexiones activas</p>
+          <p class="text-xl font-bold text-white">{{ snapshot?.websocket?.activeConnections || 0 }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottleneck Alerts -->
+  <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-2xl p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-xs font-medium text-white/50">Alertas de cuello de botella</h3>
+      <span *ngIf="alerts.length" class="text-[10px] text-white/30 bg-white/[0.06] px-2 py-0.5 rounded-full">{{ alerts.length }}</span>
+    </div>
+    <div *ngIf="alerts.length" class="space-y-2">
+      <div *ngFor="let alert of alerts" class="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+        <span class="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold mt-0.5 shrink-0"
+              [style.background]="severityColor(alert.severity) + '20'"
+              [style.color]="severityColor(alert.severity)">
+          {{ severityIcon(alert.severity) }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-white capitalize">{{ alert.metric }}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                  [style.background]="severityColor(alert.severity) + '20'"
+                  [style.color]="severityColor(alert.severity)">
+              {{ alert.severity }}
+            </span>
+          </div>
+          <p class="text-xs text-white/40 mt-0.5">{{ alert.value }}% de uso</p>
+        </div>
+        <span class="text-[10px] text-white/20 shrink-0 mt-0.5">{{ timeAgo(alert.detectedAt) }}</span>
+      </div>
+    </div>
+    <div *ngIf="!alerts.length" class="flex items-center justify-center py-8">
+      <p class="text-sm text-white/20">No hay alertas activas</p>
+    </div>
+  </div>
+</div>

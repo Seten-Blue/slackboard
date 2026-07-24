@@ -5,10 +5,22 @@
       <span *ngIf="activeView === 'activity'">Vista general de actividad en tiempo real</span>
       <span *ngIf="activeView === 'traffic'">Trafico de datos, recursos e integraciones</span>
       <span *ngIf="activeView === 'stats'">Estadisticas, tendencias y analisis</span>
+      <span *ngIf="activeView === 'reports'">Reportes de analisis y metricas</span>
+      <span *ngIf="activeView === 'tasks'">Gestion de tareas y flujo de trabajo del equipo</span>
+      <span *ngIf="activeView === 'surveys'">Encuestas y retroalimentacion del equipo</span>
+      <span *ngIf="activeView === 'audit'">Registro de actividades y auditoria del sistema</span>
+      <span *ngIf="activeView === 'performance'">Monitoreo de rendimiento en tiempo real</span>
+      <span *ngIf="activeView === 'ai-metrics'">Metricas de uso, costos y rendimiento de IA</span>
     </p>
   </div>
 
   <app-dashboard-activity *ngIf="activeView === 'activity'"></app-dashboard-activity>
   <app-dashboard-traffic *ngIf="activeView === 'traffic'"></app-dashboard-traffic>
   <app-dashboard-statistics *ngIf="activeView === 'stats'"></app-dashboard-statistics>
+  <app-dashboard-performance *ngIf="activeView === 'performance'"></app-dashboard-performance>
+  <app-dashboard-reports *ngIf="activeView === 'reports'"></app-dashboard-reports>
+  <app-dashboard-tasks *ngIf="activeView === 'tasks'"></app-dashboard-tasks>
+  <app-dashboard-surveys *ngIf="activeView === 'surveys'"></app-dashboard-surveys>
+  <app-dashboard-audit *ngIf="activeView === 'audit'"></app-dashboard-audit>
+  <app-dashboard-ai-metrics *ngIf="activeView === 'ai-metrics'"></app-dashboard-ai-metrics>
 </div>

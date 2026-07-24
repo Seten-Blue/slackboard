@@ -1,0 +1,262 @@
+<div class="min-h-full p-6 space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Auditoria</h1>
+      <p class="text-sm text-white/50 mt-1">Registro de actividad y eventos del sistema</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          (keyup.enter)="onSearch()"
+          placeholder="Buscar en registros..."
+          class="w-64 pl-10 pr-4 py-2 rounded-lg bg-white/[0.06] border border-white/10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-signal/50 transition-colors"
+        />
+      </div>
+      <div class="flex rounded-lg bg-white/[0.06] border border-white/10 p-0.5">
+        <button
+          (click)="activeTab = 'logs'"
+          [class]="activeTab === 'logs' ? 'bg-signal/20 text-signal border-signal/30' : 'text-white/50 border-transparent'"
+          class="px-3 py-1.5 text-sm font-medium rounded-md border transition-all"
+        >
+          Registro
+        </button>
+        <button
+          (click)="activeTab = 'stats'"
+          [class]="activeTab === 'stats' ? 'bg-signal/20 text-signal border-signal/30' : 'text-white/50 border-transparent'"
+          class="px-3 py-1.5 text-sm font-medium rounded-md border transition-all"
+        >
+          Estadisticas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="flex flex-wrap items-center gap-3">
+    <select
+      [(ngModel)]="filterCategory"
+      (change)="onFilter()"
+      class="px-3 py-2 rounded-lg bg-white/[0.06] border border-white/10 text-white text-sm focus:outline-none focus:border-signal/50 transition-colors appearance-none cursor-pointer"
+    >
+      <option value="" class="bg-gray-900">Todas las categorias</option>
+      <option value="auth" class="bg-gray-900">Auth</option>
+      <option value="permissions" class="bg-gray-900">Permisos</option>
+      <option value="config" class="bg-gray-900">Configuracion</option>
+      <option value="create" class="bg-gray-900">Creacion</option>
+      <option value="modify" class="bg-gray-900">Modificacion</option>
+      <option value="delete" class="bg-gray-900">Eliminacion</option>
+      <option value="access" class="bg-gray-900">Acceso</option>
+      <option value="integration" class="bg-gray-900">Integracion</option>
+      <option value="api" class="bg-gray-900">API</option>
+      <option value="ai" class="bg-gray-900">IA</option>
+    </select>
+
+    <div class="flex rounded-lg bg-white/[0.06] border border-white/10 p-0.5">
+      <button
+        (click)="filterSuccess = ''; onFilter()"
+        [class]="filterSuccess === '' ? 'bg-signal/20 text-signal border-signal/30' : 'text-white/50 border-transparent'"
+        class="px-3 py-1.5 text-xs font-medium rounded-md border transition-all"
+      >
+        Todos
+      </button>
+      <button
+        (click)="filterSuccess = 'true'; onFilter()"
+        [class]="filterSuccess === 'true' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'text-white/50 border-transparent'"
+        class="px-3 py-1.5 text-xs font-medium rounded-md border transition-all"
+      >
+        Exitosos
+      </button>
+      <button
+        (click)="filterSuccess = 'false'; onFilter()"
+        [class]="filterSuccess === 'false' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'text-white/50 border-transparent'"
+        class="px-3 py-1.5 text-xs font-medium rounded-md border transition-all"
+      >
+        Fallidos
+      </button>
+    </div>
+
+    <span class="text-xs text-white/30 ml-1">{{ logs.length }} registros</span>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="flex items-center justify-center py-20">
+    <div class="flex items-center gap-3 text-white/50">
+      <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <span class="text-sm">Cargando registros...</span>
+    </div>
+  </div>
+
+  <!-- ==================== LOGS TAB ==================== -->
+  <ng-container *ngIf="!loading && activeTab === 'logs'">
+
+    <!-- Empty State -->
+    <div *ngIf="logs.length === 0" class="flex flex-col items-center justify-center py-20">
+      <svg class="w-16 h-16 text-white/10 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p class="text-white/50 text-sm font-medium">No se encontraron registros</p>
+      <p class="text-white/30 text-xs mt-1">Intenta ajustar los filtros o la busqueda</p>
+    </div>
+
+    <!-- Log List -->
+    <div *ngIf="logs.length > 0" class="space-y-2">
+      <div
+        *ngFor="let log of logs"
+        class="flex items-center gap-4 p-4 rounded-xl bg-white/[0.06] border border-white/[0.06] hover:bg-white/[0.09] transition-colors group"
+      >
+        <!-- Category Icon -->
+        <div [class]="categoryColor(log.category)" class="flex-shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center text-base">
+          {{ categoryIcon(log.category) }}
+        </div>
+
+        <!-- Log Content -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span [class]="categoryColor(log.category)" class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border">
+              {{ log.category }}
+            </span>
+            <span class="text-white/30 text-xs">{{ formatDate(log.timestamp || log.createdAt) }}</span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-white font-medium text-sm truncate">{{ log.actor?.name || 'Sistema' }}</span>
+            <span class="text-white/50 text-sm">{{ log.action }}</span>
+          </div>
+          <p *ngIf="log.target" class="text-white/30 text-xs mt-1 truncate">{{ log.target }}</p>
+        </div>
+
+        <!-- Time & Status -->
+        <div class="flex-shrink-0 flex items-center gap-3">
+          <span class="text-white/30 text-xs whitespace-nowrap">{{ timeAgo(log.timestamp || log.createdAt) }}</span>
+          <div
+            [class]="log.success !== false ? 'bg-emerald-400' : 'bg-red-400'"
+            class="w-2 h-2 rounded-full"
+            [title]="log.success !== false ? 'Exitoso' : 'Fallido'"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div *ngIf="logs.length > 0 && totalPages > 1" class="flex items-center justify-center gap-4 pt-4">
+      <button
+        (click)="prevPage()"
+        [disabled]="currentPage <= 1"
+        class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border transition-all"
+        [class]="currentPage <= 1 ? 'text-white/20 bg-white/[0.03] border-white/[0.04] cursor-not-allowed' : 'text-white/60 bg-white/[0.06] border-white/10 hover:bg-white/10'"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Anterior
+      </button>
+      <span class="text-sm text-white/40">Pagina {{ currentPage }} de {{ totalPages }}</span>
+      <button
+        (click)="nextPage()"
+        [disabled]="currentPage >= totalPages"
+        class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border transition-all"
+        [class]="currentPage >= totalPages ? 'text-white/20 bg-white/[0.03] border-white/[0.04] cursor-not-allowed' : 'text-white/60 bg-white/[0.06] border-white/10 hover:bg-white/10'"
+      >
+        Siguiente
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  </ng-container>
+
+  <!-- ==================== STATS TAB ==================== -->
+  <ng-container *ngIf="!loading && activeTab === 'stats'">
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="p-4 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+        <p class="text-xs text-white/40 uppercase tracking-wider font-medium">Total registros</p>
+        <p class="text-2xl font-bold text-white mt-2">{{ stats?.totalLogs || 0 }}</p>
+        <p class="text-xs text-white/30 mt-1">{{ stats?.successRate != null ? (stats.successRate | number:'1.1-1') : '--' }}% exitosos</p>
+      </div>
+      <div class="p-4 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+        <p class="text-xs text-white/40 uppercase tracking-wider font-medium">Registros fallidos</p>
+        <p class="text-2xl font-bold text-red-400 mt-2">{{ stats?.failedLogs || 0 }}</p>
+        <p class="text-xs text-white/30 mt-1">Requieren atencion</p>
+      </div>
+      <div class="p-4 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+        <p class="text-xs text-white/40 uppercase tracking-wider font-medium">Categorias activas</p>
+        <p class="text-2xl font-bold text-signal mt-2">{{ stats?.byCategory?.length || 0 }}</p>
+        <p class="text-xs text-white/30 mt-1">Categorias registradas</p>
+      </div>
+      <div class="p-4 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+        <p class="text-xs text-white/40 uppercase tracking-wider font-medium">Actividad ultimas 24h</p>
+        <p class="text-2xl font-bold text-amber-400 mt-2">{{ stats?.last24h || 0 }}</p>
+        <p class="text-xs text-white/30 mt-1">Eventos recientes</p>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+      <!-- Category Doughnut -->
+      <div class="p-5 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white mb-4">Distribucion por categoria</h3>
+        <div *ngIf="categoryChartData" class="h-64">
+          <canvas baseChart [data]="categoryChartData" [options]="doughnutOptions" type="doughnut"></canvas>
+        </div>
+        <div *ngIf="!categoryChartData" class="h-64 flex items-center justify-center">
+          <p class="text-white/30 text-sm">Sin datos disponibles</p>
+        </div>
+      </div>
+
+      <!-- Timeline Line -->
+      <div class="p-5 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white mb-4">Actividad por hora (24h)</h3>
+        <div *ngIf="timelineChartData" class="h-64">
+          <canvas baseChart [data]="timelineChartData" [options]="chartOptions" type="line"></canvas>
+        </div>
+        <div *ngIf="!timelineChartData" class="h-64 flex items-center justify-center">
+          <p class="text-white/30 text-sm">Sin datos disponibles</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Actors -->
+    <div class="p-5 rounded-xl bg-white/[0.06] border border-white/[0.06]">
+      <h3 class="text-sm font-semibold text-white mb-4">Principales usuarios</h3>
+      <div *ngIf="stats?.topActors && stats.topActors.length > 0" class="space-y-3">
+        <div
+          *ngFor="let actor of topActors; let i = index"
+          class="flex items-center gap-4"
+        >
+          <span class="w-5 text-xs text-white/30 font-mono text-right">{{ i + 1 }}</span>
+          <div class="w-8 h-8 rounded-full bg-signal/20 border border-signal/30 flex items-center justify-center text-signal text-xs font-bold">
+            {{ (actor._id || '?').charAt(0) | uppercase }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-white font-medium truncate">{{ actor._id || 'Desconocido' }}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                class="h-full rounded-full bg-signal/60 transition-all"
+                [style.width.%]="topActors.length > 0 ? (actor.count / topActors[0].count * 100) : 0"
+              ></div>
+            </div>
+            <span class="text-xs text-white/40 font-mono w-10 text-right">{{ actor.count }}</span>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="!stats?.topActors || stats.topActors.length === 0" class="py-6 text-center">
+        <p class="text-white/30 text-sm">Sin datos de usuarios</p>
+      </div>
+    </div>
+  </ng-container>
+
+</div>

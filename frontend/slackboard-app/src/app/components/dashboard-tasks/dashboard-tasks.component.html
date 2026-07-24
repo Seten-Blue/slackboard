@@ -1,0 +1,784 @@
+<div class="h-full overflow-y-auto p-6 space-y-6" style="scrollbar-width: none; -ms-overflow-style: none;">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="font-display font-bold text-lg text-white">Tareas</h1>
+      <p class="text-sm text-white/50 mt-0.5">Gestiona el flujo de trabajo del equipo</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex bg-white/[0.06] rounded-xl p-1 border border-white/10">
+        <button
+          (click)="activeTab = 'board'"
+          [class]="activeTab === 'board' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Kanban
+        </button>
+        <button
+          (click)="activeTab = 'list'"
+          [class]="activeTab === 'list' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Lista
+        </button>
+        <button
+          (click)="activeTab = 'stats'"
+          [class]="activeTab === 'stats' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          Estadisticas
+        </button>
+      </div>
+      <button
+        (click)="showCreateModal = true"
+        class="px-4 py-2 bg-signal hover:bg-signal/80 text-white text-sm font-medium rounded-xl transition-colors">
+        + Nueva Tarea
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div *ngIf="activeTab !== 'stats'" class="flex items-center gap-3 flex-wrap">
+    <select [(ngModel)]="filterStatus" (change)="loadTasks()"
+      class="px-3 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 transition-all appearance-none pr-8">
+      <option value="" class="bg-[#1a1a2e]">Todos los estados</option>
+      <option value="pending" class="bg-[#1a1a2e]">Pendiente</option>
+      <option value="in_progress" class="bg-[#1a1a2e]">En progreso</option>
+      <option value="completed" class="bg-[#1a1a2e]">Completada</option>
+      <option value="cancelled" class="bg-[#1a1a2e]">Cancelada</option>
+    </select>
+    <select [(ngModel)]="filterPriority" (change)="loadTasks()"
+      class="px-3 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 transition-all appearance-none pr-8">
+      <option value="" class="bg-[#1a1a2e]">Todas las prioridades</option>
+      <option value="urgent" class="bg-[#1a1a2e]">Urgente</option>
+      <option value="high" class="bg-[#1a1a2e]">Alta</option>
+      <option value="medium" class="bg-[#1a1a2e]">Media</option>
+      <option value="low" class="bg-[#1a1a2e]">Baja</option>
+    </select>
+    <input type="text" [(ngModel)]="filterAssignee" (change)="loadTasks()" placeholder="Filtrar por asignado..."
+      class="px-3 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 transition-all" />
+    <button *ngIf="filterStatus || filterPriority || filterAssignee"
+      (click)="filterStatus = ''; filterPriority = ''; filterAssignee = ''; loadTasks()"
+      class="px-3 py-2 text-xs text-white/40 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-xl transition-colors">
+      Limpiar filtros
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="flex items-center justify-center h-64">
+    <div class="flex items-center gap-2 text-white/30 text-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-signal animate-pulse"></span>
+      Cargando tareas...
+    </div>
+  </div>
+
+  <!-- ==================== BOARD VIEW ==================== -->
+  <div *ngIf="!loading && activeTab === 'board'" class="flex gap-4 overflow-x-auto pb-4" style="min-height: 400px;">
+
+    <!-- Pending column -->
+    <div class="w-72 flex-shrink-0 flex flex-col">
+      <div class="flex items-center justify-between px-3 py-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <h3 class="text-sm font-semibold text-white/80">Pendiente</h3>
+        </div>
+        <span class="text-[11px] font-mono text-white/30 bg-white/[0.06] px-2 py-0.5 rounded-full">{{ pendingTasks.length }}</span>
+      </div>
+      <div class="flex-1 space-y-2 overflow-y-auto">
+        <div *ngIf="pendingTasks.length === 0" class="flex items-center justify-center h-24 text-xs text-white/20 border border-dashed border-white/10 rounded-xl">
+          Sin tareas pendientes
+        </div>
+        <div *ngFor="let task of pendingTasks"
+          (click)="viewTask(task)"
+          class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-xl p-3.5 cursor-pointer hover:border-white/20 hover:bg-white/[0.08] transition-all group">
+          <div class="flex items-start justify-between mb-2">
+            <h4 class="text-sm font-medium text-white leading-snug flex-1 pr-2">{{ task.title }}</h4>
+            <span [class]="'text-[10px] font-medium px-1.5 py-0.5 rounded-md border flex-shrink-0 ' + priorityColor(task.priority)">
+              {{ priorityLabel(task.priority) }}
+            </span>
+          </div>
+          <p *ngIf="task.description" class="text-xs text-white/30 line-clamp-2 mb-2">{{ task.description }}</p>
+          <div class="flex items-center gap-1.5 flex-wrap mb-2" *ngIf="task.tags?.length">
+            <span *ngFor="let tag of task.tags | slice:0:3"
+              class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/40 border border-white/[0.06]">
+              {{ tag }}
+            </span>
+            <span *ngIf="task.tags.length > 3" class="text-[10px] text-white/20">+{{ task.tags.length - 3 }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <img *ngIf="task.assignee"
+                [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + task.assignee"
+                class="w-5 h-5 rounded-full border border-white/10">
+              <span *ngIf="task.assignee" class="text-[10px] text-white/30">{{ task.assignee }}</span>
+              <span *ngIf="!task.assignee" class="text-[10px] text-white/20">Sin asignar</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span *ngIf="task.dueDate"
+                [class]="'text-[10px] font-mono px-1.5 py-0.5 rounded ' + (isOverdue(task) ? 'bg-red-400/10 text-red-400' : 'text-white/30 bg-white/[0.04]')">
+                {{ formatDate(task.dueDate) }}
+              </span>
+              <span *ngIf="task.estimatedHours" class="text-[10px] text-white/20" title="Tiempo estimado">
+                {{ formatHours(task.estimatedHours) }}
+              </span>
+            </div>
+          </div>
+          <div *ngIf="task.subtasks?.length" class="mt-2 pt-2 border-t border-white/[0.06]">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div class="h-full bg-signal rounded-full transition-all" [style.width.%]="subtaskProgress(task)"></div>
+              </div>
+              <span class="text-[10px] text-white/25 font-mono">{{ subtaskProgress(task) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- In Progress column -->
+    <div class="w-72 flex-shrink-0 flex flex-col">
+      <div class="flex items-center justify-between px-3 py-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          <h3 class="text-sm font-semibold text-white/80">En progreso</h3>
+        </div>
+        <span class="text-[11px] font-mono text-white/30 bg-white/[0.06] px-2 py-0.5 rounded-full">{{ inProgressTasks.length }}</span>
+      </div>
+      <div class="flex-1 space-y-2 overflow-y-auto">
+        <div *ngIf="inProgressTasks.length === 0" class="flex items-center justify-center h-24 text-xs text-white/20 border border-dashed border-white/10 rounded-xl">
+          Sin tareas en progreso
+        </div>
+        <div *ngFor="let task of inProgressTasks"
+          (click)="viewTask(task)"
+          class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-xl p-3.5 cursor-pointer hover:border-white/20 hover:bg-white/[0.08] transition-all group">
+          <div class="flex items-start justify-between mb-2">
+            <h4 class="text-sm font-medium text-white leading-snug flex-1 pr-2">{{ task.title }}</h4>
+            <span [class]="'text-[10px] font-medium px-1.5 py-0.5 rounded-md border flex-shrink-0 ' + priorityColor(task.priority)">
+              {{ priorityLabel(task.priority) }}
+            </span>
+          </div>
+          <p *ngIf="task.description" class="text-xs text-white/30 line-clamp-2 mb-2">{{ task.description }}</p>
+          <div class="flex items-center gap-1.5 flex-wrap mb-2" *ngIf="task.tags?.length">
+            <span *ngFor="let tag of task.tags | slice:0:3"
+              class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/40 border border-white/[0.06]">
+              {{ tag }}
+            </span>
+            <span *ngIf="task.tags.length > 3" class="text-[10px] text-white/20">+{{ task.tags.length - 3 }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <img *ngIf="task.assignee"
+                [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + task.assignee"
+                class="w-5 h-5 rounded-full border border-white/10">
+              <span *ngIf="task.assignee" class="text-[10px] text-white/30">{{ task.assignee }}</span>
+              <span *ngIf="!task.assignee" class="text-[10px] text-white/20">Sin asignar</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span *ngIf="task.dueDate"
+                [class]="'text-[10px] font-mono px-1.5 py-0.5 rounded ' + (isOverdue(task) ? 'bg-red-400/10 text-red-400' : 'text-white/30 bg-white/[0.04]')">
+                {{ formatDate(task.dueDate) }}
+              </span>
+              <button (click)="toggleTimer(task._id); $event.stopPropagation()"
+                [class]="'text-[10px] font-mono px-1.5 py-0.5 rounded transition-colors ' + (runningTimers[task._id] ? 'bg-emerald-400/10 text-emerald-400' : 'text-white/25 bg-white/[0.04] hover:bg-white/[0.08]')"
+                [title]="runningTimers[task._id] ? 'Detener cronometro' : 'Iniciar cronometro'">
+                {{ runningTimers[task._id] ? '||' : '&#9654;' }}
+              </button>
+            </div>
+          </div>
+          <div *ngIf="task.subtasks?.length" class="mt-2 pt-2 border-t border-white/[0.06]">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div class="h-full bg-signal rounded-full transition-all" [style.width.%]="subtaskProgress(task)"></div>
+              </div>
+              <span class="text-[10px] text-white/25 font-mono">{{ subtaskProgress(task) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Completed column -->
+    <div class="w-72 flex-shrink-0 flex flex-col">
+      <div class="flex items-center justify-between px-3 py-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <h3 class="text-sm font-semibold text-white/80">Completada</h3>
+        </div>
+        <span class="text-[11px] font-mono text-white/30 bg-white/[0.06] px-2 py-0.5 rounded-full">{{ completedTasks.length }}</span>
+      </div>
+      <div class="flex-1 space-y-2 overflow-y-auto">
+        <div *ngIf="completedTasks.length === 0" class="flex items-center justify-center h-24 text-xs text-white/20 border border-dashed border-white/10 rounded-xl">
+          Sin tareas completadas
+        </div>
+        <div *ngFor="let task of completedTasks"
+          (click)="viewTask(task)"
+          class="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-xl p-3.5 cursor-pointer hover:border-white/10 hover:bg-white/[0.06] transition-all group opacity-70 hover:opacity-100">
+          <div class="flex items-start justify-between mb-2">
+            <h4 class="text-sm font-medium text-white/70 leading-snug flex-1 pr-2 line-through decoration-white/20">{{ task.title }}</h4>
+            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-md border flex-shrink-0 text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+              Listo
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <img *ngIf="task.assignee"
+                [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + task.assignee"
+                class="w-5 h-5 rounded-full border border-white/10">
+              <span *ngIf="task.assignee" class="text-[10px] text-white/30">{{ task.assignee }}</span>
+            </div>
+            <span *ngIf="task.completedAt" class="text-[10px] text-white/20">{{ formatDate(task.completedAt) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cancelled column -->
+    <div class="w-72 flex-shrink-0 flex flex-col">
+      <div class="flex items-center justify-between px-3 py-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-white/20"></span>
+          <h3 class="text-sm font-semibold text-white/60">Cancelada</h3>
+        </div>
+        <span class="text-[11px] font-mono text-white/20 bg-white/[0.04] px-2 py-0.5 rounded-full">{{ cancelledTasks.length }}</span>
+      </div>
+      <div class="flex-1 space-y-2 overflow-y-auto">
+        <div *ngIf="cancelledTasks.length === 0" class="flex items-center justify-center h-24 text-xs text-white/15 border border-dashed border-white/[0.06] rounded-xl">
+          Sin tareas canceladas
+        </div>
+        <div *ngFor="let task of cancelledTasks"
+          (click)="viewTask(task)"
+          class="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 cursor-pointer hover:bg-white/[0.05] transition-all group opacity-50 hover:opacity-70">
+          <div class="flex items-start justify-between mb-2">
+            <h4 class="text-sm font-medium text-white/40 leading-snug flex-1 pr-2 line-through decoration-white/10">{{ task.title }}</h4>
+            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-md border flex-shrink-0 text-white/30 bg-white/[0.03] border-white/[0.06]">
+              Cancelada
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <img *ngIf="task.assignee"
+                [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + task.assignee"
+                class="w-5 h-5 rounded-full border border-white/10 opacity-50">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LIST VIEW ==================== -->
+  <div *ngIf="!loading && activeTab === 'list'">
+    <div *ngIf="tasks.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center mb-4">
+        <span class="text-2xl">📋</span>
+      </div>
+      <p class="text-white/60 font-medium">Sin tareas</p>
+      <p class="text-white/30 text-sm mt-1">Crea tu primera tarea para empezar</p>
+      <button (click)="showCreateModal = true" class="mt-4 px-4 py-2 bg-signal/10 hover:bg-signal/20 text-signal text-sm font-medium rounded-xl transition-colors border border-signal/20">
+        + Crear tarea
+      </button>
+    </div>
+
+    <div *ngIf="tasks.length > 0" class="bg-white/[0.04] rounded-2xl border border-white/[0.06] overflow-hidden">
+      <!-- Table header -->
+      <div class="grid grid-cols-12 gap-3 px-5 py-3 border-b border-white/[0.06] text-[11px] font-medium text-white/40 uppercase tracking-wider">
+        <div class="col-span-4">Tarea</div>
+        <div class="col-span-2">Estado</div>
+        <div class="col-span-2">Prioridad</div>
+        <div class="col-span-1">Asignado</div>
+        <div class="col-span-1 text-center">Vence</div>
+        <div class="col-span-1 text-center">Tiempo</div>
+        <div class="col-span-1 text-right">Acciones</div>
+      </div>
+
+      <!-- Table rows -->
+      <div *ngFor="let task of tasks; let last = last"
+        class="grid grid-cols-12 gap-3 px-5 py-3 items-center hover:bg-white/[0.04] transition-colors cursor-pointer"
+        [class.border-b]="!last"
+        [class.border-b-0]="last"
+        [class.border-b]="!last"
+        [style.border-bottom-color]="last ? 'transparent' : 'rgba(255,255,255,0.04)'"
+        (click)="viewTask(task)">
+        <!-- Title -->
+        <div class="col-span-4 min-w-0">
+          <p class="text-sm text-white font-medium truncate">{{ task.title }}</p>
+          <p *ngIf="task.description" class="text-[11px] text-white/30 truncate mt-0.5">{{ task.description }}</p>
+          <div *ngIf="task.tags?.length" class="flex gap-1 mt-1">
+            <span *ngFor="let tag of task.tags | slice:0:2"
+              class="text-[9px] px-1 py-0.5 rounded bg-white/[0.06] text-white/30">{{ tag }}</span>
+          </div>
+        </div>
+        <!-- Status -->
+        <div class="col-span-2">
+          <span [class]="'text-[10px] font-medium px-2 py-0.5 rounded-full border ' + statusColor(task.status)">
+            {{ statusLabel(task.status) }}
+          </span>
+        </div>
+        <!-- Priority -->
+        <div class="col-span-2">
+          <span [class]="'text-[10px] font-medium px-2 py-0.5 rounded-md border ' + priorityColor(task.priority)">
+            {{ priorityLabel(task.priority) }}
+          </span>
+        </div>
+        <!-- Assignee -->
+        <div class="col-span-1">
+          <div *ngIf="task.assignee" class="flex items-center gap-1.5">
+            <img [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + task.assignee"
+              class="w-5 h-5 rounded-full border border-white/10">
+            <span class="text-[11px] text-white/40 truncate">{{ task.assignee }}</span>
+          </div>
+          <span *ngIf="!task.assignee" class="text-[11px] text-white/20">--</span>
+        </div>
+        <!-- Due date -->
+        <div class="col-span-1 text-center">
+          <span *ngIf="task.dueDate"
+            [class]="'text-[11px] font-mono ' + (isOverdue(task) ? 'text-red-400' : 'text-white/30')">
+            {{ formatDate(task.dueDate) }}
+          </span>
+          <span *ngIf="!task.dueDate" class="text-[11px] text-white/15">--</span>
+        </div>
+        <!-- Time tracked -->
+        <div class="col-span-1 text-center">
+          <span class="text-[11px] font-mono text-white/30">{{ formatHours(totalTrackedMinutes(task) / 60) }}</span>
+        </div>
+        <!-- Actions -->
+        <div class="col-span-1 text-right">
+          <div class="flex items-center justify-end gap-1" (click)="$event.stopPropagation()">
+            <button (click)="toggleTimer(task._id)"
+              [class]="'w-6 h-6 rounded text-[10px] flex items-center justify-center transition-colors ' + (runningTimers[task._id] ? 'bg-emerald-400/10 text-emerald-400' : 'text-white/20 hover:text-white/50 hover:bg-white/[0.06]')"
+              [title]="runningTimers[task._id] ? 'Detener' : 'Cronometro'">
+              {{ runningTimers[task._id] ? '||' : '&#9654;' }}
+            </button>
+            <button *ngIf="task.status === 'pending'"
+              (click)="changeStatus(task._id, 'in_progress')"
+              class="w-6 h-6 rounded text-[10px] text-blue-400/40 hover:text-blue-400 hover:bg-blue-400/10 flex items-center justify-center transition-colors"
+              title="Iniciar">
+              &#9654;
+            </button>
+            <button *ngIf="task.status === 'in_progress'"
+              (click)="changeStatus(task._id, 'completed')"
+              class="w-6 h-6 rounded text-[10px] text-emerald-400/40 hover:text-emerald-400 hover:bg-emerald-400/10 flex items-center justify-center transition-colors"
+              title="Completar">
+              &#10003;
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STATS VIEW ==================== -->
+  <div *ngIf="!loading && activeTab === 'stats'" class="space-y-6">
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-sm">📋</span>
+          <span class="text-xs font-medium text-white/50">Total tareas</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ stats?.total || 0 }}</p>
+        <p class="text-[11px] text-white/30 mt-1">{{ stats?.totalActive || 0 }} activas</p>
+      </div>
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-sm">✅</span>
+          <span class="text-xs font-medium text-white/50">Completadas</span>
+        </div>
+        <p class="text-2xl font-bold text-emerald-400">{{ stats?.completed || 0 }}</p>
+        <p class="text-[11px] text-white/30 mt-1">{{ stats?.completionRate || 0 }}% tasa</p>
+      </div>
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-sm">⏰</span>
+          <span class="text-xs font-medium text-white/50">Vencidas</span>
+        </div>
+        <p class="text-2xl font-bold text-red-400">{{ stats?.overdue || 0 }}</p>
+        <p class="text-[11px] text-white/30 mt-1">{{ stats?.overdueToday || 0 }} vencen hoy</p>
+      </div>
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-sm">⏱️</span>
+          <span class="text-xs font-medium text-white/50">Tiempo prom. completion</span>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ formatHours(stats?.avgCompletionHours || 0) }}</p>
+        <p class="text-[11px] text-white/30 mt-1">{{ stats?.avgCompletionDays || 0 }} dias</p>
+      </div>
+    </div>
+
+    <!-- Charts row 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Priority doughnut -->
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <h3 class="text-sm font-semibold text-white mb-4">Tareas por prioridad</h3>
+        <div style="height: 240px;">
+          <canvas baseChart [type]="'doughnut'" [data]="priorityChart.data" [options]="priorityChart.options"></canvas>
+        </div>
+      </div>
+
+      <!-- Hours doughnut -->
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <h3 class="text-sm font-semibold text-white mb-4">Horas rastreadas vs estimadas</h3>
+        <div class="flex items-center gap-6">
+          <div style="height: 200px; width: 200px; flex-shrink: 0;">
+            <canvas baseChart [type]="'doughnut'" [data]="hoursChart.data" [options]="hoursChart.options"></canvas>
+          </div>
+          <div class="space-y-3 flex-1">
+            <div>
+              <p class="text-[11px] text-white/40">Rastreado</p>
+              <p class="text-lg font-bold text-signal">{{ formatHours(stats?.totalTrackedHours || 0) }}</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-white/40">Estimado</p>
+              <p class="text-lg font-bold text-white">{{ formatHours(stats?.totalEstimatedHours || 0) }}</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-white/40">Diferencia</p>
+              <p [class]="'text-lg font-bold ' + ((stats?.totalTrackedHours || 0) > (stats?.totalEstimatedHours || 0) ? 'text-red-400' : 'text-emerald-400')">
+                {{ formatHours(abs((stats?.totalTrackedHours || 0) - (stats?.totalEstimatedHours || 0))) }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row 2 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Weekly completions -->
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <h3 class="text-sm font-semibold text-white mb-4">Tareas completadas por semana</h3>
+        <div style="height: 220px;">
+          <canvas baseChart [type]="'line'" [data]="weeklyChart.data" [options]="weeklyChart.options"></canvas>
+        </div>
+      </div>
+
+      <!-- Workload distribution -->
+      <div class="bg-white/[0.06] rounded-2xl border border-white/10 p-5">
+        <h3 class="text-sm font-semibold text-white mb-4">Distribucion de carga por usuario</h3>
+        <div style="height: 220px;">
+          <canvas *ngIf="stats?.workload?.length" baseChart [type]="'bar'" [data]="workloadChart.data" [options]="workloadChart.options"></canvas>
+          <div *ngIf="!stats?.workload?.length" class="flex items-center justify-center h-full">
+            <p class="text-sm text-white/30">Sin datos de carga</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state for board/list when no tasks -->
+  <div *ngIf="!loading && (activeTab === 'board' || activeTab === 'list') && tasks.length === 0 && !filterStatus && !filterPriority && !filterAssignee"
+    class="flex flex-col items-center justify-center h-64 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center mb-4">
+      <span class="text-2xl">📋</span>
+    </div>
+    <p class="text-white/60 font-medium">Sin tareas aun</p>
+    <p class="text-white/30 text-sm mt-1">Crea tu primera tarea para organizar el trabajo del equipo</p>
+    <button (click)="showCreateModal = true" class="mt-4 px-4 py-2 bg-signal/10 hover:bg-signal/20 text-signal text-sm font-medium rounded-xl transition-colors border border-signal/20">
+      + Crear tarea
+    </button>
+  </div>
+</div>
+
+<!-- ==================== CREATE TASK MODAL ==================== -->
+<div *ngIf="showCreateModal"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  (click)="showCreateModal = false">
+
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl" (click)="$event.stopPropagation()">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="font-display font-bold text-lg text-white">Nueva Tarea</h2>
+        <button (click)="showCreateModal = false" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Titulo *</label>
+          <input type="text" [(ngModel)]="newTask.title"
+            placeholder="Nombre de la tarea"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Descripcion</label>
+          <textarea [(ngModel)]="newTask.description"
+            placeholder="Descripcion detallada de la tarea..."
+            rows="3"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all resize-none"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-white/50 mb-1.5">Prioridad</label>
+            <select [(ngModel)]="newTask.priority"
+              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all appearance-none">
+              <option value="low" class="bg-[#1a1a2e]">Baja</option>
+              <option value="medium" class="bg-[#1a1a2e]">Media</option>
+              <option value="high" class="bg-[#1a1a2e]">Alta</option>
+              <option value="urgent" class="bg-[#1a1a2e]">Urgente</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha limite</label>
+            <input type="date" [(ngModel)]="newTask.dueDate"
+              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-white/50 mb-1.5">Horas estimadas</label>
+            <input type="number" [(ngModel)]="newTask.estimatedHours" min="0" step="0.5"
+              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-white/50 mb-1.5">Asignar a</label>
+            <input type="text" [(ngModel)]="newTask.assignee"
+              placeholder="username"
+              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Tags (separados por coma)</label>
+          <input type="text" [(ngModel)]="newTask.tags"
+            placeholder="frontend, bug, urgente"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Canal asociado</label>
+          <input type="text" [(ngModel)]="newTask.channel"
+            placeholder="#general"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/[0.06]">
+        <button (click)="showCreateModal = false"
+          class="px-4 py-2 text-sm text-white/50 hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button (click)="createTask()"
+          [disabled]="!newTask.title || creating"
+          class="px-5 py-2 bg-signal hover:bg-signal/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors">
+          {{ creating ? 'Creando...' : 'Crear Tarea' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TASK DETAIL MODAL ==================== -->
+<div *ngIf="showDetailModal && selectedTask"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  (click)="closeAll()">
+
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-y-auto shadow-2xl" (click)="$event.stopPropagation()"
+    style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+
+    <!-- Detail header -->
+    <div class="sticky top-0 z-10 bg-[#1a1a2e]/90 backdrop-blur-xl border-b border-white/[0.06] px-6 py-4">
+      <div class="flex items-start justify-between">
+        <div class="flex-1 min-w-0 pr-4">
+          <h2 class="font-display font-bold text-lg text-white">{{ selectedTask.title }}</h2>
+          <div class="flex items-center gap-2 mt-2 flex-wrap">
+            <span [class]="'text-[10px] font-medium px-2 py-0.5 rounded-full border ' + statusColor(selectedTask.status)">
+              {{ statusLabel(selectedTask.status) }}
+            </span>
+            <span [class]="'text-[10px] font-medium px-2 py-0.5 rounded-md border ' + priorityColor(selectedTask.priority)">
+              {{ priorityLabel(selectedTask.priority) }}
+            </span>
+            <span *ngIf="selectedTask.dueDate"
+              [class]="'text-[10px] font-mono px-1.5 py-0.5 rounded ' + (isOverdue(selectedTask) ? 'bg-red-400/10 text-red-400' : 'text-white/30 bg-white/[0.04]')">
+              {{ formatDate(selectedTask.dueDate) }}
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button (click)="deleteTask(selectedTask._id)"
+            class="w-8 h-8 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-400/10 flex items-center justify-center transition-colors"
+            title="Eliminar">
+            🗑
+          </button>
+          <button (click)="closeAll()" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6 space-y-6">
+
+      <!-- Status change bar -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[11px] text-white/30 mr-1">Cambiar estado:</span>
+        <button *ngIf="selectedTask.status !== 'pending'"
+          (click)="changeStatus(selectedTask._id, 'pending')"
+          class="px-3 py-1.5 text-[11px] font-medium rounded-lg border transition-colors text-amber-400 bg-amber-400/10 border-amber-400/20 hover:bg-amber-400/20">
+          Pendiente
+        </button>
+        <button *ngIf="selectedTask.status !== 'in_progress'"
+          (click)="changeStatus(selectedTask._id, 'in_progress')"
+          class="px-3 py-1.5 text-[11px] font-medium rounded-lg border transition-colors text-blue-400 bg-blue-400/10 border-blue-400/20 hover:bg-blue-400/20">
+          En progreso
+        </button>
+        <button *ngIf="selectedTask.status !== 'completed'"
+          (click)="changeStatus(selectedTask._id, 'completed')"
+          class="px-3 py-1.5 text-[11px] font-medium rounded-lg border transition-colors text-emerald-400 bg-emerald-400/10 border-emerald-400/20 hover:bg-emerald-400/20">
+          Completar
+        </button>
+        <button *ngIf="selectedTask.status !== 'cancelled'"
+          (click)="changeStatus(selectedTask._id, 'cancelled')"
+          class="px-3 py-1.5 text-[11px] font-medium rounded-lg border transition-colors text-white/30 bg-white/[0.04] border-white/10 hover:bg-white/[0.08]">
+          Cancelar
+        </button>
+      </div>
+
+      <!-- Description -->
+      <div *ngIf="selectedTask.description">
+        <label class="text-[11px] uppercase tracking-wider text-white/30 font-semibold mb-2 block">Descripcion</label>
+        <p class="text-sm text-white/60 leading-relaxed">{{ selectedTask.description }}</p>
+      </div>
+
+      <!-- Tags -->
+      <div *ngIf="selectedTask.tags?.length">
+        <label class="text-[11px] uppercase tracking-wider text-white/30 font-semibold mb-2 block">Etiquetas</label>
+        <div class="flex flex-wrap gap-1.5">
+          <span *ngFor="let tag of selectedTask.tags"
+            class="text-[11px] px-2 py-0.5 rounded-md bg-white/[0.06] text-white/40 border border-white/[0.06]">
+            {{ tag }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Assignee & Meta -->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06]">
+          <p class="text-[10px] text-white/30 mb-1">Asignado</p>
+          <div *ngIf="selectedTask.assignee" class="flex items-center gap-2">
+            <img [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + selectedTask.assignee"
+              class="w-6 h-6 rounded-full border border-white/10">
+            <span class="text-sm text-white">{{ selectedTask.assignee }}</span>
+          </div>
+          <p *ngIf="!selectedTask.assignee" class="text-sm text-white/20">Sin asignar</p>
+        </div>
+        <div class="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06]">
+          <p class="text-[10px] text-white/30 mb-1">Estimado</p>
+          <p class="text-sm text-white font-medium">{{ formatHours(selectedTask.estimatedHours) }}</p>
+        </div>
+        <div class="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06]">
+          <p class="text-[10px] text-white/30 mb-1">Tiempo rastreado</p>
+          <p class="text-sm text-signal font-medium">{{ formatHours(totalTrackedMinutes(selectedTask) / 60) }}</p>
+        </div>
+      </div>
+
+      <!-- Time tracking controls -->
+      <div class="flex items-center gap-3">
+        <button (click)="toggleTimer(selectedTask._id)"
+          [class]="'px-4 py-2 text-xs font-medium rounded-xl border transition-all flex items-center gap-2 ' + (runningTimers[selectedTask._id] ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20 hover:bg-emerald-400/20' : 'bg-white/[0.06] text-white/60 border-white/10 hover:bg-white/[0.10] hover:text-white')">
+          {{ runningTimers[selectedTask._id] ? 'Detener cronometro' : 'Iniciar cronometro' }}
+          <span [class]="'w-2 h-2 rounded-full ' + (runningTimers[selectedTask._id] ? 'bg-emerald-400 animate-pulse' : 'bg-white/20')"></span>
+        </button>
+      </div>
+
+      <!-- Time entries -->
+      <div *ngIf="selectedTask.timeEntries?.length">
+        <label class="text-[11px] uppercase tracking-wider text-white/30 font-semibold mb-2 block">Entradas de tiempo</label>
+        <div class="space-y-1.5">
+          <div *ngFor="let entry of selectedTask.timeEntries"
+            class="flex items-center justify-between py-2 px-3 bg-white/[0.04] rounded-lg border border-white/[0.04]">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-signal"></span>
+              <span class="text-xs text-white/50">{{ entry.action || 'Trabajo' }}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span *ngIf="entry.startedAt" class="text-[10px] text-white/25 font-mono">{{ formatDate(entry.startedAt) }}</span>
+              <span class="text-xs text-white/60 font-mono">{{ formatHours((entry.duration || 0) / 60) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subtasks -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[11px] uppercase tracking-wider text-white/30 font-semibold">Subtareas</label>
+          <span *ngIf="selectedTask.subtasks?.length" class="text-[10px] text-white/25 font-mono">
+            {{ subtaskProgress(selectedTask) }}% completado
+          </span>
+        </div>
+
+        <div *ngIf="selectedTask.subtasks?.length" class="mb-3">
+          <div class="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+            <div class="h-full bg-signal rounded-full transition-all" [style.width.%]="subtaskProgress(selectedTask)"></div>
+          </div>
+        </div>
+
+        <div *ngIf="selectedTask.subtasks?.length" class="space-y-1.5">
+          <div *ngFor="let sub of selectedTask.subtasks; let i = index"
+            (click)="toggleSubtask(i)"
+            class="flex items-center gap-2.5 py-1.5 px-2 hover:bg-white/[0.04] rounded-lg cursor-pointer transition-colors">
+            <div [class]="'w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ' + (sub.completed ? 'bg-signal border-signal' : 'border-white/20 bg-transparent')">
+              <span *ngIf="sub.completed" class="text-[10px] text-white">&#10003;</span>
+            </div>
+            <span class="text-sm" [class]="sub.completed ? 'text-white/30 line-through' : 'text-white/70'">{{ sub.title }}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 mt-2">
+          <input type="text" [(ngModel)]="selectedTask._newSubtask"
+            (keydown.enter)="addSubtask()"
+            placeholder="Agregar subtarea..."
+            class="flex-1 px-3 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 transition-all" />
+          <button (click)="addSubtask()"
+            [disabled]="!selectedTask._newSubtask"
+            class="px-3 py-2 text-xs font-medium text-signal bg-signal/10 hover:bg-signal/20 border border-signal/20 rounded-xl transition-colors disabled:opacity-30">
+            +
+          </button>
+        </div>
+      </div>
+
+      <!-- Comments -->
+      <div>
+        <label class="text-[11px] uppercase tracking-wider text-white/30 font-semibold mb-3 block">Comentarios</label>
+
+        <div class="flex items-start gap-3 mb-4">
+          <div class="w-7 h-7 rounded-full bg-signal/20 border border-signal/30 flex items-center justify-center text-[9px] font-bold text-signal flex-shrink-0">TU</div>
+          <div class="flex-1">
+            <input [(ngModel)]="selectedTask._newComment"
+              (keydown.enter)="addComment()"
+              placeholder="Escribe un comentario..."
+              class="w-full text-sm bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-signal/50 transition-colors placeholder:text-white/20 text-white" />
+          </div>
+        </div>
+
+        <div *ngIf="selectedTask.comments?.length" class="space-y-3">
+          <div *ngFor="let comment of selectedTask.comments" class="flex items-start gap-3">
+            <div class="w-7 h-7 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-[9px] font-bold text-white/40 flex-shrink-0 overflow-hidden">
+              <img *ngIf="comment.user" [src]="'https://api.dicebear.com/7.x/avataaars/svg?seed=' + comment.user"
+                class="w-full h-full object-cover">
+              <span *ngIf="!comment.user">{{ (comment.author || '?')[0] | uppercase }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold text-white/70">{{ comment.author || comment.user || 'Alguien' }}</span>
+                <span *ngIf="comment.createdAt" class="text-[10px] text-white/20">{{ formatDate(comment.createdAt) }}</span>
+              </div>
+              <p class="text-sm text-white/50 mt-0.5">{{ comment.text }}</p>
+            </div>
+          </div>
+        </div>
+        <p *ngIf="!selectedTask.comments?.length" class="text-xs text-white/20 pl-10">Sin comentarios aun</p>
+      </div>
+
+      <!-- Footer meta -->
+      <div class="pt-4 border-t border-white/[0.06] text-[10px] text-white/15">
+        <span>Creado {{ formatDate(selectedTask.createdAt) }}</span>
+        <span *ngIf="selectedTask.completedAt"> · Completado {{ formatDate(selectedTask.completedAt) }}</span>
+        <span *ngIf="selectedTask.channel"> · Canal: {{ selectedTask.channel }}</span>
+      </div>
+    </div>
+  </div>
+</div>

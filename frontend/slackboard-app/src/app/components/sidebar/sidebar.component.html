@@ -290,7 +290,13 @@
         <div class="menu__collapsible-inner">
           <ul class="submenu submenu--tree">
             <li *ngFor="let item of analyticsSubItems">
-              <button type="button" class="submenu__item">{{ item.label }}</button>
+              <button
+                type="button"
+                class="submenu__item"
+                [class.submenu__item--active]="activeAnalyticsItem === item.id"
+                (click)="selectAnalyticsItem(item.id)">
+                {{ item.label }}
+              </button>
             </li>
           </ul>
         </div>

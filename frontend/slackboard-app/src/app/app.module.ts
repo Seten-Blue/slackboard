@@ -29,8 +29,14 @@ import { ThreadPanelComponent } from './components/thread-panel/thread-panel.com
 import { DashboardActivityComponent } from './components/dashboard-activity/dashboard-activity.component';
 import { DashboardTrafficComponent } from './components/dashboard-traffic/dashboard-traffic.component';
 import { DashboardStatisticsComponent } from './components/dashboard-statistics/dashboard-statistics.component';
+import { DashboardPerformanceComponent } from './components/dashboard-performance/dashboard-performance.component';
+import { DashboardReportsComponent } from './components/dashboard-reports/dashboard-reports.component';
+import { DashboardSurveysComponent } from './components/dashboard-surveys/dashboard-surveys.component';
 import { FriendsComponent } from './components/friends/friends.component';
 import { UserProfilePanelComponent } from './components/user-profile-panel/user-profile-panel.component';
+import { DashboardTasksComponent } from './components/dashboard-tasks/dashboard-tasks.component';
+import { DashboardAiMetricsComponent } from './components/dashboard-ai-metrics/dashboard-ai-metrics.component';
+import { DashboardAuditComponent } from './components/dashboard-audit/dashboard-audit.component';
 
 @NgModule({
   declarations: [
@@ -56,8 +62,14 @@ import { UserProfilePanelComponent } from './components/user-profile-panel/user-
     DashboardActivityComponent,
     DashboardTrafficComponent,
     DashboardStatisticsComponent,
+    DashboardPerformanceComponent,
+    DashboardReportsComponent,
+    DashboardSurveysComponent,
     FriendsComponent,
-    UserProfilePanelComponent
+    UserProfilePanelComponent,
+    DashboardTasksComponent,
+    DashboardAiMetricsComponent,
+    DashboardAuditComponent
   ],
   imports: [
     BrowserModule,
