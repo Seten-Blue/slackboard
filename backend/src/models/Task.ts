@@ -15,9 +15,10 @@ export interface ITask extends Document {
   estimatedHours?: number;
   actualHours: number;
   tags: string[];
-  subtasks: { title: string; completed: boolean }[];
+  subtasks: { title: string; completed: boolean; completedBy?: mongoose.Types.ObjectId; completedAt?: Date }[];
   timeEntries: { user: mongoose.Types.ObjectId; start: Date; end?: Date; description: string }[];
   completedAt?: Date;
+  completedBy?: mongoose.Types.ObjectId;
   comments: { user: mongoose.Types.ObjectId; text: string; createdAt: Date }[];
   attachments: { filename: string; url: string; uploadedBy: mongoose.Types.ObjectId; uploadedAt: Date }[];
   source?: 'slack' | 'discord' | 'trello' | 'manual' | 'ai';
@@ -54,6 +55,8 @@ const TaskSchema: Schema = new Schema(
       {
         title: { type: String, required: true },
         completed: { type: Boolean, default: false },
+        completedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        completedAt: { type: Date, default: null },
       },
     ],
     timeEntries: [

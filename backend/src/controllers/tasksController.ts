@@ -189,6 +189,7 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
         .populate('creator', 'username email avatar role')
         .populate('assignee', 'username email avatar')
         .populate('assignedBy', 'username email avatar role')
+        .populate('completedBy', 'username email avatar')
         .populate('channel', 'name platform')
         .populate('assignmentChannel', 'name platform')
         .sort({ [sortField]: sortDir })
@@ -217,10 +218,12 @@ export const getTask = async (req: AuthRequest, res: Response) => {
       .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
       .populate('assignedBy', 'username email avatar role')
+      .populate('completedBy', 'username email avatar')
       .populate('channel', 'name platform')
       .populate('assignmentChannel', 'name platform')
       .populate('comments.user', 'username email avatar')
       .populate('timeEntries.user', 'username email avatar')
+      .populate('subtasks.completedBy', 'username email avatar')
       .lean();
 
     if (!task) {
@@ -245,11 +248,9 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
 
     const user = await User.findById(userId).select('role').lean();
     const isCreator = task.creator.toString() === userId;
-    const isAssignee = task.assignee?.toString() === userId;
-    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
 
-    if (!isCreator && !isAssignee && !isManagerOrAbove) {
-      return res.status(403).json({ success: false, message: 'No tienes permiso para editar esta tarea' });
+    if (!isCreator) {
+      return res.status(403).json({ success: false, message: 'Solo el creador puede editar esta tarea' });
     }
 
     const allowedFields = [
@@ -392,18 +393,27 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
     const user = await User.findById(userId).select('role').lean();
     const isCreator = task.creator.toString() === userId;
     const isAssignee = task.assignee?.toString() === userId;
-    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
 
-    if (!isCreator && !isAssignee && !isManagerOrAbove) {
+    if (!isCreator && !isAssignee) {
       return res.status(403).json({ success: false, message: 'No tienes permiso para cambiar el estado de esta tarea' });
+    }
+
+    if ((status === 'in_progress' || status === 'completed') && !isAssignee) {
+      return res.status(403).json({ success: false, message: 'Solo el asignado puede cambiar a en progreso o completado' });
+    }
+
+    if (status === 'cancelled' && !isCreator) {
+      return res.status(403).json({ success: false, message: 'Solo el creador puede cancelar la tarea' });
     }
 
     const oldStatus = task.status;
     task.status = status;
     if (status === 'completed') {
       task.completedAt = new Date();
-    } else {
+      task.completedBy = new mongoose.Types.ObjectId(userId);
+    } else if (status !== 'completed') {
       task.completedAt = undefined;
+      task.completedBy = undefined;
     }
 
     await task.save();
@@ -472,6 +482,7 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
       .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
       .populate('assignedBy', 'username email avatar role')
+      .populate('completedBy', 'username email avatar')
       .populate('channel', 'name platform')
       .populate('assignmentChannel', 'name platform');
 
@@ -524,6 +535,10 @@ export const addTimeEntry = async (req: AuthRequest, res: Response) => {
       end: end ? new Date(end) : undefined,
       description: description || '',
     });
+
+    if (task.status === 'pending') {
+      task.status = 'in_progress';
+    }
 
     if (end) {
       const durationMs = new Date(end).getTime() - new Date(start || Date.now()).getTime();
@@ -595,6 +610,7 @@ export const addSubtask = async (req: AuthRequest, res: Response) => {
 
 export const toggleSubtask = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!;
     const { taskId, index } = req.params;
     const idx = parseInt(index, 10);
 
@@ -608,6 +624,13 @@ export const toggleSubtask = async (req: AuthRequest, res: Response) => {
     }
 
     task.subtasks[idx].completed = !task.subtasks[idx].completed;
+    if (task.subtasks[idx].completed) {
+      task.subtasks[idx].completedBy = new mongoose.Types.ObjectId(userId);
+      task.subtasks[idx].completedAt = new Date();
+    } else {
+      task.subtasks[idx].completedBy = undefined;
+      task.subtasks[idx].completedAt = undefined;
+    }
     await task.save();
 
     res.json({ success: true, data: task.subtasks });
@@ -871,5 +894,39 @@ export const getTaskReport = async (req: AuthRequest, res: Response) => {
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error generando reporte', error: error.message });
+  }
+};
+
+export const getTaskPermissions = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const { taskId } = req.params;
+
+    const task = await Task.findById(taskId).select('creator assignee').lean() as any;
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Tarea no encontrada' });
+    }
+
+    const isCreator = task.creator.toString() === userId;
+    const isAssignee = task.assignee?.toString() === userId;
+
+    res.json({
+      success: true,
+      data: {
+        canEdit: isCreator,
+        canChangeStatus: isCreator || isAssignee,
+        canStartProgress: isAssignee,
+        canComplete: isAssignee,
+        canCancel: isCreator,
+        canComment: true,
+        canAddSubtask: isCreator || isAssignee,
+        canToggleSubtask: isCreator || isAssignee,
+        canDelete: isCreator,
+        isCreator,
+        isAssignee,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: 'Error obteniendo permisos', error: error.message });
   }
 };

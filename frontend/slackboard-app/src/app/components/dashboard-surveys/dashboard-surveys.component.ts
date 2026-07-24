@@ -334,6 +334,10 @@ export class DashboardSurveysComponent implements OnInit, OnChanges {
     return type === 'single_choice' || type === 'multiple_choice' || type === 'yes_no';
   }
 
+  trackByIndex(index: number): number {
+    return index;
+  }
+
   totalResponses(): number {
     return this.surveys.reduce((sum, s) => sum + (s.responseCount || 0), 0);
   }

@@ -14,6 +14,7 @@ import {
   toggleSubtask,
   getTaskStats,
   getTaskReport,
+  getTaskPermissions,
 } from '../controllers/tasksController';
 
 const router = Router();
@@ -33,5 +34,6 @@ router.post('/:taskId/time', addTimeEntry);
 router.post('/:taskId/comment', addComment);
 router.post('/:taskId/subtask', addSubtask);
 router.post('/:taskId/subtask/:index/toggle', toggleSubtask);
+router.get('/:taskId/permissions', getTaskPermissions);
 
 export default router;

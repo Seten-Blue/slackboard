@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { TasksService } from '../../services/tasks.service';
 import { AuthService } from '../../services/auth.service';
 import { ChatService } from '../../services/chat.service';
@@ -9,7 +9,7 @@ import { ChartConfiguration } from 'chart.js';
   templateUrl: './dashboard-tasks.component.html',
   styleUrls: ['./dashboard-tasks.component.scss']
 })
-export class DashboardTasksComponent implements OnInit {
+export class DashboardTasksComponent implements OnInit, OnDestroy {
   tasks: any[] = [];
   stats: any = null;
   loading = true;
@@ -34,6 +34,11 @@ export class DashboardTasksComponent implements OnInit {
   get cancelledTasks() { return this.tasks.filter(t => t.status === 'cancelled'); }
 
   runningTimers: Record<string, boolean> = {};
+  taskPermissions: any = null;
+  timerInterval: any = null;
+  elapsedTime: string = '00:00:00';
+  timerExceeded = false;
+  timerStartedAt: Date | null = null;
 
   priorityChart: ChartConfiguration<'doughnut'> = {
     type: 'doughnut',
@@ -122,6 +127,10 @@ export class DashboardTasksComponent implements OnInit {
   constructor(private tasksService: TasksService, public authService: AuthService, private chatService: ChatService) {}
 
   ngOnInit() { this.loadTasks(); this.loadStats(); this.loadChannels(); }
+
+  ngOnDestroy() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+  }
 
   loadChannels() {
     this.chatService.getChannels().subscribe({
@@ -233,9 +242,47 @@ export class DashboardTasksComponent implements OnInit {
   viewTask(task: any) {
     this.selectedTask = { ...task };
     this.showDetailModal = true;
-    if (!task.timeEntries) {
-      this.tasksService.getTask(task._id).subscribe({ next: (res) => { this.selectedTask = res.data; } });
+    this.taskPermissions = null;
+    this.timerExceeded = false;
+    this.elapsedTime = '00:00:00';
+    if (this.timerInterval) clearInterval(this.timerInterval);
+
+    this.tasksService.getTask(task._id).subscribe({
+      next: (res) => {
+        this.selectedTask = res.data;
+        this.tasksService.getPermissions(task._id).subscribe({
+          next: (pres) => { this.taskPermissions = pres.data; }
+        });
+        this.checkRunningTimer();
+      }
+    });
+  }
+
+  checkRunningTimer() {
+    if (!this.selectedTask?.timeEntries?.length) return;
+        const running = this.selectedTask.timeEntries.find((e: any) => !e.end && e.user?._id === this.authService.currentUser?._id);
+    if (running) {
+      this.runningTimers[this.selectedTask._id] = true;
+      this.timerStartedAt = new Date(running.start);
+      this.startTimerCountdown();
     }
+  }
+
+  startTimerCountdown() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => {
+      if (!this.timerStartedAt) return;
+      const now = new Date();
+      const elapsed = now.getTime() - this.timerStartedAt.getTime();
+      const hrs = Math.floor(elapsed / 3600000);
+      const mins = Math.floor((elapsed % 3600000) / 60000);
+      const secs = Math.floor((elapsed % 60000) / 1000);
+      this.elapsedTime = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+      if (this.selectedTask?.estimatedHours && elapsed > this.selectedTask.estimatedHours * 3600000) {
+        this.timerExceeded = true;
+      }
+    }, 1000);
   }
 
   changeStatus(taskId: string, status: string) {
@@ -251,7 +298,29 @@ export class DashboardTasksComponent implements OnInit {
   toggleTimer(taskId: string) {
     const action = this.runningTimers[taskId] ? 'stop' : 'start';
     this.tasksService.addTimeEntry(taskId, { action }).subscribe({
-      next: () => { this.runningTimers[taskId] = !this.runningTimers[taskId]; }
+      next: () => {
+        this.runningTimers[taskId] = !this.runningTimers[taskId];
+        if (action === 'start') {
+          this.timerStartedAt = new Date();
+          this.timerExceeded = false;
+          this.startTimerCountdown();
+          const idx = this.tasks.findIndex(t => t._id === taskId);
+          if (idx !== -1) this.tasks[idx] = { ...this.tasks[idx], status: 'in_progress' };
+          if (this.selectedTask?._id === taskId) this.selectedTask = { ...this.selectedTask, status: 'in_progress' };
+        } else {
+          if (this.timerInterval) clearInterval(this.timerInterval);
+          this.timerStartedAt = null;
+          this.elapsedTime = '00:00:00';
+          this.timerExceeded = false;
+          this.tasksService.getTask(taskId).subscribe({
+            next: (res) => {
+              if (this.selectedTask?._id === taskId) this.selectedTask = res.data;
+              const idx = this.tasks.findIndex(t => t._id === taskId);
+              if (idx !== -1) this.tasks[idx] = { ...this.tasks[idx], actualHours: res.data.actualHours };
+            }
+          });
+        }
+      }
     });
   }
 
@@ -336,9 +405,11 @@ export class DashboardTasksComponent implements OnInit {
   }
 
   closeAll() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
     this.showCreateModal = false;
     this.showDetailModal = false;
     this.selectedTask = null;
+    this.taskPermissions = null;
   }
 
   abs(val: number): number {

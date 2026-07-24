@@ -23,6 +23,7 @@ export class TasksService {
   addComment(id: string, text: string): Observable<any> { return this.http.post(`${this.apiUrl}/tasks/${id}/comment`, { text }); }
   addSubtask(id: string, title: string): Observable<any> { return this.http.post(`${this.apiUrl}/tasks/${id}/subtask`, { title }); }
   toggleSubtask(id: string, index: number): Observable<any> { return this.http.post(`${this.apiUrl}/tasks/${id}/subtask/${index}/toggle`, {}); }
+  getPermissions(id: string): Observable<any> { return this.http.get(`${this.apiUrl}/tasks/${id}/permissions`); }
   getStats(): Observable<any> { return this.http.get(`${this.apiUrl}/tasks/stats`); }
   getReport(params: any = {}): Observable<any> {
     const q = Object.entries(params).filter(([_,v]) => v).map(([k,v]) => `${k}=${v}`).join('&');

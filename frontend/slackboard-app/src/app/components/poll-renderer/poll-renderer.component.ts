@@ -21,7 +21,7 @@ export class PollRendererComponent implements OnChanges {
   constructor(private chatService: ChatService, private router: Router) {}
 
   get surveyId(): string | null {
-    return this.message?.surveyData?.surveyId || null;
+    return this.message?.pollData?.surveyId || this.message?.surveyData?.surveyId || null;
   }
 
   goToSurvey(event: Event) {

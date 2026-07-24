@@ -110,9 +110,9 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
           expiresAt: pollData.expiresAt || null,
           status: 'active',
         });
-        // Actualizar el message con el surveyId
+        // Actualizar el message con el surveyId en pollData
         await Message.findByIdAndUpdate(message._id, {
-          'surveyData.surveyId': survey._id,
+          $set: { 'pollData.surveyId': survey._id },
         });
       } catch (surveyErr: any) {
         console.error('Error creando Survey desde poll:', surveyErr.message);

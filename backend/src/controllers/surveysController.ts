@@ -57,30 +57,52 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Crear mensaje en el chat (igual que las tareas)
+    // Crear mensaje tipo poll en el chat
     const targetChannelId = channel ? (() => { try { return new mongoose.Types.ObjectId(channel); } catch { return null; } })() : null;
     if (targetChannelId) {
-      const questionsPreview = (questions || []).slice(0, 3).map((q: any) => ({
-        text: q.text,
-        type: q.type,
-      }));
+      let pollOptions: { emoji: string; text: string; voters: never[] }[] = [];
+
+      const firstQ = questions[0];
+      if (firstQ && (firstQ.type === 'single_choice' || firstQ.type === 'multiple_choice') && firstQ.options?.length) {
+        pollOptions = firstQ.options.map((opt: string) => ({
+          emoji: '',
+          text: opt,
+          voters: [],
+        }));
+      } else if (firstQ && firstQ.type === 'yes_no') {
+        pollOptions = [
+          { emoji: '', text: 'Si', voters: [] },
+          { emoji: '', text: 'No', voters: [] },
+        ];
+      } else if (firstQ && firstQ.type === 'rating') {
+        pollOptions = Array.from({ length: firstQ.maxRating || 5 }, (_, i) => ({
+          emoji: '',
+          text: `${i + 1} ★`,
+          voters: [],
+        }));
+      } else {
+        pollOptions = [{ emoji: '', text: 'Ver encuesta', voters: [] }];
+      }
+
+      let pollExpiresAt: Date | null = null;
+      if (expiresAt) {
+        pollExpiresAt = new Date(expiresAt);
+      }
 
       const chatMsg = await Message.create({
-        content: `📊 Nueva encuesta: ${title}`,
+        content: `📊 ${title}`,
         channel: targetChannelId,
         sender: userId,
-        type: 'survey',
-        surveyData: {
+        type: 'poll',
+        pollData: {
+          question: title,
+          options: pollOptions,
+          allowMultiple: false,
+          isAnonymous: anonymous ?? false,
+          duration: 0,
+          createdBy: userId,
+          expiresAt: pollExpiresAt,
           surveyId: survey._id,
-          title,
-          description: description || '',
-          status: 'active',
-          questionsCount: questions.length,
-          questionsPreview,
-          responseCount: 0,
-          expiresAt: expiresAt || null,
-          anonymous: anonymous ?? false,
-          action: 'created',
         },
       });
 
@@ -322,8 +344,8 @@ export const activateSurvey = async (req: AuthRequest, res: Response) => {
     // Actualizar mensaje en chat si existe
     if (survey.channel) {
       await Message.findOneAndUpdate(
-        { 'surveyData.surveyId': survey._id, type: 'survey' },
-        { $set: { 'surveyData.status': 'active', 'surveyData.action': 'activated' } }
+        { 'pollData.surveyId': survey._id, type: 'poll' },
+        { $set: { 'pollData.question': `${survey.title} (Activa)` } }
       );
       const io = req.app.get('io');
       if (io) {
@@ -378,8 +400,8 @@ export const closeSurvey = async (req: AuthRequest, res: Response) => {
     // Actualizar mensaje en chat si existe
     if (survey.channel) {
       await Message.findOneAndUpdate(
-        { 'surveyData.surveyId': survey._id, type: 'survey' },
-        { $set: { 'surveyData.status': 'closed', 'surveyData.action': 'closed' } }
+        { 'pollData.surveyId': survey._id, type: 'poll' },
+        { $set: { 'pollData.question': `${survey.title} (Cerrada)` } }
       );
       const io = req.app.get('io');
       if (io) {
@@ -514,12 +536,8 @@ export const submitResponse = async (req: AuthRequest, res: Response) => {
 
     await survey.save();
 
-    // Actualizar responseCount en el mensaje del chat
+    // Notificar via socket (el voto del poll en chat es independiente)
     if (survey.channel) {
-      await Message.findOneAndUpdate(
-        { 'surveyData.surveyId': survey._id, type: 'survey' },
-        { $set: { 'surveyData.responseCount': survey.responses.length } }
-      );
       const io = req.app.get('io');
       if (io) {
         io.to(survey.channel.toString()).emit('survey-response-updated', {

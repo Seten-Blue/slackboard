@@ -340,22 +340,28 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     });
 
     const surveyStatusSub = this.socketService.onSurveyStatusChanged().subscribe((data: any) => {
-      const index = this.messages.findIndex(m => m.surveyData?.surveyId === data.surveyId);
+      const index = this.messages.findIndex(m =>
+        m.surveyData?.surveyId === data.surveyId || m.pollData?.surveyId === data.surveyId
+      );
       if (index !== -1) {
-        this.messages[index] = {
-          ...this.messages[index],
-          surveyData: { ...this.messages[index].surveyData, status: data.status }
-        };
+        const msg = { ...this.messages[index] };
+        if (msg.surveyData) {
+          msg.surveyData = { ...msg.surveyData, status: data.status };
+        }
+        this.messages[index] = msg;
       }
     });
 
     const surveyResponseSub = this.socketService.onSurveyResponseUpdated().subscribe((data: any) => {
-      const index = this.messages.findIndex(m => m.surveyData?.surveyId === data.surveyId);
+      const index = this.messages.findIndex(m =>
+        m.surveyData?.surveyId === data.surveyId || m.pollData?.surveyId === data.surveyId
+      );
       if (index !== -1) {
-        this.messages[index] = {
-          ...this.messages[index],
-          surveyData: { ...this.messages[index].surveyData, responseCount: data.responseCount }
-        };
+        const msg = { ...this.messages[index] };
+        if (msg.surveyData) {
+          msg.surveyData = { ...msg.surveyData, responseCount: data.responseCount };
+        }
+        this.messages[index] = msg;
       }
     });
 

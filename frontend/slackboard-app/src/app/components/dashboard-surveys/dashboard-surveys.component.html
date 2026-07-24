@@ -283,7 +283,7 @@
             <p class="text-sm text-white/30">No hay preguntas. Haz clic en "Agregar pregunta" para comenzar.</p>
           </div>
 
-          <div *ngFor="let q of newSurvey.questions; let qi = index"
+          <div *ngFor="let q of newSurvey.questions; let qi = index; trackBy: trackByIndex"
             class="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-3 space-y-3">
 
             <div class="flex items-start gap-3">
@@ -311,7 +311,7 @@
 
                 <!-- Options editor for choice types -->
                 <div *ngIf="q.type === 'single_choice' || q.type === 'multiple_choice'" class="space-y-2 pl-2">
-                  <div class="flex items-center gap-2" *ngFor="let opt of q.options; let oi = index">
+                  <div class="flex items-center gap-2" *ngFor="let opt of q.options; let oi = index; trackBy: trackByIndex">
                     <span *ngIf="q.type === 'single_choice'" class="text-white/15 text-[10px]">◉</span>
                     <span *ngIf="q.type === 'multiple_choice'" class="text-white/15 text-[10px]">☑</span>
                     <input type="text" [(ngModel)]="q.options[oi]"
@@ -652,7 +652,7 @@
             <p class="text-sm text-white/30">Sin preguntas</p>
           </div>
 
-          <div *ngFor="let q of editSurvey.questions; let qi = index"
+          <div *ngFor="let q of editSurvey.questions; let qi = index; trackBy: trackByIndex"
             class="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-3 space-y-3">
 
             <div class="flex items-start gap-3">
@@ -679,7 +679,7 @@
                 </div>
 
                 <div *ngIf="q.type === 'single_choice' || q.type === 'multiple_choice'" class="space-y-2 pl-2">
-                  <div class="flex items-center gap-2" *ngFor="let opt of q.options; let oi = index">
+                  <div class="flex items-center gap-2" *ngFor="let opt of q.options; let oi = index; trackBy: trackByIndex">
                     <input type="text" [(ngModel)]="q.options[oi]"
                       [placeholder]="'Opcion ' + (oi + 1)"
                       class="flex-1 px-2 py-1.5 bg-white/[0.06] border border-white/10 rounded-lg text-xs text-white placeholder-white/20 focus:outline-none focus:border-signal/50 transition-all" />
