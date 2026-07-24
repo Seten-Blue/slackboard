@@ -6,6 +6,9 @@ export interface ITask extends Document {
   creator: mongoose.Types.ObjectId;
   assignee?: mongoose.Types.ObjectId;
   channel?: mongoose.Types.ObjectId;
+  assignedBy?: mongoose.Types.ObjectId;
+  assignmentChannel?: mongoose.Types.ObjectId;
+  assignerRole?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   dueDate?: Date;
@@ -30,6 +33,9 @@ const TaskSchema: Schema = new Schema(
     creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     assignee: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     channel: { type: Schema.Types.ObjectId, ref: 'Channel', default: null },
+    assignedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    assignmentChannel: { type: Schema.Types.ObjectId, ref: 'Channel', default: null },
+    assignerRole: { type: String, default: null },
     status: {
       type: String,
       enum: ['pending', 'in_progress', 'completed', 'cancelled'],
@@ -76,6 +82,7 @@ const TaskSchema: Schema = new Schema(
     ],
     source: { type: String, enum: ['slack', 'discord', 'trello', 'manual', 'ai'], default: 'manual' },
     sourceId: { type: String, default: null },
+    discordNotificationMessageId: { type: String, default: null },
   },
   { timestamps: true }
 );

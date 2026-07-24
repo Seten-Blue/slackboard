@@ -1,10 +1,14 @@
 import { Response } from 'express';
 import Survey, { ISurvey } from '../models/Survey';
+import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { logAction } from './auditLogController';
 
 export const createSurvey = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
+    const io = req.app.get('io');
+
     const {
       title,
       description,
@@ -32,10 +36,26 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
       allowMultipleResponses: allowMultipleResponses ?? false,
       expiresAt: expiresAt || null,
       targetUsers: targetUsers || [],
-      status: 'draft',
+      status: 'active',
     });
 
-    res.status(201).json({ success: true, data: survey });
+    const populated = await Survey.findById(survey._id)
+      .populate('creator', 'username email avatar')
+      .populate('channel', 'name platform')
+      .lean();
+
+    if (channel && io) {
+      io.to(channel.toString()).emit('new-survey', {
+        channelId: channel.toString(),
+        survey: populated,
+      });
+    }
+
+    logAction(userId, 'survey.created', 'create', survey._id.toString(), 'Survey',
+      { title, questionsCount: questions.length, channel: channel || null },
+      req.ip, req.headers['user-agent']);
+
+    res.status(201).json({ success: true, data: populated });
   } catch (error: any) {
     res.status(500).json({
       success: false,
@@ -109,9 +129,13 @@ export const getSurvey = async (req: AuthRequest, res: Response) => {
     }
 
     const s = survey as any;
-    const isCreator = s.creator.toString() === userId;
-    const isTarget = s.targetUsers.some((u: any) => u._id.toString() === userId);
-    const hasResponse = s.responses.some((r: any) => r.respondent._id.toString() === userId);
+    const creatorId = s.creator?._id?.toString() || s.creator?.toString() || '';
+    const isCreator = creatorId === userId;
+    const isTarget = s.targetUsers.some((u: any) => (u._id?.toString() || u.toString()) === userId);
+    const hasResponse = s.responses.some((r: any) => {
+      const respId = r.respondent?._id?.toString() || r.respondent?.toString() || '';
+      return respId === userId;
+    });
 
     if (!isCreator && !isTarget && !hasResponse) {
       return res.status(403).json({ success: false, message: 'No tienes acceso a esta encuesta' });
@@ -219,8 +243,11 @@ export const activateSurvey = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Encuesta no encontrada' });
     }
 
-    if (survey.creator.toString() !== userId) {
-      return res.status(403).json({ success: false, message: 'Solo el creador puede activar la encuesta' });
+    const user = await User.findById(userId).select('role').lean();
+    const isCreator = survey.creator.toString() === userId;
+    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
+    if (!isCreator && !isManagerOrAbove) {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para activar esta encuesta' });
     }
 
     if (survey.status !== 'draft') {
@@ -239,6 +266,10 @@ export const activateSurvey = async (req: AuthRequest, res: Response) => {
 
     survey.status = 'active';
     await survey.save();
+
+    logAction(userId, 'survey.activated', 'modify', surveyId, 'Survey',
+      { title: survey.title },
+      req.ip, req.headers['user-agent']);
 
     res.json({ success: true, data: survey });
   } catch (error: any) {
@@ -260,8 +291,11 @@ export const closeSurvey = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Encuesta no encontrada' });
     }
 
-    if (survey.creator.toString() !== userId) {
-      return res.status(403).json({ success: false, message: 'Solo el creador puede cerrar la encuesta' });
+    const user = await User.findById(userId).select('role').lean();
+    const isCreator = survey.creator.toString() === userId;
+    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
+    if (!isCreator && !isManagerOrAbove) {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para cerrar esta encuesta' });
     }
 
     if (survey.status !== 'active') {
@@ -273,6 +307,10 @@ export const closeSurvey = async (req: AuthRequest, res: Response) => {
 
     survey.status = 'closed';
     await survey.save();
+
+    logAction(userId, 'survey.closed', 'modify', surveyId, 'Survey',
+      { title: survey.title, responsesCount: survey.responses.length },
+      req.ip, req.headers['user-agent']);
 
     res.json({ success: true, data: survey });
   } catch (error: any) {
@@ -350,12 +388,23 @@ export const submitResponse = async (req: AuthRequest, res: Response) => {
         });
       }
 
-      if (question.type === 'rating' && typeof answer.value === 'number') {
+      if (question.type === 'rating') {
+        const numVal = Number(answer.value);
         const max = question.maxRating || 5;
-        if (answer.value < 1 || answer.value > max) {
+        if (isNaN(numVal) || numVal < 1 || numVal > max) {
           return res.status(400).json({
             success: false,
             message: `El rating debe estar entre 1 y ${max}`,
+          });
+        }
+      }
+
+      if (question.type === 'yes_no') {
+        const valid = ['si', 'no', 'yes', 'no', true, false, 'Si', 'No', 'YES', 'NO'];
+        if (!valid.includes(answer.value)) {
+          return res.status(400).json({
+            success: false,
+            message: `La respuesta debe ser Si o No`,
           });
         }
       }
@@ -407,7 +456,8 @@ export const getSurveyResults = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Encuesta no encontrada' });
     }
 
-    const isCreator = survey.creator.toString() === userId;
+    const creatorId = survey.creator?._id?.toString() || survey.creator?.toString() || '';
+    const isCreator = creatorId === userId;
     if (!isCreator && survey.status === 'draft') {
       return res.status(403).json({ success: false, message: 'No tienes acceso a esta encuesta' });
     }
@@ -449,8 +499,8 @@ export const getSurveyResults = async (req: AuthRequest, res: Response) => {
       }
 
       if (question.type === 'yes_no') {
-        const yes = questionResponses.filter((r: any) => r.value === 'yes' || r.value === true).length;
-        const no = questionResponses.filter((r: any) => r.value === 'no' || r.value === false).length;
+        const yes = questionResponses.filter((r: any) => r.value === 'yes' || r.value === 'Si' || r.value === 'YES' || r.value === true).length;
+        const no = questionResponses.filter((r: any) => r.value === 'no' || r.value === 'No' || r.value === 'NO' || r.value === false).length;
 
         return {
           ...base,

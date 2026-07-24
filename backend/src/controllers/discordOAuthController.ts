@@ -4,6 +4,7 @@ import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import discordOAuthService from '../services/discordOAuthService';
 import discordservice from '../services/discordservice';
+import { logAction } from './auditLogController';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-env';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
@@ -80,6 +81,9 @@ export const oauthCallback = async (req: Request, res: Response) => {
     currentUser.discordRefreshToken = tokenData.refresh_token;
     currentUser.discordTokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
     await currentUser.save();
+
+    logAction(decoded.userId, 'discord.connected', 'integration', decoded.userId, 'User',
+      { discordUsername: discordUser.username, discordId: discordUser.id });
 
     res.redirect(`${FRONTEND_URL}/chat?discordLinked=success`);
   } catch (err: any) {
@@ -158,6 +162,10 @@ export const unlinkDiscord = async (req: AuthRequest, res: Response) => {
       discordRefreshToken: null,
       discordTokenExpiresAt: null,
     });
+
+    logAction(req.userId!, 'discord.disconnected', 'integration', req.userId!, 'User',
+      {}, req.ip, req.headers['user-agent'] as string);
+
     res.json({ success: true, message: 'Cuenta de Discord desvinculada.' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al desvincular', error: error.message });

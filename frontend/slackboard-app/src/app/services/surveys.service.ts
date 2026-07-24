@@ -21,4 +21,5 @@ export class SurveysService {
   submitResponse(id: string, answers: any[]): Observable<any> { return this.http.post(`${this.apiUrl}/surveys/${id}/respond`, { answers }); }
   getResults(id: string): Observable<any> { return this.http.get(`${this.apiUrl}/surveys/${id}/results`); }
   getStats(): Observable<any> { return this.http.get(`${this.apiUrl}/surveys/stats`); }
+  getChannels(): Observable<any> { return this.http.get(`${this.apiUrl}/channels`); }
 }

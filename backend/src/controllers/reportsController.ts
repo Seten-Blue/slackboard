@@ -4,7 +4,12 @@ import crypto from 'crypto';
 import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
+import Task from '../models/Task';
+import Survey from '../models/Survey';
+import AiMetric from '../models/AiMetric';
+import AuditLog from '../models/AuditLog';
 import { AuthRequest } from '../middleware/auth';
+import { logAction } from './auditLogController';
 
 // ==================== MODELS (Report / ScheduledReport) ====================
 
@@ -12,6 +17,7 @@ export interface IReport extends Document {
   title: string;
   description: string;
   type: 'daily' | 'weekly' | 'monthly' | 'custom';
+  reportCategory: 'executive' | 'productivity' | 'engagement' | 'ai' | 'security' | 'full';
   createdBy: mongoose.Types.ObjectId;
   dateRange: { start: Date; end: Date };
   filters: {
@@ -19,41 +25,10 @@ export interface IReport extends Document {
     channels: mongoose.Types.ObjectId[];
     users: mongoose.Types.ObjectId[];
   };
-  data: {
-    summary: {
-      totalMessages: number;
-      totalUniqueSenders: number;
-      totalChannels: number;
-      activeChannels: number;
-      avgResponseTime: number;
-      uptimeEstimate: number;
-    };
-    messagesPerDay: { date: string; count: number }[];
-    topChannels: { name: string; platform: string; count: number }[];
-    topUsers: { username: string; messageCount: number }[];
-    platformDistribution: { platform: string; count: number }[];
-    hourlyActivity: { hour: number; count: number }[];
-    kpis: {
-      messagesPerUser: number;
-      responseTime: number;
-      channelActivityRate: number;
-      userRetention: number;
-    };
-    comparison: {
-      totalMessages: number;
-      totalUniqueSenders: number;
-      avgResponseTime: number;
-    };
-  };
+  data: any;
   status: 'pending' | 'completed' | 'failed';
-  signature?: {
-    hash: string;
-    timestamp: Date;
-  };
-  sharedWith: {
-    user: mongoose.Types.ObjectId;
-    permission: 'view' | 'edit';
-  }[];
+  signature?: { hash: string; timestamp: Date };
+  sharedWith: { user: mongoose.Types.ObjectId; permission: 'view' | 'edit' }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,19 +37,11 @@ export interface IScheduledReport extends Document {
   title: string;
   description: string;
   type: 'daily' | 'weekly' | 'monthly' | 'custom';
+  reportCategory: string;
   createdBy: mongoose.Types.ObjectId;
   dateRange: { start: Date; end: Date };
-  filters: {
-    platforms: string[];
-    channels: mongoose.Types.ObjectId[];
-    users: mongoose.Types.ObjectId[];
-  };
-  schedule: {
-    frequency: 'daily' | 'weekly' | 'monthly';
-    time: string;
-    dayOfWeek?: number;
-    dayOfMonth?: number;
-  };
+  filters: { platforms: string[]; channels: mongoose.Types.ObjectId[]; users: mongoose.Types.ObjectId[] };
+  schedule: { frequency: string; time: string; dayOfWeek?: number; dayOfMonth?: number };
   nextGeneration: Date;
   isActive: boolean;
   createdAt: Date;
@@ -90,11 +57,12 @@ const ReportSchema: Schema = new Schema(
       enum: ['daily', 'weekly', 'monthly', 'custom'],
       required: true,
     },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
+    reportCategory: {
+      type: String,
+      enum: ['executive', 'productivity', 'engagement', 'ai', 'security', 'full'],
+      default: 'full',
     },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     dateRange: {
       start: { type: Date, required: true },
       end: { type: Date, required: true },
@@ -104,42 +72,7 @@ const ReportSchema: Schema = new Schema(
       channels: { type: [Schema.Types.ObjectId], ref: 'Channel', default: [] },
       users: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     },
-    data: {
-      summary: {
-        totalMessages: { type: Number, default: 0 },
-        totalUniqueSenders: { type: Number, default: 0 },
-        totalChannels: { type: Number, default: 0 },
-        activeChannels: { type: Number, default: 0 },
-        avgResponseTime: { type: Number, default: 0 },
-        uptimeEstimate: { type: Number, default: 100 },
-      },
-      messagesPerDay: [
-        { date: String, count: Number },
-      ],
-      topChannels: [
-        { name: String, platform: String, count: Number },
-      ],
-      topUsers: [
-        { username: String, messageCount: Number },
-      ],
-      platformDistribution: [
-        { platform: String, count: Number },
-      ],
-      hourlyActivity: [
-        { hour: Number, count: Number },
-      ],
-      kpis: {
-        messagesPerUser: { type: Number, default: 0 },
-        responseTime: { type: Number, default: 0 },
-        channelActivityRate: { type: Number, default: 0 },
-        userRetention: { type: Number, default: 0 },
-      },
-      comparison: {
-        totalMessages: { type: Number, default: 0 },
-        totalUniqueSenders: { type: Number, default: 0 },
-        avgResponseTime: { type: Number, default: 0 },
-      },
-    },
+    data: { type: Schema.Types.Mixed, default: {} },
     status: {
       type: String,
       enum: ['pending', 'completed', 'failed'],
@@ -168,11 +101,8 @@ const ScheduledReportSchema: Schema = new Schema(
       enum: ['daily', 'weekly', 'monthly', 'custom'],
       required: true,
     },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
+    reportCategory: { type: String, default: 'full' },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     dateRange: {
       start: { type: Date, required: true },
       end: { type: Date, required: true },
@@ -183,11 +113,7 @@ const ScheduledReportSchema: Schema = new Schema(
       users: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     },
     schedule: {
-      frequency: {
-        type: String,
-        enum: ['daily', 'weekly', 'monthly'],
-        required: true,
-      },
+      frequency: { type: String, enum: ['daily', 'weekly', 'monthly'], required: true },
       time: { type: String, default: '09:00' },
       dayOfWeek: { type: Number, min: 0, max: 6, default: null },
       dayOfMonth: { type: Number, min: 1, max: 31, default: null },
@@ -218,8 +144,9 @@ function computePercentChange(current: number, previous: number): number {
 async function generateReportData(
   userId: string,
   dateRange: { start: Date; end: Date },
-  filters: { platforms: string[]; channels: string[]; users: string[] }
-) {
+  filters: { platforms: string[]; channels: string[]; users: string[] },
+  reportCategory: string = 'full'
+): Promise<any> {
   const userChannelIds = await getUserChannelIds(userId);
   const matchStage: any = {
     channel: { $in: userChannelIds },
@@ -227,321 +154,249 @@ async function generateReportData(
   };
 
   if (filters.channels?.length) {
-    matchStage.channel = {
-      $in: userChannelIds.filter((id) =>
-        filters.channels.includes(id.toString())
-      ),
-    };
+    matchStage.channel = { $in: userChannelIds.filter((id) => filters.channels.includes(id.toString())) };
   }
-
   if (filters.users?.length) {
     matchStage.sender = { $in: filters.users };
   }
-
-  let channelIdsForPlatform = userChannelIds;
   if (filters.platforms?.length) {
-    const platformChannels = await Channel.find({
-      _id: { $in: userChannelIds },
-      platform: { $in: filters.platforms },
-    })
-      .select('_id')
-      .lean();
-    channelIdsForPlatform = platformChannels.map((c: any) => c._id);
-    matchStage.channel = { $in: channelIdsForPlatform };
+    const platformChannels = await Channel.find({ _id: { $in: userChannelIds }, platform: { $in: filters.platforms } }).select('_id').lean();
+    matchStage.channel = { $in: platformChannels.map((c: any) => c._id) };
   }
 
-  // --- summary ---
-  const [totalMessages, uniqueSendersAgg, totalChannelsCount, activeChannelsAgg] =
-    await Promise.all([
+  const data: any = {};
+  const cat = reportCategory || 'full';
+  const includeMessages = cat === 'full' || cat === 'executive' || cat === 'engagement';
+  const includeTasks = cat === 'full' || cat === 'executive' || cat === 'productivity';
+  const includeSurveys = cat === 'full' || cat === 'engagement';
+  const includeAi = cat === 'full' || cat === 'ai';
+  const includeAudit = cat === 'full' || cat === 'security';
+
+  if (includeMessages) {
+    const [totalMessages, uniqueSendersAgg, totalChannelsCount, activeChannelsAgg] = await Promise.all([
       Message.countDocuments(matchStage),
-      Message.aggregate([
-        { $match: matchStage },
-        { $group: { _id: '$sender' } },
-        { $count: 'total' },
-      ]),
+      Message.aggregate([{ $match: matchStage }, { $group: { _id: '$sender' } }, { $count: 'total' }]),
       Channel.countDocuments({ _id: { $in: userChannelIds } }),
-      Message.aggregate([
-        { $match: matchStage },
-        { $group: { _id: '$channel' } },
-        { $count: 'total' },
-      ]),
+      Message.aggregate([{ $match: matchStage }, { $group: { _id: '$channel' } }, { $count: 'total' }]),
+    ]);
+    const totalUniqueSenders = uniqueSendersAgg[0]?.total || 0;
+    const activeChannels = activeChannelsAgg[0]?.total || 0;
+
+    const messagesPerDay = await Message.aggregate([
+      { $match: matchStage },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+      { $project: { date: '$_id', count: 1, _id: 0 } },
+      { $sort: { date: 1 } },
     ]);
 
-  const totalUniqueSenders = uniqueSendersAgg[0]?.total || 0;
-  const activeChannels = activeChannelsAgg[0]?.total || 0;
-
-  // avg response time (ms between consecutive messages in same channel)
-  const avgResponseAgg = await Message.aggregate([
-    { $match: matchStage },
-    { $sort: { channel: 1, createdAt: 1 } },
-    {
-      $group: {
-        _id: '$channel',
-        messages: { $push: '$createdAt' },
-      },
-    },
-    {
-      $project: {
-        diffs: {
-          $filter: {
-            input: {
-              $map: {
-                input: { $range: [1, { $size: '$messages' }] },
-                as: 'i',
-                in: {
-                  $subtract: [
-                    { $arrayElemAt: ['$messages', '$$i'] },
-                    { $arrayElemAt: ['$messages', { $subtract: ['$$i', 1] }] },
-                  ],
-                },
-              },
-            },
-            cond: { $lt: ['$$this', 86400000] },
-          },
-        },
-      },
-    },
-    { $unwind: '$diffs' },
-    { $group: { _id: null, avgMs: { $avg: '$diffs' } } },
-  ]);
-  const avgResponseTime = Math.round(avgResponseAgg[0]?.avgMs || 0);
-
-  const uptimeEstimate =
-    totalChannelsCount > 0
-      ? Math.round((activeChannels / totalChannelsCount) * 100)
-      : 100;
-
-  // --- messagesPerDay ---
-  const messagesPerDay = await Message.aggregate([
-    { $match: matchStage },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
-          day: { $dayOfMonth: '$createdAt' },
-        },
-        count: { $sum: 1 },
-      },
-    },
-    {
-      $project: {
-        date: {
-          $dateFromParts: {
-            year: '$_id.year',
-            month: '$_id.month',
-            day: '$_id.day',
-          },
-        },
-        count: 1,
-        _id: 0,
-      },
-    },
-    { $sort: { date: 1 } },
-  ]);
-
-  // --- topChannels ---
-  const topChannels = await Message.aggregate([
-    { $match: matchStage },
-    { $group: { _id: '$channel', count: { $sum: 1 } } },
-    {
-      $lookup: {
-        from: 'channels',
-        localField: '_id',
-        foreignField: '_id',
-        as: 'ch',
-      },
-    },
-    { $unwind: '$ch' },
-    {
-      $project: {
-        name: '$ch.name',
-        platform: '$ch.platform',
-        count: 1,
-        _id: 0,
-      },
-    },
-    { $sort: { count: -1 } },
-    { $limit: 10 },
-  ]);
-
-  // --- topUsers ---
-  const topUsers = await Message.aggregate([
-    { $match: matchStage },
-    { $group: { _id: '$sender', messageCount: { $sum: 1 } } },
-    {
-      $lookup: {
-        from: 'users',
-        localField: '_id',
-        foreignField: '_id',
-        as: 'u',
-      },
-    },
-    { $unwind: '$u' },
-    {
-      $project: { username: '$u.username', messageCount: 1, _id: 0 },
-    },
-    { $sort: { messageCount: -1 } },
-    { $limit: 10 },
-  ]);
-
-  // --- platformDistribution ---
-  const platformDistribution = await Message.aggregate([
-    { $match: matchStage },
-    {
-      $lookup: {
-        from: 'channels',
-        localField: 'channel',
-        foreignField: '_id',
-        as: 'ch',
-      },
-    },
-    { $unwind: '$ch' },
-    { $group: { _id: '$ch.platform', count: { $sum: 1 } } },
-    { $project: { platform: '$_id', count: 1, _id: 0 } },
-    { $sort: { count: -1 } },
-  ]);
-
-  // --- hourlyActivity ---
-  const hourlyActivity = await Message.aggregate([
-    { $match: matchStage },
-    { $group: { _id: { $hour: '$createdAt' }, count: { $sum: 1 } } },
-    { $project: { hour: '$_id', count: 1, _id: 0 } },
-    { $sort: { hour: 1 } },
-  ]);
-
-  // --- kpis ---
-  const messagesPerUser =
-    totalUniqueSenders > 0
-      ? Math.round((totalMessages / totalUniqueSenders) * 100) / 100
-      : 0;
-  const channelActivityRate =
-    totalChannelsCount > 0
-      ? Math.round((activeChannels / totalChannelsCount) * 10000) / 100
-      : 0;
-
-  const sevenDaysAgo = new Date(
-    dateRange.end.getTime() - 7 * 24 * 60 * 60 * 1000
-  );
-  const recentActiveSenders = await Message.distinct('sender', {
-    channel: { $in: userChannelIds },
-    createdAt: { $gte: sevenDaysAgo, $lte: dateRange.end },
-  });
-  const allChannelMembers = await Channel.distinct('members', {
-    _id: { $in: userChannelIds },
-  });
-  const userRetention =
-    allChannelMembers.length > 0
-      ? Math.round(
-          (recentActiveSenders.length / allChannelMembers.length) * 10000
-        ) / 100
-      : 0;
-
-  // --- comparison (previous period of same length) ---
-  const periodMs = dateRange.end.getTime() - dateRange.start.getTime();
-  const prevStart = new Date(dateRange.start.getTime() - periodMs);
-  const prevEnd = new Date(dateRange.start.getTime() - 1);
-  const prevMatch: any = {
-    channel: { $in: userChannelIds },
-    createdAt: { $gte: prevStart, $lte: prevEnd },
-  };
-  if (filters.channels?.length) {
-    prevMatch.channel = {
-      $in: userChannelIds.filter((id) =>
-        filters.channels.includes(id.toString())
-      ),
-    };
-  }
-  if (filters.users?.length) {
-    prevMatch.sender = { $in: filters.users };
-  }
-  if (filters.platforms?.length) {
-    prevMatch.channel = { $in: channelIdsForPlatform };
-  }
-
-  const [prevTotalMessages, prevUniqueSendersAgg, prevAvgResponseAgg] =
-    await Promise.all([
-      Message.countDocuments(prevMatch),
-      Message.aggregate([
-        { $match: prevMatch },
-        { $group: { _id: '$sender' } },
-        { $count: 'total' },
-      ]),
-      Message.aggregate([
-        { $match: prevMatch },
-        { $sort: { channel: 1, createdAt: 1 } },
-        {
-          $group: {
-            _id: '$channel',
-            messages: { $push: '$createdAt' },
-          },
-        },
-        {
-          $project: {
-            diffs: {
-              $filter: {
-                input: {
-                  $map: {
-                    input: { $range: [1, { $size: '$messages' }] },
-                    as: 'i',
-                    in: {
-                      $subtract: [
-                        { $arrayElemAt: ['$messages', '$$i'] },
-                        {
-                          $arrayElemAt: [
-                            '$messages',
-                            { $subtract: ['$$i', 1] },
-                          ],
-                        },
-                      ],
-                    },
-                  },
-                },
-                cond: { $lt: ['$$this', 86400000] },
-              },
-            },
-          },
-        },
-        { $unwind: '$diffs' },
-        { $group: { _id: null, avgMs: { $avg: '$diffs' } } },
-      ]),
+    const topChannels = await Message.aggregate([
+      { $match: matchStage },
+      { $group: { _id: '$channel', count: { $sum: 1 } } },
+      { $lookup: { from: 'channels', localField: '_id', foreignField: '_id', as: 'ch' } },
+      { $unwind: '$ch' },
+      { $project: { name: '$ch.name', platform: '$ch.platform', count: 1, _id: 0 } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
     ]);
 
-  const prevTotalUniqueSenders = prevUniqueSendersAgg[0]?.total || 0;
-  const prevAvgResponseTime = Math.round(prevAvgResponseAgg[0]?.avgMs || 0);
+    const topUsers = await Message.aggregate([
+      { $match: matchStage },
+      { $group: { _id: '$sender', messageCount: { $sum: 1 } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u' } },
+      { $unwind: '$u' },
+      { $project: { username: '$u.username', messageCount: 1, _id: 0 } },
+      { $sort: { messageCount: -1 } },
+      { $limit: 10 },
+    ]);
 
-  return {
-    summary: {
-      totalMessages,
-      totalUniqueSenders,
+    const hourlyActivity = await Message.aggregate([
+      { $match: matchStage },
+      { $group: { _id: { $hour: '$createdAt' }, count: { $sum: 1 } } },
+      { $project: { hour: '$_id', count: 1, _id: 0 } },
+      { $sort: { hour: 1 } },
+    ]);
+
+    const messagesPerUser = totalUniqueSenders > 0 ? Math.round((totalMessages / totalUniqueSenders) * 100) / 100 : 0;
+    const channelActivityRate = totalChannelsCount > 0 ? Math.round((activeChannels / totalChannelsCount) * 10000) / 100 : 0;
+
+    data.messages = {
+      total: totalMessages,
+      uniqueSenders: totalUniqueSenders,
       totalChannels: totalChannelsCount,
       activeChannels,
-      avgResponseTime,
-      uptimeEstimate,
-    },
-    messagesPerDay: messagesPerDay.map((d: any) => ({
-      date: d.date.toISOString().split('T')[0],
-      count: d.count,
-    })),
-    topChannels,
-    topUsers,
-    platformDistribution,
-    hourlyActivity,
-    kpis: {
+      messagesPerDay,
+      topChannels,
+      topUsers,
+      hourlyActivity,
       messagesPerUser,
-      responseTime: avgResponseTime,
       channelActivityRate,
-      userRetention,
-    },
-    comparison: {
-      totalMessages: computePercentChange(totalMessages, prevTotalMessages),
-      totalUniqueSenders: computePercentChange(
-        totalUniqueSenders,
-        prevTotalUniqueSenders
-      ),
-      avgResponseTime: computePercentChange(avgResponseTime, prevAvgResponseTime),
-    },
+    };
+  }
+
+  if (includeTasks) {
+    const taskMatch: any = { createdAt: { $gte: dateRange.start, $lte: dateRange.end } };
+    if (filters.users?.length) {
+      taskMatch.$or = [{ creator: { $in: filters.users } }, { assignee: { $in: filters.users } }];
+    } else {
+      taskMatch.$or = [{ creator: userId }, { assignee: userId }];
+    }
+
+    const [totalTasks, taskStatusCounts, taskPriorityCounts, overdueTasks, completedTasks, avgCompletionAgg, tasksByUserAgg, hoursAgg] = await Promise.all([
+      Task.countDocuments(taskMatch),
+      Task.aggregate([{ $match: taskMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Task.aggregate([{ $match: taskMatch }, { $group: { _id: '$priority', count: { $sum: 1 } } }]),
+      Task.countDocuments({ ...taskMatch, dueDate: { $lt: new Date() }, status: { $nin: ['completed', 'cancelled'] } }),
+      Task.countDocuments({ ...taskMatch, status: 'completed' }),
+      Task.aggregate([
+        { $match: { ...taskMatch, status: 'completed', completedAt: { $ne: null }, createdAt: { $ne: null } } },
+        { $project: { durationMs: { $subtract: ['$completedAt', '$createdAt'] } } },
+        { $group: { _id: null, avgMs: { $avg: '$durationMs' } } },
+      ]),
+      Task.aggregate([
+        { $match: taskMatch },
+        { $group: { _id: '$assignee', count: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } } } },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        { $project: { username: '$user.username', count: 1, completed: 1, _id: 0 } },
+        { $sort: { count: -1 } },
+      ]),
+      Task.aggregate([
+        { $match: { ...taskMatch, actualHours: { $gt: 0 } } },
+        { $group: { _id: null, totalActual: { $sum: '$actualHours' }, totalEstimated: { $sum: { $ifNull: ['$estimatedHours', 0] } } } },
+      ]),
+    ]);
+
+    const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 10000) / 100 : 0;
+    const avgCompletionTimeDays = avgCompletionAgg[0]?.avgMs ? Math.round(avgCompletionAgg[0].avgMs / (1000 * 60 * 60 * 24) * 100) / 100 : 0;
+
+    const taskStatusMap: Record<string, number> = { pending: 0, in_progress: 0, completed: 0, cancelled: 0 };
+    taskStatusCounts.forEach((s: any) => { taskStatusMap[s._id] = s.count; });
+    const taskPriorityMap: Record<string, number> = { low: 0, medium: 0, high: 0, urgent: 0 };
+    taskPriorityCounts.forEach((p: any) => { taskPriorityMap[p._id] = p.count; });
+
+    data.tasks = {
+      total: totalTasks,
+      completed: completedTasks,
+      overdue: overdueTasks,
+      completionRate: taskCompletionRate,
+      avgCompletionTimeDays,
+      byStatus: taskStatusMap,
+      byPriority: taskPriorityMap,
+      byUser: tasksByUserAgg,
+      hoursTracked: Math.round((hoursAgg[0]?.totalActual || 0) * 100) / 100,
+      hoursEstimated: Math.round((hoursAgg[0]?.totalEstimated || 0) * 100) / 100,
+    };
+  }
+
+  let totalSurveys = 0;
+  let totalAiQueries = 0;
+  let failedLogins = 0;
+  let taskCompletionRate = 0;
+  let totalUniqueSenders = 0;
+  let messagesPerUser = 0;
+  let tasksByUserAgg: any[] = [];
+
+  if (includeSurveys) {
+    const surveyMatch: any = { createdAt: { $gte: dateRange.start, $lte: dateRange.end } };
+    if (filters.users?.length) {
+      surveyMatch.creator = { $in: filters.users };
+    } else {
+      surveyMatch.creator = userId;
+    }
+
+    const [totalSurveysCount, surveyStatusCounts, totalResponses, avgScoreAgg] = await Promise.all([
+      Survey.countDocuments(surveyMatch),
+      Survey.aggregate([{ $match: surveyMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Survey.aggregate([
+        { $match: surveyMatch },
+        { $project: { responseCount: { $size: { $ifNull: ['$responses', []] } } } },
+        { $group: { _id: null, total: { $sum: '$responseCount' } } },
+      ]),
+      Survey.aggregate([
+        { $match: surveyMatch },
+        { $unwind: { path: '$responses', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$responses.answers', preserveNullAndEmptyArrays: true } },
+        { $match: { 'answers.value': { $exists: true, $ne: null } } },
+        { $group: { _id: null, avgScore: { $avg: { $toDouble: '$answers.value' } } } },
+      ]),
+    ]);
+
+    totalSurveys = totalSurveysCount;
+    const surveyStatusMap: Record<string, number> = { draft: 0, active: 0, closed: 0 };
+    surveyStatusCounts.forEach((s: any) => { surveyStatusMap[s._id] = s.count; });
+
+    data.surveys = {
+      total: totalSurveys,
+      byStatus: surveyStatusMap,
+      totalResponses: totalResponses[0]?.total || 0,
+      avgScore: avgScoreAgg[0]?.avgScore ? Math.round(avgScoreAgg[0].avgScore * 100) / 100 : null,
+    };
+  }
+
+  if (includeAi) {
+    const aiMatch: any = { createdAt: { $gte: dateRange.start, $lte: dateRange.end } };
+    if (filters.users?.length) {
+      aiMatch.user = { $in: filters.users };
+    }
+
+    const [totalAiQueriesCount, aiByModel, aiCostAgg, aiPerformanceAgg] = await Promise.all([
+      AiMetric.countDocuments(aiMatch),
+      AiMetric.aggregate([{ $match: aiMatch }, { $group: { _id: '$modelName', count: { $sum: 1 }, totalTokens: { $sum: '$totalTokens' }, totalCost: { $sum: '$costUsd' } } }, { $sort: { count: -1 } }]),
+      AiMetric.aggregate([{ $match: aiMatch }, { $group: { _id: null, totalCost: { $sum: '$costUsd' }, totalTokens: { $sum: '$totalTokens' } } }]),
+      AiMetric.aggregate([{ $match: aiMatch }, { $group: { _id: null, avgResponseTime: { $avg: '$responseTimeMs' }, successRate: { $avg: { $cond: ['$success', 1, 0] } } } }]),
+    ]);
+
+    totalAiQueries = totalAiQueriesCount;
+
+    data.ai = {
+      totalQueries: totalAiQueries,
+      byModel: aiByModel,
+      totalCost: Math.round((aiCostAgg[0]?.totalCost || 0) * 10000) / 10000,
+      totalTokens: aiCostAgg[0]?.totalTokens || 0,
+      avgResponseTime: aiPerformanceAgg[0]?.avgResponseTime ? Math.round(aiPerformanceAgg[0].avgResponseTime) : 0,
+      successRate: aiPerformanceAgg[0]?.successRate ? Math.round(aiPerformanceAgg[0].successRate * 100) : 100,
+    };
+  }
+
+  if (includeAudit) {
+    const auditMatch: any = { createdAt: { $gte: dateRange.start, $lte: dateRange.end } };
+    const [totalAuditEvents, failedLoginsCount, permissionChanges, auditByCategory] = await Promise.all([
+      AuditLog.countDocuments(auditMatch),
+      AuditLog.countDocuments({ ...auditMatch, action: 'login.failed' }),
+      AuditLog.countDocuments({ ...auditMatch, category: 'permissions' }),
+      AuditLog.aggregate([{ $match: auditMatch }, { $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+    ]);
+
+    failedLogins = failedLoginsCount;
+
+    data.audit = {
+      totalEvents: totalAuditEvents,
+      failedLogins,
+      permissionChanges,
+      byCategory: auditByCategory,
+    };
+  }
+
+  if (includeMessages && data.messages) {
+    totalUniqueSenders = data.messages.uniqueSenders || 0;
+    messagesPerUser = data.messages.messagesPerUser || 0;
+  }
+  if (includeTasks && data.tasks) {
+    taskCompletionRate = data.tasks.completionRate || 0;
+    tasksByUserAgg = data.tasks.byUser || [];
+  }
+
+  const activeUsers = Math.max(totalUniqueSenders, tasksByUserAgg.length);
+  data.kpis = {
+    activeUsers,
+    messagesPerUser,
+    taskCompletionRate,
+    surveyResponseRate: totalSurveys > 0 ? Math.round(((data.surveys?.totalResponses || 0) / Math.max(totalSurveys, 1)) * 100) / 100 : 0,
+    aiAdoptionRate: activeUsers > 0 ? Math.round((totalAiQueries > 0 ? 1 : 0) * 100) : 0,
+    securityScore: failedLogins > 5 ? 'attention' : 'healthy',
   };
+
+  return data;
 }
 
 function calculateNextGeneration(schedule: {
@@ -581,7 +436,7 @@ function calculateNextGeneration(schedule: {
 export const createReport = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { title, description, type, dateRange, filters } = req.body;
+    const { title, description, type, dateRange, filters, reportCategory } = req.body;
 
     if (!title || !type || !dateRange?.start || !dateRange?.end) {
       return res
@@ -590,18 +445,23 @@ export const createReport = async (req: AuthRequest, res: Response) => {
     }
 
     const parsedDateRange = { start: new Date(dateRange.start), end: new Date(dateRange.end) };
-    const reportData = await generateReportData(userId, parsedDateRange, filters || {});
+    const reportData = await generateReportData(userId, parsedDateRange, filters || {}, reportCategory || 'full');
 
     const report = await Report.create({
       title,
       description: description || '',
       type,
+      reportCategory: reportCategory || 'full',
       createdBy: userId,
       dateRange: parsedDateRange,
       filters: filters || { platforms: [], channels: [], users: [] },
       data: reportData,
       status: 'completed',
     });
+
+    logAction(userId, 'report.created', 'create', report._id.toString(), 'Report',
+      { title, type, reportCategory: reportCategory || 'full', dateRange },
+      req.ip, req.headers['user-agent'] as string);
 
     res.status(201).json({ success: true, data: report });
   } catch (error: any) {
@@ -654,6 +514,10 @@ export const getReport = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ success: false, message: 'No tienes acceso a este reporte' });
     }
 
+    logAction(userId, 'report.viewed', 'access', reportId, 'Report',
+      { title: report.title },
+      req.ip, req.headers['user-agent']);
+
     res.json({ success: true, data: report });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error obteniendo reporte', error: error.message });
@@ -675,6 +539,11 @@ export const deleteReport = async (req: AuthRequest, res: Response) => {
     }
 
     await Report.findByIdAndDelete(reportId);
+
+    logAction(userId, 'report.deleted', 'delete', reportId, 'Report',
+      { title: report.title },
+      req.ip, req.headers['user-agent']);
+
     res.json({ success: true, message: 'Reporte eliminado' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error eliminando reporte', error: error.message });
@@ -751,6 +620,11 @@ export const shareReport = async (req: AuthRequest, res: Response) => {
     }
 
     await report.save();
+
+    logAction(userId, 'report.shared', 'access', reportId, 'Report',
+      { sharedWith: targetUserId, permission: permission || 'view', title: report.title },
+      req.ip, req.headers['user-agent']);
+
     res.json({ success: true, data: report.sharedWith });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error compartiendo reporte', error: error.message });
@@ -777,46 +651,77 @@ export const exportReport = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ success: false, message: 'No tienes acceso a este reporte' });
     }
 
+    logAction(userId, 'report.exported', 'access', reportId, 'Report',
+      { format, title: report.title },
+      req.ip, req.headers['user-agent']);
+
     if (format === 'csv') {
       const rows: string[] = [];
       rows.push('Metric,Value');
       rows.push(`Title,${report.title}`);
       rows.push(`Type,${report.type}`);
       rows.push(`Date Range,${report.dateRange.start} - ${report.dateRange.end}`);
-      rows.push(`Total Messages,${report.data.summary.totalMessages}`);
-      rows.push(`Total Unique Senders,${report.data.summary.totalUniqueSenders}`);
-      rows.push(`Total Channels,${report.data.summary.totalChannels}`);
-      rows.push(`Active Channels,${report.data.summary.activeChannels}`);
-      rows.push(`Avg Response Time (ms),${report.data.summary.avgResponseTime}`);
-      rows.push('');
-      rows.push('Messages Per Day');
-      rows.push('Date,Count');
-      for (const d of report.data.messagesPerDay) {
-        rows.push(`${d.date},${d.count}`);
+      if (report.data.messages) {
+        rows.push(`Total Messages,${report.data.messages.total || 0}`);
+        rows.push(`Total Unique Senders,${report.data.messages.uniqueSenders || 0}`);
+        rows.push(`Total Channels,${report.data.messages.totalChannels || 0}`);
+        rows.push(`Active Channels,${report.data.messages.activeChannels || 0}`);
+        rows.push(`Messages Per User,${report.data.messages.messagesPerUser || 0}`);
       }
-      rows.push('');
-      rows.push('Top Channels');
-      rows.push('Name,Platform,Count');
-      for (const ch of report.data.topChannels) {
-        rows.push(`${ch.name},${ch.platform},${ch.count}`);
+      if (report.data.tasks) {
+        rows.push(`Total Tasks,${report.data.tasks.total || 0}`);
+        rows.push(`Completed Tasks,${report.data.tasks.completed || 0}`);
+        rows.push(`Task Completion Rate,${report.data.tasks.completionRate || 0}%`);
+        rows.push(`Overdue Tasks,${report.data.tasks.overdue || 0}`);
       }
-      rows.push('');
-      rows.push('Top Users');
-      rows.push('Username,Message Count');
-      for (const u of report.data.topUsers) {
-        rows.push(`${u.username},${u.messageCount}`);
+      if (report.data.surveys) {
+        rows.push(`Total Surveys,${report.data.surveys.total || 0}`);
+        rows.push(`Survey Responses,${report.data.surveys.totalResponses || 0}`);
       }
-      rows.push('');
-      rows.push('Platform Distribution');
-      rows.push('Platform,Count');
-      for (const p of report.data.platformDistribution) {
-        rows.push(`${p.platform},${p.count}`);
+      if (report.data.ai) {
+        rows.push(`AI Queries,${report.data.ai.totalQueries || 0}`);
+        rows.push(`AI Total Cost,${report.data.ai.totalCost || 0}`);
+        rows.push(`AI Total Tokens,${report.data.ai.totalTokens || 0}`);
       }
-      rows.push('');
-      rows.push('Hourly Activity');
-      rows.push('Hour,Count');
-      for (const h of report.data.hourlyActivity) {
-        rows.push(`${h.hour},${h.count}`);
+      if (report.data.audit) {
+        rows.push(`Audit Events,${report.data.audit.totalEvents || 0}`);
+        rows.push(`Failed Logins,${report.data.audit.failedLogins || 0}`);
+      }
+      if (report.data.kpis) {
+        rows.push(`Active Users,${report.data.kpis.activeUsers || 0}`);
+        rows.push(`Security Score,${report.data.kpis.securityScore || 'healthy'}`);
+      }
+      if (report.data.messages?.messagesPerDay?.length) {
+        rows.push('');
+        rows.push('Messages Per Day');
+        rows.push('Date,Count');
+        for (const d of report.data.messages.messagesPerDay) {
+          rows.push(`${d.date},${d.count}`);
+        }
+      }
+      if (report.data.messages?.topChannels?.length) {
+        rows.push('');
+        rows.push('Top Channels');
+        rows.push('Name,Platform,Count');
+        for (const ch of report.data.messages.topChannels) {
+          rows.push(`${ch.name},${ch.platform || ''},${ch.count}`);
+        }
+      }
+      if (report.data.messages?.topUsers?.length) {
+        rows.push('');
+        rows.push('Top Users');
+        rows.push('Username,Message Count');
+        for (const u of report.data.messages.topUsers) {
+          rows.push(`${u.username},${u.messageCount}`);
+        }
+      }
+      if (report.data.messages?.hourlyActivity?.length) {
+        rows.push('');
+        rows.push('Hourly Activity');
+        rows.push('Hour,Count');
+        for (const h of report.data.messages.hourlyActivity) {
+          rows.push(`${h.hour},${h.count}`);
+        }
       }
 
       const csv = rows.join('\n');

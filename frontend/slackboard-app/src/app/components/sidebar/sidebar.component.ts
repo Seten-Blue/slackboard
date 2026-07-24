@@ -52,7 +52,7 @@ export class SidebarComponent implements OnInit {
   };
 
   dashboardSubItems: DashboardSubItem[] = [
-    { id: 'activity', label: 'Actividad' },
+    { id: 'activity', label: 'Resumen del Dia' },
     { id: 'traffic', label: 'Trafico' },
     { id: 'stats', label: 'Estadisticas' },
     { id: 'tasks', label: 'Tareas' },

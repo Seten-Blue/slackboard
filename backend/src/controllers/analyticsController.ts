@@ -5,6 +5,10 @@ import Analytics from '../models/Analytics';
 import Message from '../models/Message';
 import Channel from '../models/Channel';
 import User from '../models/User';
+import Task from '../models/Task';
+import Survey from '../models/Survey';
+import AiMetric from '../models/AiMetric';
+import AuditLog from '../models/AuditLog';
 import { AuthRequest } from '../middleware/auth';
 import { getFriendIds } from './friendshipController';
 
@@ -84,7 +88,7 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
     const recentEvents = await Message.find({ channel: { $in: channelIds } })
       .sort({ createdAt: -1 })
       .limit(20)
-      .populate('sender', 'username avatar')
+      .populate('sender', 'username avatar role')
       .select('content type createdAt sender channel')
       .lean();
 
@@ -95,7 +99,7 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
     })
       .sort({ createdAt: -1 })
       .limit(10)
-      .populate('sender', 'username')
+      .populate('sender', 'username role')
       .select('content type attachments createdAt sender')
       .lean();
 
@@ -131,6 +135,26 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
     ]);
     const avgResponseMs = avgResponseTimeAgg[0]?.avgMs || 0;
 
+    // === TASKS (today) ===
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [todayTasks, overdueTasks, myPendingTasks] = await Promise.all([
+      Task.countDocuments({ createdAt: { $gte: todayStart } }),
+      Task.countDocuments({ dueDate: { $lt: now }, status: { $nin: ['completed', 'cancelled'] }, $or: [{ creator: userId }, { assignee: userId }] }),
+      Task.find({ assignee: userId, status: { $nin: ['completed', 'cancelled'] } }).select('title priority dueDate status').sort({ dueDate: 1 }).limit(5).lean(),
+    ]);
+
+    // === SURVEYS (active) ===
+    const activeSurveys = await Survey.countDocuments({ status: 'active', $or: [{ creator: userId }, { targetUsers: userId }] });
+
+    // === AI (today) ===
+    const [todayAiQueries, aiCostToday] = await Promise.all([
+      AiMetric.countDocuments({ createdAt: { $gte: todayStart } }),
+      AiMetric.aggregate([{ $match: { createdAt: { $gte: todayStart } } }, { $group: { _id: null, total: { $sum: '$costUsd' } } }]),
+    ]);
+
+    // === AUDIT (recent security) ===
+    const recentFailedLogins = await AuditLog.countDocuments({ action: 'login.failed', createdAt: { $gte: oneDayAgo } });
+
     res.json({
       success: true,
       data: {
@@ -143,6 +167,21 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
         recentEvents,
         recentFiles,
         avgResponseTime: Math.round(avgResponseMs),
+        tasks: {
+          createdToday: todayTasks,
+          overdue: overdueTasks,
+          pending: myPendingTasks,
+        },
+        surveys: {
+          active: activeSurveys,
+        },
+        ai: {
+          queriesToday: todayAiQueries,
+          costToday: Math.round((aiCostToday[0]?.total || 0) * 10000) / 10000,
+        },
+        security: {
+          failedLogins24h: recentFailedLogins,
+        },
       },
     });
   } catch (error: any) {

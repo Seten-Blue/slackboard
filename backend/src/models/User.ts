@@ -19,7 +19,7 @@ export interface IUser extends Document {
   trelloApiKey?: string;
   trelloToken?: string;
   status: 'online' | 'offline' | 'away';
-  role: 'admin' | 'user';
+  role: 'owner' | 'admin' | 'manager' | 'member' | 'guest';
   googleId?: string;
   discordUserId?: string;
   discordUsername?: string;
@@ -128,8 +128,8 @@ const UserSchema: Schema = new Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'user'],
-      default: 'user',
+      enum: ['owner', 'admin', 'manager', 'member', 'guest'],
+      default: 'member',
     },
     googleId: {
       type: String,

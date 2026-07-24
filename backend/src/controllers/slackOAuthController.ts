@@ -4,6 +4,7 @@ import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import slackOAuthService from '../services/slackOAuthService';
 import Channel from '../models/Channel';
+import { logAction } from './auditLogController';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-env';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
@@ -82,6 +83,9 @@ export const oauthCallback = async (req: Request, res: Response) => {
 
     await user.save();
 
+    logAction(decoded.userId, 'slack.connected', 'integration', decoded.userId, 'User',
+      { teamName: tokenData.team.name, teamId: tokenData.team.id });
+
     res.redirect(`${FRONTEND_URL}/chat?slackLinked=success`);
   } catch (err: any) {
     console.error('❌ Error en el callback de OAuth de Slack:', err.message);
@@ -147,6 +151,10 @@ export const unlinkWorkspace = async (req: AuthRequest, res: Response) => {
     }
 
     await User.findByIdAndUpdate(req.userId, { $pull: { slackWorkspaces: { teamId } } });
+
+    logAction(req.userId!, 'slack.disconnected', 'integration', req.userId!, 'User',
+      { teamId }, req.ip, req.headers['user-agent'] as string);
+
     res.json({ success: true, message: 'Workspace de Slack desvinculado.' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al desvincular', error: error.message });

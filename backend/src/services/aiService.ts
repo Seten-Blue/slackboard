@@ -5,6 +5,7 @@ import User from '../models/User';
 import Channel from '../models/Channel';
 import geminiService, { QuotaExceededError } from './geminiService';
 import slackService from './slackService';
+import { recordMetric } from '../controllers/aiMetricsController';
 
 const AI_EMAIL = 'ai@slackboard.com';
 const AI_USERNAME = 'Zork';
@@ -162,8 +163,10 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
   }
 
   try {
+    const startTime = Date.now();
     const history = await buildHistory(channel._id.toString(), aiUserId, isDedicatedChannel);
     const { text: replyText, switchedTo } = await geminiService.generateReply(finalQuestion, history);
+    const responseTimeMs = Date.now() - startTime;
 
     if (switchedTo) {
       const line = SWITCH_LINES[Math.floor(Math.random() * SWITCH_LINES.length)];
@@ -172,6 +175,19 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
 
     await emitAIMessage(replyText, channel, aiUserId, io);
     console.log('🤖 Respuesta de Zork guardada y emitida');
+
+    recordMetric({
+      user: senderId || aiUserId,
+      channel: channel._id.toString(),
+      modelName: switchedTo || 'gemini-default',
+      inputTokens: finalQuestion.length,
+      outputTokens: replyText.length,
+      totalTokens: finalQuestion.length + replyText.length,
+      responseTimeMs,
+      query: finalQuestion.substring(0, 200),
+      responsePreview: replyText.substring(0, 200),
+      success: true,
+    }).catch(() => {});
 
     if (channel.slackChannelId && slackService.isConfigured()) {
       try {
@@ -187,6 +203,16 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
     const friendlyMessage = isQuotaError
       ? 'Uy, hoy ya use todas mis consultas gratis en todos los modelos que tengo disponibles. Proba de nuevo mas tarde, o si sos vos Juan, ya sabes que hacer con la facturacion 😅'
       : 'Uy, se me trabo algo por un segundo. Proba de nuevo en un rato.';
+
+    recordMetric({
+      user: senderId || aiUserId,
+      channel: channel._id.toString(),
+      modelName: 'gemini-default',
+      query: finalQuestion.substring(0, 200),
+      responsePreview: friendlyMessage.substring(0, 200),
+      success: false,
+      errorMessage: error.message,
+    }).catch(() => {});
 
     try {
       await emitAIMessage(friendlyMessage, channel, aiUserId, io);

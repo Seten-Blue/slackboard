@@ -13,17 +13,28 @@ export class DashboardSurveysComponent implements OnInit {
   showCreateModal = false;
   showResultsModal = false;
   showRespondModal = false;
+  showEditModal = false;
   selectedSurvey: any = null;
   activeTab: 'surveys' | 'stats' = 'surveys';
   results: any = null;
   stats: any = null;
   creating = false;
   submitting = false;
+  errorMessage = '';
+  channels: any[] = [];
 
   newSurvey = {
     title: '',
     description: '',
+    channel: '',
     expiresAt: '',
+    questions: [] as any[]
+  };
+
+  editSurvey = {
+    title: '',
+    description: '',
+    channel: '',
     questions: [] as any[]
   };
 
@@ -63,6 +74,14 @@ export class DashboardSurveysComponent implements OnInit {
   ngOnInit() {
     this.loadSurveys();
     this.loadStats();
+    this.loadChannels();
+  }
+
+  loadChannels() {
+    this.surveysService.getChannels().subscribe({
+      next: (res) => { this.channels = res.data || []; },
+      error: () => {}
+    });
   }
 
   loadSurveys() {
@@ -97,8 +116,10 @@ export class DashboardSurveysComponent implements OnInit {
   createSurvey() {
     if (!this.newSurvey.title || !this.newSurvey.questions.length) return;
     this.creating = true;
+    this.errorMessage = '';
     const payload: any = { ...this.newSurvey };
     if (!payload.expiresAt) delete payload.expiresAt;
+    if (!payload.channel) delete payload.channel;
     this.surveysService.createSurvey(payload).subscribe({
       next: (res) => {
         this.surveys.unshift(res.data);
@@ -107,7 +128,10 @@ export class DashboardSurveysComponent implements OnInit {
         this.resetForm();
         this.loadStats();
       },
-      error: () => { this.creating = false; }
+      error: (err) => {
+        this.creating = false;
+        this.errorMessage = err.error?.message || 'Error al crear encuesta';
+      }
     });
   }
 
@@ -116,7 +140,8 @@ export class DashboardSurveysComponent implements OnInit {
       next: (res) => {
         const idx = this.surveys.findIndex(s => s._id === id);
         if (idx !== -1) this.surveys[idx].status = 'active';
-      }
+      },
+      error: (err) => { alert(err.error?.message || 'Error al activar'); }
     });
   }
 
@@ -125,17 +150,64 @@ export class DashboardSurveysComponent implements OnInit {
       next: () => {
         const idx = this.surveys.findIndex(s => s._id === id);
         if (idx !== -1) this.surveys[idx].status = 'closed';
-      }
+      },
+      error: (err) => { alert(err.error?.message || 'Error al cerrar'); }
     });
   }
 
   deleteSurvey(id: string) {
+    if (!confirm('Eliminar esta encuesta?')) return;
     this.surveysService.deleteSurvey(id).subscribe({
       next: () => {
         this.surveys = this.surveys.filter(s => s._id !== id);
         this.loadStats();
-      }
+      },
+      error: (err) => { alert(err.error?.message || 'Error al eliminar'); }
     });
+  }
+
+  openEdit(survey: any) {
+    this.selectedSurvey = survey;
+    this.editSurvey = {
+      title: survey.title,
+      description: survey.description || '',
+      channel: survey.channel?._id || '',
+      questions: JSON.parse(JSON.stringify(survey.questions || []))
+    };
+    this.showEditModal = true;
+  }
+
+  saveEdit() {
+    if (!this.selectedSurvey) return;
+    this.surveysService.updateSurvey(this.selectedSurvey._id, this.editSurvey).subscribe({
+      next: (res) => {
+        const idx = this.surveys.findIndex(s => s._id === this.selectedSurvey._id);
+        if (idx !== -1) this.surveys[idx] = { ...this.surveys[idx], ...this.editSurvey };
+        this.showEditModal = false;
+      },
+      error: (err) => { alert(err.error?.message || 'Error al actualizar'); }
+    });
+  }
+
+  addEditQuestion() {
+    this.editSurvey.questions.push({
+      text: '',
+      type: 'single_choice',
+      options: ['', ''],
+      required: true
+    });
+  }
+
+  removeEditQuestion(index: number) {
+    this.editSurvey.questions.splice(index, 1);
+  }
+
+  addEditOption(qIndex: number) {
+    this.editSurvey.questions[qIndex].options.push('');
+  }
+
+  removeEditOption(qIndex: number, oIndex: number) {
+    this.editSurvey.questions[qIndex].options.splice(oIndex, 1);
   }
 
   openRespond(survey: any) {
@@ -264,9 +336,10 @@ export class DashboardSurveysComponent implements OnInit {
   private buildResultCharts() {
     this.questionCharts = [];
     this.ratingBarCharts = [];
-    if (!this.results?.questions) return;
+    const questions = this.results?.results || this.results?.questions || [];
+    if (!questions.length) return;
 
-    this.results.questions.forEach((q: any, i: number) => {
+    questions.forEach((q: any, i: number) => {
       if (this.isChoiceType(q.type) && q.distribution) {
         const labels = q.distribution.map((d: any) => d.option || d.label || d.value);
         const data = q.distribution.map((d: any) => d.count);
@@ -283,7 +356,7 @@ export class DashboardSurveysComponent implements OnInit {
       }
 
       if (q.type === 'rating' && q.distribution) {
-        const labels = q.distribution.map((d: any) => `${d.option || d.value} ★`);
+        const labels = q.distribution.map((d: any) => `${d.rating || d.option || d.value} ★`);
         const data = q.distribution.map((d: any) => d.count);
         const chart: ChartConfiguration<'bar'> = {
           type: 'bar',
@@ -328,14 +401,17 @@ export class DashboardSurveysComponent implements OnInit {
   }
 
   private resetForm() {
-    this.newSurvey = { title: '', description: '', expiresAt: '', questions: [] };
+    this.newSurvey = { title: '', description: '', channel: '', expiresAt: '', questions: [] };
+    this.errorMessage = '';
   }
 
   closeAll() {
     this.showCreateModal = false;
     this.showResultsModal = false;
     this.showRespondModal = false;
+    this.showEditModal = false;
     this.selectedSurvey = null;
     this.results = null;
+    this.errorMessage = '';
   }
 }

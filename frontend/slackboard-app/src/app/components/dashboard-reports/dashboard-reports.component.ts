@@ -20,16 +20,24 @@ export class DashboardReportsComponent implements OnInit {
     title: '',
     description: '',
     type: 'weekly' as string,
+    reportCategory: 'full' as string,
     dateRange: {
       start: '',
       end: ''
     }
   };
   creating = false;
-
   showShareModal = false;
   shareUserId = '';
   sharePermission = 'view';
+
+  datePresets = [
+    { label: 'Ultimos 7 dias', days: 7 },
+    { label: 'Ultimos 14 dias', days: 14 },
+    { label: 'Ultimos 30 dias', days: 30 },
+    { label: 'Este mes', days: 0 },
+    { label: 'Mes anterior', days: -1 },
+  ];
 
   messagesChart: ChartConfiguration<'line'> = {
     type: 'line',
@@ -132,8 +140,9 @@ export class DashboardReportsComponent implements OnInit {
   }
 
   buildReportCharts(data: any) {
-    if (data.messagesPerDay?.length) {
-      const labels = data.messagesPerDay.map((d: any) =>
+    const messagesPerDay = data.messages?.messagesPerDay || data.messagesPerDay || [];
+    if (messagesPerDay.length) {
+      const labels = messagesPerDay.map((d: any) =>
         new Date(d.date).toLocaleDateString('es', { day: '2-digit', month: 'short' })
       );
       this.messagesChart = {
@@ -142,19 +151,20 @@ export class DashboardReportsComponent implements OnInit {
           labels,
           datasets: [{
             ...this.messagesChart.data.datasets[0],
-            data: data.messagesPerDay.map((d: any) => d.count)
+            data: messagesPerDay.map((d: any) => d.count)
           }]
         }
       };
     }
-    if (data.platformDistribution?.length) {
+    const topChannels = data.messages?.topChannels || [];
+    if (topChannels.length) {
       this.platformChart = {
         ...this.platformChart,
         data: {
-          labels: data.platformDistribution.map((p: any) => p.platform),
+          labels: topChannels.map((ch: any) => ch.name || ch.platform),
           datasets: [{
             ...this.platformChart.data.datasets[0],
-            data: data.platformDistribution.map((p: any) => p.count)
+            data: topChannels.map((ch: any) => ch.count)
           }]
         }
       };
@@ -182,12 +192,10 @@ export class DashboardReportsComponent implements OnInit {
       next: (res) => {
         const idx = this.reports.findIndex(r => r._id === reportId);
         if (idx !== -1) {
-          this.reports[idx].signature = res.data?.signature;
-          this.reports[idx].signed = true;
+          this.reports[idx].signature = res.data;
         }
         if (this.selectedReport?._id === reportId) {
-          this.selectedReport.signature = res.data?.signature;
-          this.selectedReport.signed = true;
+          this.selectedReport.signature = res.data;
         }
       }
     });
@@ -224,7 +232,25 @@ export class DashboardReportsComponent implements OnInit {
   }
 
   private resetForm() {
-    this.newReport = { title: '', description: '', type: 'weekly', dateRange: { start: '', end: '' } };
+    this.newReport = { title: '', description: '', type: 'weekly', reportCategory: 'full', dateRange: { start: '', end: '' } };
+  }
+
+  applyPreset(preset: { label: string; days: number }) {
+    const end = new Date();
+    if (preset.days === 0) {
+      const start = new Date(end.getFullYear(), end.getMonth(), 1);
+      this.newReport.dateRange.start = start.toISOString().split('T')[0];
+      this.newReport.dateRange.end = end.toISOString().split('T')[0];
+    } else if (preset.days === -1) {
+      const start = new Date(end.getFullYear(), end.getMonth() - 1, 1);
+      const lastDay = new Date(end.getFullYear(), end.getMonth(), 0);
+      this.newReport.dateRange.start = start.toISOString().split('T')[0];
+      this.newReport.dateRange.end = lastDay.toISOString().split('T')[0];
+    } else {
+      const start = new Date(end.getTime() - preset.days * 86400000);
+      this.newReport.dateRange.start = start.toISOString().split('T')[0];
+      this.newReport.dateRange.end = end.toISOString().split('T')[0];
+    }
   }
 
   formatDate(d: string): string {

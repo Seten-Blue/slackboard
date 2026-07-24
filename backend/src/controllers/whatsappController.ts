@@ -106,7 +106,7 @@ export const receiveWebhook = async (req: Request, res: Response) => {
       whatsappMessageId: message.id,
     });
 
-    const populated = await Message.findById(created._id).populate('sender', 'username email avatar status');
+    const populated = await Message.findById(created._id).populate('sender', 'username email avatar status role');
 
     const io = req.app.get('io');
     if (io && populated) {

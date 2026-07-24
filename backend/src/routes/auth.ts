@@ -1,6 +1,7 @@
 import express from 'express';
 import { register, login, me, updateProfile, forgotPassword, resetPassword, googleAuth } from '../controllers/authController';
 import { requireAuth } from '../middleware/auth';
+import { logAction } from '../controllers/auditLogController';
 import User from '../models/User';
 import trelloService from '../services/trelloService';
 
@@ -81,6 +82,9 @@ router.post('/trello/finish', requireAuth, async (req: any, res: any) => {
       trelloApiKey: trelloService.getApiKey(),
     });
 
+    logAction(req.userId, 'trello.connected', 'integration', req.userId, 'User',
+      { trelloUsername: trelloUser.username }, req.ip, req.headers['user-agent']);
+
     res.json({
       success: true,
       message: 'Trello vinculado correctamente',
@@ -98,6 +102,10 @@ router.delete('/trello/unlink', requireAuth, async (req: any, res: any) => {
       trelloToken: null,
       trelloApiKey: null,
     });
+
+    logAction(req.userId, 'trello.disconnected', 'integration', req.userId, 'User',
+      {}, req.ip, req.headers['user-agent']);
+
     res.json({ success: true, message: 'Trello desvinculado' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al desvincular Trello' });

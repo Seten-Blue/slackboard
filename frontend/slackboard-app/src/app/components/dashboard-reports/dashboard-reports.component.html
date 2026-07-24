@@ -82,24 +82,24 @@
         <!-- KPI summary -->
         <div *ngIf="report.data" class="grid grid-cols-3 gap-2 mb-4">
           <div class="bg-white/[0.04] rounded-lg p-2 text-center">
-            <p class="text-sm font-bold text-white">{{ report.data.totalMessages || 0 | number }}</p>
+            <p class="text-sm font-bold text-white">{{ report.data.messages?.total || 0 | number }}</p>
             <p class="text-[10px] text-white/30">Mensajes</p>
           </div>
           <div class="bg-white/[0.04] rounded-lg p-2 text-center">
-            <p class="text-sm font-bold text-white">{{ report.data.totalUsers || 0 }}</p>
+            <p class="text-sm font-bold text-white">{{ report.data.messages?.uniqueSenders || 0 }}</p>
             <p class="text-[10px] text-white/30">Usuarios</p>
           </div>
           <div class="bg-white/[0.04] rounded-lg p-2 text-center">
-            <p class="text-sm font-bold text-white">{{ report.data.totalChannels || 0 }}</p>
+            <p class="text-sm font-bold text-white">{{ report.data.messages?.totalChannels || 0 }}</p>
             <p class="text-[10px] text-white/30">Canales</p>
           </div>
         </div>
 
         <!-- Signature -->
-        <div *ngIf="report.signed || report.signature" class="flex items-center gap-1.5 mb-3 text-[10px] text-emerald-400">
+        <div *ngIf="report.signature" class="flex items-center gap-1.5 mb-3 text-[10px] text-emerald-400">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           Firmado
-          <span class="text-white/30" *ngIf="report.signature?.signedAt">· {{ formatDate(report.signature.signedAt) }}</span>
+          <span class="text-white/30" *ngIf="report.signature.timestamp">· {{ formatDate(report.signature.timestamp) }}</span>
         </div>
 
         <!-- Created date -->
@@ -213,6 +213,30 @@
           </select>
         </div>
 
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Categoria</label>
+          <select [(ngModel)]="newReport.reportCategory"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all appearance-none">
+            <option value="full" class="bg-[#1a1a2e]">Completo (todos los datos)</option>
+            <option value="executive" class="bg-[#1a1a2e]">Ejecutivo</option>
+            <option value="productivity" class="bg-[#1a1a2e]">Productividad (tareas)</option>
+            <option value="engagement" class="bg-[#1a1a2e]">Participacion (mensajes)</option>
+            <option value="ai" class="bg-[#1a1a2e]">IA (metricas)</option>
+            <option value="security" class="bg-[#1a1a2e]">Seguridad (auditoria)</option>
+          </select>
+        </div>
+
+        <!-- Date presets -->
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Rapido</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button *ngFor="let preset of datePresets" (click)="applyPreset(preset)"
+              class="px-2.5 py-1 text-[10px] text-white/40 hover:text-signal hover:bg-signal/10 border border-white/10 hover:border-signal/20 rounded-lg transition-colors">
+              {{ preset.label }}
+            </button>
+          </div>
+        </div>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha inicio</label>
@@ -286,45 +310,42 @@
       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
           <p class="text-[10px] text-white/30 mb-1">Mensajes</p>
-          <p class="text-lg font-bold text-white">{{ selectedReport.data.totalMessages || 0 | number }}</p>
-          <p *ngIf="selectedReport.data.prevTotalMessages !== undefined"
-            [class]="'text-[10px] font-medium mt-0.5 ' + changeColor(selectedReport.data.totalMessages - selectedReport.data.prevTotalMessages)">
-            {{ changeIcon(selectedReport.data.totalMessages - selectedReport.data.prevTotalMessages) }}
-            {{ ((selectedReport.data.totalMessages - selectedReport.data.prevTotalMessages) / (selectedReport.data.prevTotalMessages || 1) * 100) | number:'1.0-0' }}%
-          </p>
-        </div>
-        <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
-          <p class="text-[10px] text-white/30 mb-1">Usuarios</p>
-          <p class="text-lg font-bold text-white">{{ selectedReport.data.totalUsers || 0 }}</p>
-          <p *ngIf="selectedReport.data.prevTotalUsers !== undefined"
-            [class]="'text-[10px] font-medium mt-0.5 ' + changeColor(selectedReport.data.totalUsers - selectedReport.data.prevTotalUsers)">
-            {{ changeIcon(selectedReport.data.totalUsers - selectedReport.data.prevTotalUsers) }}
-            {{ ((selectedReport.data.totalUsers - selectedReport.data.prevTotalUsers) / (selectedReport.data.prevTotalUsers || 1) * 100) | number:'1.0-0' }}%
-          </p>
+          <p class="text-lg font-bold text-white">{{ selectedReport.data.messages?.total || 0 | number }}</p>
+          <p *ngIf="selectedReport.data.messages?.uniqueSenders"
+            class="text-[10px] text-white/30 mt-0.5">{{ selectedReport.data.messages.uniqueSenders }} usuarios unicos</p>
         </div>
         <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
           <p class="text-[10px] text-white/30 mb-1">Canales</p>
-          <p class="text-lg font-bold text-white">{{ selectedReport.data.totalChannels || 0 }}</p>
-          <p *ngIf="selectedReport.data.activeChannels"
-            class="text-[10px] text-white/30 mt-0.5">{{ selectedReport.data.activeChannels }} activos</p>
+          <p class="text-lg font-bold text-white">{{ selectedReport.data.messages?.totalChannels || 0 }}</p>
+          <p *ngIf="selectedReport.data.messages?.activeChannels"
+            class="text-[10px] text-white/30 mt-0.5">{{ selectedReport.data.messages.activeChannels }} activos</p>
         </div>
         <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
-          <p class="text-[10px] text-white/30 mb-1">Canales activos</p>
-          <p class="text-lg font-bold text-white">{{ selectedReport.data.activeChannels || 0 }}</p>
-          <p *ngIf="selectedReport.data.totalChannels"
-            class="text-[10px] text-white/30 mt-0.5">{{ ((selectedReport.data.activeChannels || 0) / selectedReport.data.totalChannels * 100) | number:'1.0-0' }}% del total</p>
+          <p class="text-[10px] text-white/30 mb-1">Tareas</p>
+          <p class="text-lg font-bold text-white">{{ selectedReport.data.tasks?.total || 0 }}</p>
+          <p *ngIf="selectedReport.data.tasks?.completionRate !== undefined"
+            class="text-[10px] text-white/30 mt-0.5">{{ selectedReport.data.tasks.completionRate }}% completadas</p>
         </div>
         <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
-          <p class="text-[10px] text-white/30 mb-1">Respuesta avg</p>
-          <p class="text-lg font-bold text-white">{{ selectedReport.data.avgResponseTime || '—' }}</p>
-          <p *ngIf="selectedReport.data.prevAvgResponseTime"
-            [class]="'text-[10px] font-medium mt-0.5 ' + changeColor(-(selectedReport.data.avgResponseTime - selectedReport.data.prevAvgResponseTime))">
-            vs periodo anterior
+          <p class="text-[10px] text-white/30 mb-1">Encuestas</p>
+          <p class="text-lg font-bold text-white">{{ selectedReport.data.surveys?.total || 0 }}</p>
+          <p *ngIf="selectedReport.data.surveys?.totalResponses !== undefined"
+            class="text-[10px] text-white/30 mt-0.5">{{ selectedReport.data.surveys.totalResponses }} respuestas</p>
+        </div>
+        <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
+          <p class="text-[10px] text-white/30 mb-1">Consultas IA</p>
+          <p class="text-lg font-bold text-white">{{ selectedReport.data.ai?.totalQueries || 0 }}</p>
+          <p *ngIf="selectedReport.data.ai?.totalCost !== undefined"
+            class="text-[10px] text-white/30 mt-0.5">${{ selectedReport.data.ai.totalCost }} USD</p>
+        </div>
+        <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
+          <p class="text-[10px] text-white/30 mb-1">Seguridad</p>
+          <p class="text-lg font-bold"
+            [class]="(selectedReport.data.audit?.failedLogins || 0) > 3 ? 'text-red-400' : 'text-emerald-400'">
+            {{ selectedReport.data.kpis?.securityScore || 'healthy' }}
           </p>
-        </div>
-        <div class="bg-white/[0.06] rounded-xl p-3 border border-white/[0.06]">
-          <p class="text-[10px] text-white/30 mb-1">Uptime</p>
-          <p class="text-lg font-bold text-white">{{ selectedReport.data.uptime || '—' }}</p>
+          <p *ngIf="selectedReport.data.audit?.failedLogins !== undefined"
+            class="text-[10px] text-white/30 mt-0.5">{{ selectedReport.data.audit.failedLogins }} logins fallidos</p>
         </div>
       </div>
 
@@ -342,32 +363,10 @@
         <div class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
           <h3 class="text-sm font-semibold text-white mb-4">Distribucion por plataforma</h3>
           <div style="height: 220px;">
-            <canvas *ngIf="selectedReport.data.platformDistribution?.length"
+            <canvas *ngIf="selectedReport.data.messages?.topChannels?.length"
               baseChart [type]="'doughnut'" [data]="platformChart.data" [options]="platformChart.options"></canvas>
-            <div *ngIf="!selectedReport.data.platformDistribution?.length" class="flex items-center justify-center h-full">
+            <div *ngIf="!selectedReport.data.messages?.topChannels?.length" class="flex items-center justify-center h-full">
               <p class="text-sm text-white/30">Sin datos de plataforma</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- KPIs with progress bars -->
-      <div *ngIf="selectedReport.data.kpis?.length" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
-        <h3 class="text-sm font-semibold text-white mb-4">KPIs del periodo</h3>
-        <div class="space-y-4">
-          <div *ngFor="let kpi of selectedReport.data.kpis">
-            <div class="flex items-center justify-between mb-1.5">
-              <span class="text-xs text-white/60">{{ kpi.name }}</span>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-white">{{ kpi.value }}{{ kpi.unit || '' }}</span>
-                <span class="text-[10px] text-white/30">/ {{ kpi.target }}{{ kpi.unit || '' }}</span>
-              </div>
-            </div>
-            <div class="w-full bg-white/[0.06] rounded-full h-1.5">
-              <div class="h-1.5 rounded-full transition-all"
-                [style.width.%]="kpi.target ? (kpi.value / kpi.target * 100) : 0"
-                [class]="kpi.value >= kpi.target ? 'bg-emerald-400' : kpi.value >= kpi.target * 0.7 ? 'bg-signal' : 'bg-amber-400'">
-              </div>
             </div>
           </div>
         </div>
@@ -375,10 +374,10 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Top channels -->
-        <div *ngIf="selectedReport.data.topChannels?.length" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
+        <div *ngIf="selectedReport.data.messages?.topChannels?.length" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
           <h3 class="text-sm font-semibold text-white mb-4">Canales mas activos</h3>
           <div class="space-y-2">
-            <div *ngFor="let ch of selectedReport.data.topChannels; let i = index" class="flex items-center gap-3 py-1.5">
+            <div *ngFor="let ch of selectedReport.data.messages.topChannels; let i = index" class="flex items-center gap-3 py-1.5">
               <span class="text-sm font-bold text-white/20 w-5 text-right">{{ i + 1 }}</span>
               <span class="text-sm text-white flex-1">#{{ ch.name }}</span>
               <span *ngIf="ch.platform" class="text-[10px] bg-white/[0.06] px-2 py-0.5 rounded-full text-white/40">{{ ch.platform }}</span>
@@ -388,16 +387,56 @@
         </div>
 
         <!-- Top users -->
-        <div *ngIf="selectedReport.data.topUsers?.length" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
+        <div *ngIf="selectedReport.data.messages?.topUsers?.length" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
           <h3 class="text-sm font-semibold text-white mb-4">Usuarios mas activos</h3>
           <div class="space-y-2">
-            <div *ngFor="let u of selectedReport.data.topUsers; let i = index" class="flex items-center gap-3 py-1.5">
+            <div *ngFor="let u of selectedReport.data.messages.topUsers; let i = index" class="flex items-center gap-3 py-1.5">
               <span class="text-sm font-bold text-white/20 w-5 text-right">{{ i + 1 }}</span>
-              <img [src]="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username"
-                class="w-7 h-7 rounded-lg">
               <span class="text-sm text-white flex-1">{{ u.username }}</span>
-              <span class="text-sm font-medium text-white">{{ u.messageCount || u.count }}</span>
+              <span class="text-sm font-medium text-white">{{ u.messageCount }}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks breakdown -->
+      <div *ngIf="selectedReport.data.tasks" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white mb-4">Desglose de tareas</h3>
+        <div class="grid grid-cols-4 gap-3">
+          <div class="text-center">
+            <p class="text-lg font-bold text-white">{{ selectedReport.data.tasks.byStatus?.pending || 0 }}</p>
+            <p class="text-[10px] text-white/30">Pendientes</p>
+          </div>
+          <div class="text-center">
+            <p class="text-lg font-bold text-amber-400">{{ selectedReport.data.tasks.byStatus?.in_progress || 0 }}</p>
+            <p class="text-[10px] text-white/30">En progreso</p>
+          </div>
+          <div class="text-center">
+            <p class="text-lg font-bold text-emerald-400">{{ selectedReport.data.tasks.byStatus?.completed || 0 }}</p>
+            <p class="text-[10px] text-white/30">Completadas</p>
+          </div>
+          <div class="text-center">
+            <p class="text-lg font-bold text-red-400">{{ selectedReport.data.tasks.overdue || 0 }}</p>
+            <p class="text-[10px] text-white/30">Vencidas</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit summary -->
+      <div *ngIf="selectedReport.data.audit" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white mb-4">Resumen de auditoria</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="text-center">
+            <p class="text-lg font-bold text-white">{{ selectedReport.data.audit.totalEvents || 0 }}</p>
+            <p class="text-[10px] text-white/30">Eventos totales</p>
+          </div>
+          <div class="text-center">
+            <p class="text-lg font-bold text-red-400">{{ selectedReport.data.audit.failedLogins || 0 }}</p>
+            <p class="text-[10px] text-white/30">Logins fallidos</p>
+          </div>
+          <div class="text-center">
+            <p class="text-lg font-bold text-amber-400">{{ selectedReport.data.audit.permissionChanges || 0 }}</p>
+            <p class="text-[10px] text-white/30">Cambios de permiso</p>
           </div>
         </div>
       </div>
@@ -410,8 +449,8 @@
             <span class="text-emerald-400">✓</span>
           </div>
           <div>
-            <p class="text-sm text-white font-medium">{{ selectedReport.signature.signedBy || 'Firmado' }}</p>
-            <p class="text-xs text-white/40">{{ formatDate(selectedReport.signature.signedAt) }}</p>
+            <p class="text-sm text-white font-medium">Firmado por {{ selectedReport.signature.signedBy || 'autor' }}</p>
+            <p class="text-xs text-white/40">{{ formatDate(selectedReport.signature.timestamp || selectedReport.signature.signedAt) }}</p>
           </div>
           <div class="ml-auto">
             <p class="text-[10px] text-white/20 font-mono">{{ selectedReport.signature.hash | slice:0:16 }}…</p>
@@ -426,7 +465,7 @@
           <span *ngIf="selectedReport.updatedAt"> · Actualizado {{ formatDate(selectedReport.updatedAt) }}</span>
         </div>
         <div class="flex items-center gap-2">
-          <button *ngIf="!selectedReport.signed" (click)="signReport(selectedReport._id)"
+          <button *ngIf="!selectedReport.signature" (click)="signReport(selectedReport._id)"
             class="px-3 py-1.5 text-xs text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/20 rounded-lg transition-colors font-medium">
             ✍ Firmar reporte
           </button>

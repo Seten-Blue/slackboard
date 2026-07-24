@@ -17,6 +17,7 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import Channel from '../models/Channel';
 import MessageModel from '../models/Message';
+import Task from '../models/Task';
 import User from '../models/User';
 import aiService from './aiService';
 import mongoose from "mongoose";
@@ -435,6 +436,41 @@ class discordService {
       }
     }
 
+    const emoji = reaction.emoji.name || reaction.emoji.toString();
+
+    const taskReactionMap: Record<string, string> = {
+      '✅': 'completed',
+      '🔄': 'in_progress',
+      '⏳': 'pending',
+      '❌': 'cancelled',
+    };
+
+    if (action === 'add' && taskReactionMap[emoji]) {
+      const task = await Task.findOne({ discordNotificationMessageId: reaction.message.id });
+      if (task) {
+        const newStatus = taskReactionMap[emoji] as any;
+        const oldStatus = task.status;
+        if (oldStatus !== newStatus) {
+          task.status = newStatus;
+          if (newStatus === 'completed') task.completedAt = new Date();
+          else task.completedAt = undefined;
+          await task.save();
+
+          if (this.io) {
+            this.io.to(task.channel?.toString() || '').emit('task:status-changed', {
+              taskId: task._id,
+              status: newStatus,
+              title: task.title,
+            });
+          }
+
+          const mongoUser = await this.resolveOrCreateDiscordUser(discordUser);
+          console.log(`[DiscordService] Task status changed via reaction: ${task.title} → ${newStatus} by ${mongoUser.username}`);
+          return;
+        }
+      }
+    }
+
     const existing: any = await MessageModel.findOne({ discordMessageId: reaction.message.id });
     if (!existing) return;
 
@@ -442,7 +478,6 @@ class discordService {
     if (existing.type === 'poll') return;
 
     const mongoUser = await this.resolveOrCreateDiscordUser(discordUser);
-    const emoji = reaction.emoji.name || reaction.emoji.toString();
 
     existing.reactions = existing.reactions || [];
     let entry = existing.reactions.find((r: any) => r.emoji === emoji);

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { logAction } from './auditLogController';
 import emailService from '../services/emailService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-env';
@@ -35,8 +36,12 @@ export const register = async (req: Request, res: Response) => {
       telefono: telefono || null,
       idioma: idioma || null,
       status: 'online',
+      role: 'member',
     });
     const token = signToken(user._id.toString());
+
+    logAction(user._id.toString(), 'register', 'auth', user._id.toString(), 'User',
+      { email, username }, req.ip, req.headers['user-agent']);
 
     res.status(201).json({
       success: true,
@@ -57,6 +62,7 @@ export const register = async (req: Request, res: Response) => {
         github: user.github,
         linkedin: user.linkedin,
         website: user.website,
+        role: user.role,
       },
     });
   } catch (error: any) {
@@ -74,6 +80,8 @@ export const login = async (req: Request, res: Response) => {
 
     const user: any = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
+      logAction(user?._id?.toString() || 'unknown', 'login.failed', 'auth', undefined, 'User',
+        { email }, req.ip, req.headers['user-agent'], false, 'Credenciales invalidas');
       return res.status(401).json({ success: false, message: 'Credenciales invalidas' });
     }
 
@@ -81,6 +89,9 @@ export const login = async (req: Request, res: Response) => {
     await user.save();
 
     const token = signToken(user._id.toString());
+
+    logAction(user._id.toString(), 'login.success', 'auth', user._id.toString(), 'User',
+      { email }, req.ip, req.headers['user-agent']);
 
     res.json({
       success: true,
@@ -101,6 +112,7 @@ export const login = async (req: Request, res: Response) => {
         github: user.github,
         linkedin: user.linkedin,
         website: user.website,
+        role: user.role,
       },
     });
   } catch (error: any) {
@@ -253,6 +265,9 @@ export const resetPassword = async (req: Request, res: Response) => {
     user.resetPasswordTokenHash = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
+
+    logAction(user._id.toString(), 'password_changed', 'auth', user._id.toString(), 'User',
+      {}, req.ip, req.headers['user-agent']);
 
     res.json({ success: true, message: 'Contrasena actualizada. Ya podes ingresar con la nueva.' });
   } catch (error: any) {

@@ -28,7 +28,7 @@ export const recordMetric = async (data: {
     const metric = await AiMetric.create({
       user: data.user,
       channel: data.channel ?? null,
-      model: data.modelName,
+      modelName: data.modelName,
       inputTokens,
       outputTokens,
       totalTokens,

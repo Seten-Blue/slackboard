@@ -4,6 +4,7 @@ import User from '../models/User';
 import slackService from '../services/slackService';
 import discordService from '../services/discordservice';
 import { AuthRequest } from '../middleware/auth';
+import { logAction } from './auditLogController';
 
 // Obtener SOLO los canales de los que el usuario autenticado es miembro
 export const getAllChannels = async (req: AuthRequest, res: Response) => {
@@ -63,6 +64,11 @@ export const createChannel = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
+    const isManagerOrAbove = ['owner', 'admin', 'manager'].includes(user.role);
+    if (!isManagerOrAbove) {
+      return res.status(403).json({ success: false, message: 'Se requiere rol manager o superior para crear canales' });
+    }
+
     const channelPlatform = platform || 'other';
     let slackChannelId: string | undefined;
     let discordChannelId: string | undefined;
@@ -104,6 +110,10 @@ export const createChannel = async (req: AuthRequest, res: Response) => {
     const populatedChannel = await Channel.findById(channel._id)
       .populate('createdBy', 'username email avatar')
       .populate('members', 'username email avatar status');
+
+    logAction(req.userId!, 'channel.created', 'create', (channel as any)._id.toString(), 'Channel',
+      { name, platform: channelPlatform, isPrivate: isPrivate || false },
+      req.ip, req.headers['user-agent'] as string);
 
     res.status(201).json({
       success: true,
@@ -206,6 +216,10 @@ export const addMemberToChannel = async (req: AuthRequest, res: Response) => {
       .populate('createdBy', 'username email avatar')
       .populate('members', 'username email avatar status');
 
+    logAction(req.userId!, 'channel.member_added', 'modify', channelId, 'Channel',
+      { addedUser: userId, channelName: channel.name },
+      req.ip, req.headers['user-agent']);
+
     res.json({
       success: true,
       message: 'Miembro agregado exitosamente',
@@ -282,6 +296,11 @@ export const deleteChannel = async (req: AuthRequest, res: Response) => {
     }
 
     await Channel.findByIdAndDelete(req.params.id);
+
+    logAction(req.userId!, 'channel.deleted', 'delete', req.params.id, 'Channel',
+      { name: channel.name },
+      req.ip, req.headers['user-agent']);
+
     res.json({ success: true, message: 'Canal eliminado exitosamente' });
   } catch (error: any) {
     res.status(500).json({

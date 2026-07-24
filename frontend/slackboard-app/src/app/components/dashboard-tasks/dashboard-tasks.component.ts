@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { TasksService } from '../../services/tasks.service';
 import { AuthService } from '../../services/auth.service';
+import { ChatService } from '../../services/chat.service';
 import { ChartConfiguration } from 'chart.js';
 
 @Component({
@@ -20,9 +21,12 @@ export class DashboardTasksComponent implements OnInit {
   filterStatus = '';
   filterPriority = '';
   filterAssignee = '';
+  allUsers: any[] = [];
 
   newTask = { title: '', description: '', assignee: '', priority: 'medium', dueDate: '', estimatedHours: 0, tags: '', channel: '' };
   creating = false;
+  channels: any[] = [];
+  channelMembers: any[] = [];
 
   get pendingTasks() { return this.tasks.filter(t => t.status === 'pending'); }
   get inProgressTasks() { return this.tasks.filter(t => t.status === 'in_progress'); }
@@ -115,9 +119,39 @@ export class DashboardTasksComponent implements OnInit {
     }
   };
 
-  constructor(private tasksService: TasksService, public authService: AuthService) {}
+  constructor(private tasksService: TasksService, public authService: AuthService, private chatService: ChatService) {}
 
-  ngOnInit() { this.loadTasks(); this.loadStats(); }
+  ngOnInit() { this.loadTasks(); this.loadStats(); this.loadChannels(); }
+
+  loadChannels() {
+    this.chatService.getChannels().subscribe({
+      next: (res) => {
+        this.channels = res.data || res || [];
+        this.collectAllUsers();
+      }
+    });
+  }
+
+  onChannelChange(channelId: string) {
+    if (!channelId) {
+      this.channelMembers = [];
+      this.newTask.assignee = '';
+      return;
+    }
+    const ch = this.channels.find(c => c._id === channelId);
+    this.channelMembers = ch?.members || [];
+    this.newTask.assignee = '';
+  }
+
+  collectAllUsers() {
+    const userMap = new Map<string, any>();
+    for (const ch of this.channels) {
+      for (const m of ch.members || []) {
+        if (m._id) userMap.set(m._id, m);
+      }
+    }
+    this.allUsers = Array.from(userMap.values());
+  }
 
   loadTasks() {
     this.loading = true;
@@ -257,6 +291,7 @@ export class DashboardTasksComponent implements OnInit {
 
   private resetForm() {
     this.newTask = { title: '', description: '', assignee: '', priority: 'medium', dueDate: '', estimatedHours: 0, tags: '', channel: '' };
+    this.channelMembers = [];
   }
 
   priorityColor(p: string): string {

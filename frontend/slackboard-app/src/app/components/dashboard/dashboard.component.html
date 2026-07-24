@@ -2,15 +2,15 @@
   <div class="mb-6">
     <h1 class="text-xl font-display font-bold text-ink-950">Dashboard</h1>
     <p class="text-sm text-ink-950/50 mt-0.5">
-      <span *ngIf="activeView === 'activity'">Vista general de actividad en tiempo real</span>
-      <span *ngIf="activeView === 'traffic'">Trafico de datos, recursos e integraciones</span>
-      <span *ngIf="activeView === 'stats'">Estadisticas, tendencias y analisis</span>
-      <span *ngIf="activeView === 'reports'">Reportes de analisis y metricas</span>
-      <span *ngIf="activeView === 'tasks'">Gestion de tareas y flujo de trabajo del equipo</span>
-      <span *ngIf="activeView === 'surveys'">Encuestas y retroalimentacion del equipo</span>
-      <span *ngIf="activeView === 'audit'">Registro de actividades y auditoria del sistema</span>
-      <span *ngIf="activeView === 'performance'">Monitoreo de rendimiento en tiempo real</span>
-      <span *ngIf="activeView === 'ai-metrics'">Metricas de uso, costos y rendimiento de IA</span>
+      <span *ngIf="activeView === 'activity'">Resumen del dia: tareas pendientes, encuestas activas, uso de IA y seguridad</span>
+      <span *ngIf="activeView === 'traffic'">Trafico de datos, recursos e integraciones en tiempo real</span>
+      <span *ngIf="activeView === 'stats'">Estadisticas de uso, tendencias y analisis del equipo</span>
+      <span *ngIf="activeView === 'reports'">Genera reportes unificados que cruzan tareas, encuestas, IA y seguridad</span>
+      <span *ngIf="activeView === 'tasks'">Gestion de tareas: crear, asignar, seguir progreso y tiempo</span>
+      <span *ngIf="activeView === 'surveys'">Encuestas para medir satisfaccion, engagement y retroalimentacion del equipo</span>
+      <span *ngIf="activeView === 'audit'">Registro de actividad: quien hizo que, cuando y desde donde. Solo para managers y admins</span>
+      <span *ngIf="activeView === 'performance'">Monitoreo de rendimiento del servidor, base de datos y conexiones</span>
+      <span *ngIf="activeView === 'ai-metrics'">Uso, costos y rendimiento de las consultas de IA</span>
     </p>
   </div>
 

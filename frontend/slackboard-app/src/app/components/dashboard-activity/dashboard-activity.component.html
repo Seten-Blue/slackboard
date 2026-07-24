@@ -1,45 +1,91 @@
 <div *ngIf="loading" class="flex items-center justify-center h-64">
   <div class="flex items-center gap-2 text-ink-950/40 text-sm">
     <span class="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse"></span>
-    Cargando actividad…
+    Cargando resumen del dia...
   </div>
 </div>
 
 <div *ngIf="!loading && data" class="space-y-6">
-  <!-- Stat cards row -->
+  <!-- Primary stat cards -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
     <div class="bg-white rounded-xl border border-ink-950/5 p-4">
       <div class="flex items-center gap-2 mb-2">
         <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-        <span class="text-xs font-medium text-ink-950/50">Conectados</span>
+        <span class="text-xs font-medium text-ink-950/50">Equipo conectado</span>
       </div>
       <p class="text-2xl font-bold text-ink-950">{{ data.connectedCount }}</p>
-      <p class="text-xs text-ink-950/40 mt-1">usuarios en linea</p>
+      <p class="text-xs text-ink-950/40 mt-1">usuarios activos hoy</p>
     </div>
     <div class="bg-white rounded-xl border border-ink-950/5 p-4">
-      <div class="flex items-center gap-2 mb-2"><span class="text-sm">💬</span><span class="text-xs font-medium text-ink-950/50">Mensajes 5min</span></div>
-      <p class="text-2xl font-bold text-ink-950">{{ data.recentMessages }}</p>
-      <p class="text-xs text-ink-950/40 mt-1">ultimos 5 minutos</p>
+      <div class="flex items-center gap-2 mb-2">
+        <svg class="w-4 h-4 text-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <span class="text-xs font-medium text-ink-950/50">Tareas creadas hoy</span>
+      </div>
+      <p class="text-2xl font-bold text-ink-950">{{ data.tasks?.createdToday || 0 }}</p>
+      <p class="text-xs mt-1" [class]="(data.tasks?.overdue || 0) > 0 ? 'text-red-500 font-medium' : 'text-ink-950/40'">
+        {{ data.tasks?.overdue || 0 }} vencidas
+      </p>
     </div>
     <div class="bg-white rounded-xl border border-ink-950/5 p-4">
-      <div class="flex items-center gap-2 mb-2"><span class="text-sm">🤖</span><span class="text-xs font-medium text-ink-950/50">Bots activos</span></div>
-      <p class="text-2xl font-bold text-ink-950">{{ data.botActivity }}</p>
-      <p class="text-xs text-ink-950/40 mt-1">mensajes de bots (5min)</p>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-sm">📊</span>
+        <span class="text-xs font-medium text-ink-950/50">Encuestas activas</span>
+      </div>
+      <p class="text-2xl font-bold text-ink-950">{{ data.surveys?.active || 0 }}</p>
+      <p class="text-xs text-ink-950/40 mt-1">esperando respuestas</p>
     </div>
     <div class="bg-white rounded-xl border border-ink-950/5 p-4">
-      <div class="flex items-center gap-2 mb-2"><span class="text-sm">⚡</span><span class="text-xs font-medium text-ink-950/50">Respuesta avg</span></div>
-      <p class="text-2xl font-bold text-ink-950">{{ formatTime(data.avgResponseTime) }}</p>
-      <p class="text-xs text-ink-950/40 mt-1">entre mensajes</p>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-sm">🤖</span>
+        <span class="text-xs font-medium text-ink-950/50">Consultas IA hoy</span>
+      </div>
+      <p class="text-2xl font-bold text-ink-950">{{ data.ai?.queriesToday || 0 }}</p>
+      <p class="text-xs text-ink-950/40 mt-1">${{ data.ai?.costToday || 0 }} en costos</p>
+    </div>
+  </div>
+
+  <!-- Security alert banner (if needed) -->
+  <div *ngIf="(data.security?.failedLogins24h || 0) > 3" class="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+    <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <div>
+      <p class="text-sm font-medium text-red-800">Intentos de login fallidos: {{ data.security?.failedLogins24h }} en las ultimas 24h</p>
+      <p class="text-xs text-red-600/70 mt-0.5">Revisa la seccion de Auditoria para mas detalles</p>
     </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- My pending tasks -->
+    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
+      <h3 class="text-sm font-semibold text-ink-950 mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Mis tareas pendientes
+      </h3>
+      <div class="space-y-2 max-h-64 overflow-y-auto">
+        <div *ngFor="let t of data.tasks?.pending" class="flex items-center gap-3 py-2 border-b border-ink-950/5 last:border-0">
+          <span class="w-2 h-2 rounded-full flex-shrink-0"
+            [class]="t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-orange-500' : t.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'"></span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-950 truncate">{{ t.title }}</p>
+            <p class="text-xs text-ink-950/40" *ngIf="t.dueDate">Vence: {{ t.dueDate | date:'dd/MM' }}</p>
+          </div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+            [class]="t.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'">
+            {{ t.status === 'in_progress' ? 'en progreso' : 'pendiente' }}
+          </span>
+        </div>
+        <p *ngIf="!data.tasks?.pending?.length" class="text-sm text-ink-950/40 py-4 text-center">No tienes tareas pendientes</p>
+      </div>
+    </div>
+
     <!-- Connected users -->
     <div class="bg-white rounded-xl border border-ink-950/5 p-5">
-      <h3 class="text-sm font-semibold text-ink-950 mb-4">🟢 Usuarios activos (24h)</h3>
+      <h3 class="text-sm font-semibold text-ink-950 mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+        Equipo conectado
+      </h3>
       <div class="space-y-2 max-h-64 overflow-y-auto">
         <div *ngFor="let u of data.connectedUsers" class="flex items-center gap-3 py-1.5">
-          <img [src]="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="w-7 h-7 rounded-lg">
+          <img [src]="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="w-7 h-7 rounded-lg object-cover">
           <span class="text-sm text-ink-950">{{ u.username }}</span>
           <span class="ml-auto w-2 h-2 rounded-full bg-green-500"></span>
         </div>
@@ -49,7 +95,10 @@
 
     <!-- Active channels -->
     <div class="bg-white rounded-xl border border-ink-950/5 p-5">
-      <h3 class="text-sm font-semibold text-ink-950 mb-4">📂 Canales con actividad</h3>
+      <h3 class="text-sm font-semibold text-ink-950 mb-4 flex items-center gap-2">
+        <span class="text-base">📂</span>
+        Canales con actividad
+      </h3>
       <div class="space-y-2 max-h-64 overflow-y-auto">
         <div *ngFor="let c of data.recentChannels" class="flex items-center gap-3 py-1.5">
           <span class="text-base">{{ platformIcon(c.platform) }}</span>
@@ -62,24 +111,12 @@
       </div>
     </div>
 
-    <!-- Active conversations -->
-    <div class="bg-white rounded-xl border border-ink-950/5 p-5">
-      <h3 class="text-sm font-semibold text-ink-950 mb-4">👥 Conversaciones activas</h3>
-      <div class="space-y-3 max-h-64 overflow-y-auto">
-        <div *ngFor="let c of data.activeConversations" class="py-2 border-b border-ink-950/5 last:border-0">
-          <p class="text-sm text-ink-950 truncate">{{ c.parentContent }}…</p>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-xs text-ink-950/40">{{ c.senderName }}</span>
-            <span class="text-xs text-signal font-medium">{{ c.replyCount }} respuestas</span>
-          </div>
-        </div>
-        <p *ngIf="data.activeConversations.length === 0" class="text-sm text-ink-950/40 py-4 text-center">Sin conversaciones activas</p>
-      </div>
-    </div>
-
     <!-- Recent files -->
     <div class="bg-white rounded-xl border border-ink-950/5 p-5">
-      <h3 class="text-sm font-semibold text-ink-950 mb-4">📎 Archivos recientes</h3>
+      <h3 class="text-sm font-semibold text-ink-950 mb-4 flex items-center gap-2">
+        <span class="text-base">📎</span>
+        Archivos recientes
+      </h3>
       <div class="space-y-2 max-h-64 overflow-y-auto">
         <div *ngFor="let f of data.recentFiles" class="flex items-center gap-3 py-1.5">
           <span class="text-base">{{ f.type === 'image' ? '🖼️' : '📄' }}</span>
@@ -95,10 +132,10 @@
 
   <!-- Recent events timeline -->
   <div class="bg-white rounded-xl border border-ink-950/5 p-5">
-    <h3 class="text-sm font-semibold text-ink-950 mb-4">🔔 Eventos recientes</h3>
+    <h3 class="text-sm font-semibold text-ink-950 mb-4">Actividad reciente</h3>
     <div class="space-y-2 max-h-72 overflow-y-auto">
       <div *ngFor="let e of data.recentEvents" class="flex items-start gap-3 py-1.5">
-        <img [src]="e.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" class="w-6 h-6 rounded-md mt-0.5">
+        <img [src]="e.sender?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" class="w-6 h-6 rounded-md mt-0.5 object-cover">
         <div class="flex-1 min-w-0">
           <p class="text-sm text-ink-950">
             <span class="font-medium">{{ e.sender?.username }}</span>

@@ -19,6 +19,8 @@ export class SocketService {
   private friendshipNewRequest$ = new Subject<any>();
   private friendshipUpdate$ = new Subject<any>();
   private friendshipRemoved$ = new Subject<any>();
+  private newSurvey$ = new Subject<any>();
+  private taskStatusChanged$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
   private pendingJoins: string[] = [];
@@ -69,6 +71,8 @@ export class SocketService {
     this.socket.on('friendship:new-request', (data: any) => this.friendshipNewRequest$.next(data));
     this.socket.on('friendship:update', (data: any) => this.friendshipUpdate$.next(data));
     this.socket.on('friendship:removed', (data: any) => this.friendshipRemoved$.next(data));
+    this.socket.on('new-survey', (data: any) => this.newSurvey$.next(data));
+    this.socket.on('task:status-changed', (data: any) => this.taskStatusChanged$.next(data));
   }
 
   private flushPendingJoins() {
@@ -148,6 +152,14 @@ export class SocketService {
 
   onFriendshipRemoved(): Observable<any> {
     return this.friendshipRemoved$.asObservable();
+  }
+
+  onNewSurvey(): Observable<any> {
+    return this.newSurvey$.asObservable();
+  }
+
+  onTaskStatusChanged(): Observable<any> {
+    return this.taskStatusChanged$.asObservable();
   }
 
   onConnected(): Observable<any> {

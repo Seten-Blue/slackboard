@@ -3,6 +3,7 @@ import Message from '../models/Message';
 import Channel from '../models/Channel';
 import aiService from '../services/aiService';
 import { AuthRequest } from '../middleware/auth';
+import { logAction } from './auditLogController';
 
 // Obtener mensajes de un canal — cualquier usuario autenticado puede leer
 // Si el canal existe pero el usuario no es miembro, se agrega automaticamente
@@ -23,7 +24,7 @@ export const getMessagesByChannel = async (req: AuthRequest, res: Response) => {
     }
 
     const messages = await Message.find({ channel: channelId, threadParent: null })
-      .populate('sender', 'username email avatar status')
+      .populate('sender', 'username email avatar status role')
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .skip(Number(skip));
@@ -89,7 +90,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
     });
 
     const populatedMessage: any = await Message.findById(message._id)
-      .populate('sender', 'username email avatar status');
+      .populate('sender', 'username email avatar status role');
 
     // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condicion de carrera
     res.status(201).json({
@@ -97,6 +98,12 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
       message: 'Mensaje enviado',
       data: populatedMessage,
     });
+
+    // Don't audit every message to avoid noise, but audit polls and threads
+    if (type === 'poll' || type === 'thread') {
+      logAction(req.userId!, `message.${type}_created`, 'create', (message as any)._id.toString(), 'Message',
+        { channel: channelExists.name, type }, req.ip, req.headers['user-agent'] as string);
+    }
 
     const senderUsername = populatedMessage?.sender?.username || 'Usuario de SlackBoard';
     const senderAvatar = populatedMessage?.sender?.avatar || undefined;
@@ -214,7 +221,7 @@ export const updateMessage = async (req: AuthRequest, res: Response) => {
     existing.isEdited = true;
     await existing.save();
 
-    const populated = await Message.findById(id).populate('sender', 'username email avatar status');
+    const populated = await Message.findById(id).populate('sender', 'username email avatar status role');
 
     res.json({
       success: true,
@@ -294,7 +301,7 @@ export const addReaction = async (req: AuthRequest, res: Response) => {
     await message.save();
 
     const updatedMessage = await Message.findById(messageId)
-      .populate('sender', 'username email avatar status');
+      .populate('sender', 'username email avatar status role');
 
     // Sync reaction to Discord
     if ((message as any).discordMessageId && message.channel) {
@@ -448,7 +455,7 @@ export const votePoll = async (req: AuthRequest, res: Response) => {
     }
 
     const populated = await Message.findById(messageId)
-      .populate('sender', 'username email avatar status');
+      .populate('sender', 'username email avatar status role');
 
     const io = req.app.get('io');
     if (io && populated) {
@@ -507,7 +514,7 @@ export const replyToThread = async (req: AuthRequest, res: Response) => {
     await parentMessage.save();
 
     const populated = await Message.findById(reply._id)
-      .populate('sender', 'username email avatar status');
+      .populate('sender', 'username email avatar status role');
 
     // Enviar respuesta al thread de Discord si existe
     (async () => {
@@ -565,7 +572,7 @@ export const getThreadReplies = async (req: AuthRequest, res: Response) => {
     }
 
     const replies = await Message.find({ threadParent: messageId })
-      .populate('sender', 'username email avatar status')
+      .populate('sender', 'username email avatar status role')
       .sort({ createdAt: 1 })
       .limit(Number(limit))
       .skip(Number(skip));

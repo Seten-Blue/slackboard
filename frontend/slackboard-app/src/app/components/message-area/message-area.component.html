@@ -48,6 +48,9 @@
       <div class="flex-1 min-w-0">
         <div *ngIf="!shouldGroupWithPrevious(i)" class="flex items-baseline gap-2 mb-0.5">
           <span class="font-semibold text-sm text-ink-950 cursor-pointer hover:underline" (click)="openProfilePanel(message.sender?._id, message.sender?.username, message.sender?.avatar)">{{ message.sender?.username || 'Usuario' }}</span>
+          <span *ngIf="message.sender?.role === 'owner'" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-600 font-medium border border-amber-400/20">OWNER</span>
+          <span *ngIf="message.sender?.role === 'admin'" class="text-[9px] px-1.5 py-0.5 rounded bg-red-400/15 text-red-500 font-medium border border-red-400/20">ADMIN</span>
+          <span *ngIf="message.sender?.role === 'manager'" class="text-[9px] px-1.5 py-0.5 rounded bg-[#5865F2]/15 text-[#5865F2] font-medium border border-[#5865F2]/20">MANAGER</span>
           <span class="text-[11px] font-mono text-ink-950/35">{{ formatTime(message.createdAt) }}</span>
           <span *ngIf="message.isEdited" class="text-[11px] text-ink-950/30">(editado)</span>
         </div>

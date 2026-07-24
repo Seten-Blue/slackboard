@@ -78,6 +78,13 @@ export const getAuditLogs = async (req: AuthRequest, res: Response) => {
       AuditLog.countDocuments(filter),
     ]);
 
+    // Log that someone accessed the audit log itself (SOC 2 requirement)
+    if (req.userId) {
+      logAction(req.userId, 'audit.accessed', 'access', undefined, 'AuditLog',
+        { filters: Object.keys(filter), resultCount: total },
+        req.ip, req.headers['user-agent']);
+    }
+
     res.json({
       success: true,
       data: {

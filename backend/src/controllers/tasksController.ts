@@ -2,34 +2,97 @@ import { Response } from 'express';
 import mongoose from 'mongoose';
 import Task from '../models/Task';
 import User from '../models/User';
+import Channel from '../models/Channel';
 import { AuthRequest } from '../middleware/auth';
+import { logAction } from './auditLogController';
+import discordservice from '../services/discordservice';
 
 export const createTask = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { title, description, assignee, priority, dueDate, estimatedHours, tags, channel, subtasks } = req.body;
+    const { title, description, assignee, priority, dueDate, estimatedHours, tags, channel, subtasks, assignmentChannel } = req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, message: 'title es requerido' });
     }
 
-    const task = await Task.create({
+    let assigneeId: mongoose.Types.ObjectId | null = null;
+    if (assignee) {
+      try {
+        assigneeId = new mongoose.Types.ObjectId(assignee);
+        const assigneeExists = await User.findById(assigneeId).select('_id').lean();
+        if (!assigneeExists) {
+          return res.status(400).json({ success: false, message: 'Usuario asignado no encontrado' });
+        }
+      } catch {
+        return res.status(400).json({ success: false, message: 'assignee debe ser un ObjectId valido' });
+      }
+    }
+
+    const channelId = channel ? (() => { try { return new mongoose.Types.ObjectId(channel); } catch { return null; } })() : null;
+
+    const user = await User.findById(userId).select('role').lean();
+    const taskData: any = {
       title,
       description: description || '',
       creator: userId,
-      assignee: assignee || null,
-      channel: channel || null,
+      assignee: assigneeId,
+      channel: channelId,
       priority: priority || 'medium',
       dueDate: dueDate ? new Date(dueDate) : null,
       estimatedHours: estimatedHours || null,
       tags: tags || [],
       subtasks: subtasks || [],
-    });
+    };
+
+    if (assigneeId) {
+      taskData.assignedBy = userId;
+      taskData.assignmentChannel = channelId;
+      taskData.assignerRole = user?.role || 'member';
+    }
+
+    const task = await Task.create(taskData);
 
     const populated = await Task.findById(task._id)
-      .populate('creator', 'username email avatar')
+      .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
-      .populate('channel', 'name platform');
+      .populate('assignedBy', 'username email avatar role')
+      .populate('channel', 'name platform')
+      .populate('assignmentChannel', 'name platform');
+
+    logAction(userId, 'task.created', 'create', task._id.toString(), 'Task',
+      { title, assignee: assignee || null, priority: priority || 'medium' },
+      req.ip, req.headers['user-agent']);
+
+    const priorityEmoji: Record<string, string> = { urgent: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
+    const statusEmoji: Record<string, string> = { pending: '⏳', in_progress: '🔄', completed: '✅', cancelled: '❌' };
+    const emoji = priorityEmoji[priority || 'medium'] || '🟡';
+    const assigneeUser = assigneeId ? await User.findById(assigneeId).select('username').lean() : null;
+
+    const taskText = [
+      `${emoji} **Nueva tarea: ${title}**`,
+      description ? `> ${description.substring(0, 120)}${description.length > 120 ? '...' : ''}` : '',
+      `📋 Estado: ${statusEmoji['pending']} Pendiente  |  Prioridad: ${(priority || 'medium').toUpperCase()}`,
+      assigneeUser ? `👤 Asignada a: **${assigneeUser.username}**` : '👤 Sin asignar',
+      dueDate ? `📅 Fecha limite: ${new Date(dueDate).toLocaleDateString('es-ES')}` : '',
+      `🔗 Ver en SlackBoard`,
+    ].filter(Boolean).join('\n');
+
+    const targetChannel = channelId;
+    if (targetChannel) {
+      try {
+        const chDoc: any = await Channel.findById(targetChannel);
+        if (chDoc?.discordChannelId) {
+          const discordMsgId = await discordservice.sendMessage(targetChannel.toString(), taskText);
+          if (discordMsgId) {
+            task.discordNotificationMessageId = discordMsgId;
+            await task.save();
+          }
+        }
+      } catch (discordErr: any) {
+        console.warn('No se pudo enviar tarea a Discord:', discordErr.message);
+      }
+    }
 
     res.status(201).json({ success: true, data: populated });
   } catch (error: any) {
@@ -52,10 +115,25 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
 
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
-    if (assignee) filter.assignee = assignee;
-    if (creator) filter.creator = creator;
-    else filter.$or = [{ creator: userId }, { assignee: userId }];
-    if (channel) filter.channel = channel;
+    if (assignee) {
+      try {
+        filter.assignee = new mongoose.Types.ObjectId(assignee as string);
+      } catch {
+        const user = await User.findOne({ username: assignee }).select('_id').lean();
+        if (user) filter.assignee = user._id;
+      }
+    }
+    if (creator) {
+      try {
+        filter.creator = new mongoose.Types.ObjectId(creator as string);
+      } catch {}
+    }
+    if (!assignee && !creator) filter.$or = [{ creator: userId }, { assignee: userId }];
+    if (channel) {
+      try {
+        filter.channel = new mongoose.Types.ObjectId(channel as string);
+      } catch {}
+    }
     if (tag) filter.tags = tag;
     if (startDate || endDate) {
       filter.dueDate = {};
@@ -63,14 +141,17 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       if (endDate) filter.dueDate.$lte = new Date(endDate);
     }
 
-    const sortField = (sortBy as string) || 'createdAt';
+    const allowedSort = ['createdAt', 'updatedAt', 'dueDate', 'priority', 'status', 'title'];
+    const sortField = allowedSort.includes(sortBy as string) ? (sortBy as string) : 'createdAt';
     const sortDir = sortOrder === 'asc' ? 1 : -1;
 
     const [tasks, total] = await Promise.all([
       Task.find(filter)
-        .populate('creator', 'username email avatar')
+        .populate('creator', 'username email avatar role')
         .populate('assignee', 'username email avatar')
+        .populate('assignedBy', 'username email avatar role')
         .populate('channel', 'name platform')
+        .populate('assignmentChannel', 'name platform')
         .sort({ [sortField]: sortDir })
         .skip(skip)
         .limit(limit)
@@ -84,6 +165,7 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error: any) {
+    console.error('Error obteniendo tareas:', error.message);
     res.status(500).json({ success: false, message: 'Error obteniendo tareas', error: error.message });
   }
 };
@@ -93,9 +175,11 @@ export const getTask = async (req: AuthRequest, res: Response) => {
     const { taskId } = req.params;
 
     const task = await Task.findById(taskId)
-      .populate('creator', 'username email avatar')
+      .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
+      .populate('assignedBy', 'username email avatar role')
       .populate('channel', 'name platform')
+      .populate('assignmentChannel', 'name platform')
       .populate('comments.user', 'username email avatar')
       .populate('timeEntries.user', 'username email avatar')
       .lean();
@@ -120,10 +204,13 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Tarea no encontrada' });
     }
 
+    const user = await User.findById(userId).select('role').lean();
     const isCreator = task.creator.toString() === userId;
     const isAssignee = task.assignee?.toString() === userId;
-    if (!isCreator && !isAssignee) {
-      return res.status(403).json({ success: false, message: 'Solo el creador o asignado pueden editar esta tarea' });
+    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
+
+    if (!isCreator && !isAssignee && !isManagerOrAbove) {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para editar esta tarea' });
     }
 
     const allowedFields = [
@@ -131,8 +218,14 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
       'tags', 'channel', 'status', 'assignee',
     ];
     const updates: any = {};
+    const changes: any = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
+        const oldVal = (task as any)[field];
+        const newVal = req.body[field];
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+          changes[field] = { before: oldVal, after: newVal };
+        }
         updates[field] = req.body[field];
       }
     }
@@ -140,9 +233,16 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
     if (updates.dueDate) updates.dueDate = new Date(updates.dueDate);
 
     const updated = await Task.findByIdAndUpdate(taskId, updates, { new: true })
-      .populate('creator', 'username email avatar')
+      .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
-      .populate('channel', 'name platform');
+      .populate('assignedBy', 'username email avatar role')
+      .populate('channel', 'name platform')
+      .populate('assignmentChannel', 'name platform');
+
+    if (Object.keys(changes).length > 0) {
+      logAction(userId, 'task.updated', 'modify', taskId, 'Task', changes,
+        req.ip, req.headers['user-agent']);
+    }
 
     res.json({ success: true, data: updated });
   } catch (error: any) {
@@ -160,14 +260,19 @@ export const deleteTask = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Tarea no encontrada' });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('role').lean();
     const isCreator = task.creator.toString() === userId;
-    const isAdmin = user?.role === 'admin';
-    if (!isCreator && !isAdmin) {
+    const isAdminOrAbove = user && ['owner', 'admin'].includes(user.role);
+    if (!isCreator && !isAdminOrAbove) {
       return res.status(403).json({ success: false, message: 'Solo el creador o un admin pueden eliminar esta tarea' });
     }
 
     await Task.findByIdAndDelete(taskId);
+
+    logAction(userId, 'task.deleted', 'delete', taskId, 'Task',
+      { title: task.title },
+      req.ip, req.headers['user-agent']);
+
     res.json({ success: true, message: 'Tarea eliminada' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error eliminando tarea', error: error.message });
@@ -176,12 +281,22 @@ export const deleteTask = async (req: AuthRequest, res: Response) => {
 
 export const assignTask = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!;
     const { taskId } = req.params;
     const { userId: assigneeId } = req.body;
 
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ success: false, message: 'Tarea no encontrada' });
+    }
+
+    const user = await User.findById(userId).select('role').lean();
+    const isCreator = task.creator.toString() === userId;
+    const isAssignee = task.assignee?.toString() === userId;
+    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
+
+    if (!isCreator && !isAssignee && !isManagerOrAbove) {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para asignar esta tarea' });
     }
 
     if (assigneeId) {
@@ -191,13 +306,27 @@ export const assignTask = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    const oldAssignee = task.assignee?.toString() || null;
     task.assignee = assigneeId || null;
+    if (assigneeId) {
+      task.assignedBy = userId;
+      task.assignmentChannel = req.body.assignmentChannel || task.channel || null;
+      task.assignerRole = user?.role || 'member';
+    }
     await task.save();
 
     const populated = await Task.findById(taskId)
-      .populate('creator', 'username email avatar')
+      .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
-      .populate('channel', 'name platform');
+      .populate('assignedBy', 'username email avatar role')
+      .populate('channel', 'name platform')
+      .populate('assignmentChannel', 'name platform');
+
+    if (oldAssignee !== (assigneeId || null)) {
+      logAction(userId, 'task.reassigned', 'modify', taskId, 'Task',
+        { before: { assignee: oldAssignee }, after: { assignee: assigneeId || null }, title: task.title },
+        req.ip, req.headers['user-agent']);
+    }
 
     res.json({ success: true, data: populated });
   } catch (error: any) {
@@ -221,12 +350,16 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Tarea no encontrada' });
     }
 
+    const user = await User.findById(userId).select('role').lean();
     const isCreator = task.creator.toString() === userId;
     const isAssignee = task.assignee?.toString() === userId;
-    if (!isCreator && !isAssignee) {
+    const isManagerOrAbove = user && ['owner', 'admin', 'manager'].includes(user.role);
+
+    if (!isCreator && !isAssignee && !isManagerOrAbove) {
       return res.status(403).json({ success: false, message: 'No tienes permiso para cambiar el estado de esta tarea' });
     }
 
+    const oldStatus = task.status;
     task.status = status;
     if (status === 'completed') {
       task.completedAt = new Date();
@@ -236,10 +369,32 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
 
     await task.save();
 
+    if (oldStatus !== status) {
+      logAction(userId, 'task.status_changed', 'modify', taskId, 'Task',
+        { before: { status: oldStatus }, after: { status }, title: task.title },
+        req.ip, req.headers['user-agent']);
+
+      const statusEmoji: Record<string, string> = { pending: '⏳', in_progress: '🔄', completed: '✅', cancelled: '❌' };
+      const statusText = `${statusEmoji[status] || '📋'} **${task.title}** cambió a: **${status.replace('_', ' ')}**`;
+      const targetChannelId = (task as any).assignmentChannel || task.channel;
+      if (targetChannelId) {
+        try {
+          const chDoc: any = await Channel.findById(targetChannelId);
+          if (chDoc?.discordChannelId) {
+            await discordservice.sendMessage(targetChannelId.toString(), statusText);
+          }
+        } catch (discordErr: any) {
+          console.warn('No se pudo notificar cambio de estado a Discord:', discordErr.message);
+        }
+      }
+    }
+
     const populated = await Task.findById(taskId)
-      .populate('creator', 'username email avatar')
+      .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
-      .populate('channel', 'name platform');
+      .populate('assignedBy', 'username email avatar role')
+      .populate('channel', 'name platform')
+      .populate('assignmentChannel', 'name platform');
 
     res.json({ success: true, data: populated });
   } catch (error: any) {
