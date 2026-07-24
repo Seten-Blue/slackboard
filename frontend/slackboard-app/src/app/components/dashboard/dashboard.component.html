@@ -20,7 +20,7 @@
   <app-dashboard-performance *ngIf="activeView === 'performance'"></app-dashboard-performance>
   <app-dashboard-reports *ngIf="activeView === 'reports'"></app-dashboard-reports>
   <app-dashboard-tasks *ngIf="activeView === 'tasks'"></app-dashboard-tasks>
-  <app-dashboard-surveys *ngIf="activeView === 'surveys'"></app-dashboard-surveys>
+  <app-dashboard-surveys *ngIf="activeView === 'surveys'" [selectedId]="selectedId"></app-dashboard-surveys>
   <app-dashboard-audit *ngIf="activeView === 'audit'"></app-dashboard-audit>
   <app-dashboard-ai-metrics *ngIf="activeView === 'ai-metrics'"></app-dashboard-ai-metrics>
 </div>

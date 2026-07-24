@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import Message from '../models/Message';
 import Channel from '../models/Channel';
+import Survey from '../models/Survey';
 import aiService from '../services/aiService';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from './auditLogController';
@@ -88,6 +89,35 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
       pollData: pollData || undefined,
       threadData: threadData || undefined,
     });
+
+    // Si es un poll, tambien crear un Survey en el dashboard
+    if (type === 'poll' && pollData) {
+      try {
+        const questions = [{
+          text: pollData.question,
+          type: 'single_choice' as const,
+          options: pollData.options.map((o: any) => o.text || ''),
+          required: true,
+        }];
+        const survey = await Survey.create({
+          title: pollData.question,
+          description: pollData.isAnonymous ? 'Encuesta anonima creada desde el chat' : 'Encuesta creada desde el chat',
+          creator: req.userId,
+          channel: channel,
+          questions,
+          anonymous: pollData.isAnonymous || false,
+          allowMultipleResponses: pollData.allowMultiple || false,
+          expiresAt: pollData.expiresAt || null,
+          status: 'active',
+        });
+        // Actualizar el message con el surveyId
+        await Message.findByIdAndUpdate(message._id, {
+          'surveyData.surveyId': survey._id,
+        });
+      } catch (surveyErr: any) {
+        console.error('Error creando Survey desde poll:', surveyErr.message);
+      }
+    }
 
     const populatedMessage: any = await Message.findById(message._id)
       .populate('sender', 'username email avatar status role');

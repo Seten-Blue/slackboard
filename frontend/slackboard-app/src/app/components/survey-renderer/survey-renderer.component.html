@@ -1,0 +1,60 @@
+<div class="survey-card" [class]="'status-' + status" (click)="onNavigate()">
+  <div class="survey-accent"></div>
+
+  <div class="survey-content">
+    <div class="survey-header">
+      <div class="survey-icon-wrap" [class]="'icon-' + status">
+        <span class="survey-icon">📊</span>
+      </div>
+      <div class="survey-info">
+        <p class="survey-title">{{ title }}</p>
+        <p class="survey-sub" *ngIf="action === 'closed'">Encuesta cerrada</p>
+        <p class="survey-sub" *ngIf="action === 'activated'">Encuesta activada</p>
+        <p class="survey-sub" *ngIf="action !== 'closed' && action !== 'activated'">Nueva encuesta creada</p>
+      </div>
+    </div>
+
+    <div class="survey-body" *ngIf="description">
+      <p class="survey-description">{{ description }}</p>
+    </div>
+
+    <!-- Questions preview -->
+    <div class="survey-questions" *ngIf="questionsPreview.length > 0">
+      <div *ngFor="let q of questionsPreview; let qi = index" class="survey-question-item">
+        <span class="question-num">{{ qi + 1 }}.</span>
+        <span class="question-text">{{ q.text }}</span>
+        <span class="question-type">{{ getTypeLabel(q.type) }}</span>
+      </div>
+      <p *ngIf="questionsCount > 3" class="questions-more">
+        +{{ questionsCount - 3 }} mas
+      </p>
+    </div>
+
+    <div class="survey-badges">
+      <span class="survey-badge status-badge" [class]="'status-' + status">
+        {{ statusLabel }}
+      </span>
+      <span class="survey-badge questions-badge">
+        📝 {{ questionsCount }} pregunta(s)
+      </span>
+      <span class="survey-badge responses-badge">
+        ↗ {{ responseCount }} respuesta(s)
+      </span>
+      <span class="survey-badge anon-badge" *ngIf="anonymous">
+        🔒 Anonima
+      </span>
+      <span class="survey-badge expired-badge" *ngIf="isExpired">
+        ⚠️ Expirada
+      </span>
+    </div>
+
+    <div class="survey-footer">
+      <div class="survey-meta">
+        <span class="survey-due" *ngIf="expiresAt" [class.expired]="isExpired">
+          📅 {{ expiresAt }}
+        </span>
+      </div>
+      <span class="survey-nav-hint">Ver encuesta →</span>
+    </div>
+  </div>
+</div>

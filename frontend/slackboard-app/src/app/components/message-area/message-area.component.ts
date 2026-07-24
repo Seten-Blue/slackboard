@@ -1,4 +1,5 @@
 import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, OnChanges, HostListener, AfterViewInit, NgZone } from '@angular/core';
+import { Router } from '@angular/router';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
 import { Subscription } from 'rxjs';
@@ -140,12 +141,14 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     { id: 'file', icon: '📎', label: 'Archivo', desc: 'Subir un archivo o imagen' },
     { id: 'poll', icon: '📊', label: 'Encuesta', desc: 'Crear una encuesta rapida' },
     { id: 'thread', icon: '💬', label: 'Hilo', desc: 'Crear un hilo de conversacion' },
+    { id: 'task', icon: '📋', label: 'Tarea', desc: 'Crear una tarea nueva' },
   ];
 
   constructor(
     private chatService: ChatService,
     private socketService: SocketService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private router: Router
   ) {
     this.currentUser = this.chatService.getCurrentUser();
   }
@@ -336,7 +339,27 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       }
     });
 
-    this.subscriptions.push(newMessageSub, typingSub, updatedSub, deletedSub, reactionSub, pollVotedSub);
+    const surveyStatusSub = this.socketService.onSurveyStatusChanged().subscribe((data: any) => {
+      const index = this.messages.findIndex(m => m.surveyData?.surveyId === data.surveyId);
+      if (index !== -1) {
+        this.messages[index] = {
+          ...this.messages[index],
+          surveyData: { ...this.messages[index].surveyData, status: data.status }
+        };
+      }
+    });
+
+    const surveyResponseSub = this.socketService.onSurveyResponseUpdated().subscribe((data: any) => {
+      const index = this.messages.findIndex(m => m.surveyData?.surveyId === data.surveyId);
+      if (index !== -1) {
+        this.messages[index] = {
+          ...this.messages[index],
+          surveyData: { ...this.messages[index].surveyData, responseCount: data.responseCount }
+        };
+      }
+    });
+
+    this.subscriptions.push(newMessageSub, typingSub, updatedSub, deletedSub, reactionSub, pollVotedSub, surveyStatusSub, surveyResponseSub);
   }
 
   loadMessages() {
@@ -447,6 +470,9 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         break;
       case 'thread':
         this.showThreadModal = true;
+        break;
+      case 'task':
+        this.router.navigate(['/dashboard'], { queryParams: { view: 'tasks' } });
         break;
     }
   }
@@ -642,6 +668,99 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     return message.type === 'thread' && message.threadData;
   }
 
+  isTaskMessage(message: any): boolean {
+    if (message.type === 'task' && message.taskData) return true;
+    return this.isLegacyTaskMessage(message);
+  }
+
+  isLegacyTaskMessage(message: any): boolean {
+    if (message.type !== 'text' || !message.content) return false;
+    return /Nueva tarea:/.test(message.content) || /cambió a:/.test(message.content);
+  }
+
+  parseLegacyTaskData(message: any): any {
+    const content = message.content || '';
+    let title = '';
+    let description = '';
+    let status = 'pending';
+    let priority = 'medium';
+    let assigneeName = '';
+    let dueDate = '';
+    let action: 'created' | 'status_changed' = 'created';
+
+    const titleMatch = content.match(/Nueva tarea:\s*(.+)/);
+    if (titleMatch) {
+      title = titleMatch[1].replace(/\*\*/g, '').trim();
+      action = 'created';
+    }
+
+    const statusChangeMatch = content.match(/(.+?) cambió a:\s*(.+)/);
+    if (statusChangeMatch) {
+      title = statusChangeMatch[1].replace(/[✅❌⏳🔄📋]\s*\*{0,2}/g, '').trim();
+      const newStatus = statusChangeMatch[2].replace(/\*{2}/g, '').trim().toLowerCase().replace(/\s/g, '_');
+      if (['pending', 'in_progress', 'completed', 'cancelled'].includes(newStatus)) {
+        status = newStatus;
+      }
+      action = 'status_changed';
+    }
+
+    const descMatch = content.match(/^>\s*(.+)/m);
+    if (descMatch) description = descMatch[1].replace(/\.\.\.$/, '').trim();
+
+    const statusMatch = content.match(/Estado:\s*(\w[\w\s]*)/);
+    if (statusMatch) {
+      const s = statusMatch[1].trim().toLowerCase().replace(/\s/g, '_');
+      if (['pending', 'in_progress', 'completed', 'cancelled'].includes(s)) status = s;
+    }
+
+    const prioMatch = content.match(/Prioridad:\s*(\w+)/i);
+    if (prioMatch) {
+      const p = prioMatch[1].toLowerCase();
+      if (['low', 'medium', 'high', 'urgent'].includes(p)) priority = p;
+    }
+
+    const assigneeMatch = content.match(/Asignada a:\s*\*{0,2}(.+?)\*{0,2}/);
+    if (assigneeMatch) assigneeName = assigneeMatch[1].trim();
+    else if (content.includes('Sin asignar')) assigneeName = '';
+
+    const dueMatch = content.match(/Fecha limite:\s*(.+)/);
+    if (dueMatch) dueDate = dueMatch[1].trim();
+
+    return {
+      taskId: message._id,
+      title: title || 'Tarea',
+      status,
+      priority,
+      description,
+      assigneeName: assigneeName || null,
+      assigneeAvatar: null,
+      dueDate: dueDate ? this.parseLegacyDate(dueDate) : null,
+      action,
+    };
+  }
+
+  private parseLegacyDate(dateStr: string): Date | null {
+    try {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    } catch {}
+    return null;
+  }
+
+  isSurveyMessage(message: any): boolean {
+    return message.type === 'survey' && message.surveyData;
+  }
+
+  onOpenTask(taskId: string) {
+    this.router.navigate(['/dashboard'], { queryParams: { view: 'tasks' } });
+  }
+
+  onOpenSurvey(surveyId: string) {
+    this.router.navigate(['/dashboard'], { queryParams: { view: 'surveys' } });
+  }
+
   addReaction(messageId: string, emoji: string) {
     this.chatService.addReaction(messageId, emoji).subscribe({
       next: (response) => {
@@ -659,7 +778,7 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     if (!current || !previous) return false;
     if (current.sender?._id !== previous.sender?._id) return false;
     if (current.type === 'sticker' || previous.type === 'sticker') return false;
-    if (current.type === 'poll' || current.type === 'thread') return false;
+    if (current.type === 'poll' || current.type === 'thread' || current.type === 'task' || current.type === 'survey') return false;
     const currentTime = new Date(current.createdAt).getTime();
     const previousTime = new Date(previous.createdAt).getTime();
     return (currentTime - previousTime) < 5 * 60 * 1000;

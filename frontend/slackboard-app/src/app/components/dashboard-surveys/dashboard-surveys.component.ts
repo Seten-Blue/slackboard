@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { SurveysService } from '../../services/surveys.service';
 import { ChartConfiguration } from 'chart.js';
 
@@ -7,7 +7,8 @@ import { ChartConfiguration } from 'chart.js';
   templateUrl: './dashboard-surveys.component.html',
   styleUrls: ['./dashboard-surveys.component.scss']
 })
-export class DashboardSurveysComponent implements OnInit {
+export class DashboardSurveysComponent implements OnInit, OnChanges {
+  @Input() selectedId: string | null = null;
   surveys: any[] = [];
   loading = true;
   showCreateModal = false;
@@ -77,6 +78,12 @@ export class DashboardSurveysComponent implements OnInit {
     this.loadChannels();
   }
 
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['selectedId'] && this.selectedId && this.surveys.length > 0) {
+      this.openDetailById(this.selectedId);
+    }
+  }
+
   loadChannels() {
     this.surveysService.getChannels().subscribe({
       next: (res) => { this.channels = res.data || []; },
@@ -87,9 +94,22 @@ export class DashboardSurveysComponent implements OnInit {
   loadSurveys() {
     this.loading = true;
     this.surveysService.getSurveys().subscribe({
-      next: (res) => { this.surveys = res.data || []; this.loading = false; },
+      next: (res) => {
+        this.surveys = res.data || [];
+        this.loading = false;
+        if (this.selectedId) {
+          this.openDetailById(this.selectedId);
+        }
+      },
       error: () => { this.loading = false; }
     });
+  }
+
+  openDetailById(id: string) {
+    const survey = this.surveys.find(s => s._id === id);
+    if (survey) {
+      this.loadResults(survey);
+    }
   }
 
   loadStats() {

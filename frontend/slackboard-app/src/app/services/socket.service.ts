@@ -20,6 +20,8 @@ export class SocketService {
   private friendshipUpdate$ = new Subject<any>();
   private friendshipRemoved$ = new Subject<any>();
   private newSurvey$ = new Subject<any>();
+  private surveyStatusChanged$ = new Subject<any>();
+  private surveyResponseUpdated$ = new Subject<any>();
   private taskStatusChanged$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
@@ -72,6 +74,8 @@ export class SocketService {
     this.socket.on('friendship:update', (data: any) => this.friendshipUpdate$.next(data));
     this.socket.on('friendship:removed', (data: any) => this.friendshipRemoved$.next(data));
     this.socket.on('new-survey', (data: any) => this.newSurvey$.next(data));
+    this.socket.on('survey-status-changed', (data: any) => this.surveyStatusChanged$.next(data));
+    this.socket.on('survey-response-updated', (data: any) => this.surveyResponseUpdated$.next(data));
     this.socket.on('task:status-changed', (data: any) => this.taskStatusChanged$.next(data));
   }
 
@@ -156,6 +160,14 @@ export class SocketService {
 
   onNewSurvey(): Observable<any> {
     return this.newSurvey$.asObservable();
+  }
+
+  onSurveyStatusChanged(): Observable<any> {
+    return this.surveyStatusChanged$.asObservable();
+  }
+
+  onSurveyResponseUpdated(): Observable<any> {
+    return this.surveyResponseUpdated$.asObservable();
   }
 
   onTaskStatusChanged(): Observable<any> {

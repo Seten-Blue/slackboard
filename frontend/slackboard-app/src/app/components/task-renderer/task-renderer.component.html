@@ -1,0 +1,63 @@
+<div class="task-card" [class]="'task-card--' + priority" [class.task-card--completed]="status === 'completed'" [class.task-card--cancelled]="status === 'cancelled'" (click)="onNavigate()">
+
+  <div class="task-card__glow"></div>
+
+  <div class="task-card__accent">
+    <div class="task-card__accent-icon">{{ priorityIcon }}</div>
+  </div>
+
+  <div class="task-card__body">
+
+    <div class="task-card__header">
+      <div class="task-card__type-tag">
+        <span class="task-card__type-dot"></span>
+        {{ action === 'status_changed' ? 'ACTUALIZACION' : 'NUEVA TAREA' }}
+      </div>
+      <span class="task-card__time">{{ timeAgo }}</span>
+    </div>
+
+    <h3 class="task-card__title">{{ title }}</h3>
+
+    <p class="task-card__description" *ngIf="description">{{ description }}</p>
+
+    <div class="task-card__status-row">
+      <div class="task-card__status-chip" [class]="'chip--' + status">
+        <span class="chip__dot"></span>
+        {{ statusLabel }}
+      </div>
+      <div class="task-card__priority-chip" [class]="'chip--' + priority">
+        {{ priorityLabel }}
+      </div>
+      <div class="task-card__overdue-chip" *ngIf="isOverdue">
+        <span class="chip__pulse"></span>
+        VENCIDA
+      </div>
+    </div>
+
+    <div class="task-card__meta">
+      <div class="task-card__assignee" *ngIf="assigneeName !== 'Sin asignar'">
+        <img *ngIf="assigneeAvatar" [src]="assigneeAvatar" [alt]="assigneeName" class="assignee__avatar">
+        <div *ngIf="!assigneeAvatar" class="assignee__avatar assignee__avatar--fallback">
+          {{ assigneeName.charAt(0).toUpperCase() }}
+        </div>
+        <span class="assignee__name">{{ assigneeName }}</span>
+      </div>
+      <div class="task-card__assignee" *ngIf="assigneeName === 'Sin asignar'">
+        <div class="assignee__avatar assignee__avatar--empty">?</div>
+        <span class="assignee__name assignee__name--muted">Sin asignar</span>
+      </div>
+      <div class="task-card__due" *ngIf="dueDate" [class.task-card__due--overdue]="isOverdue">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        {{ dueDate }}
+      </div>
+    </div>
+
+    <div class="task-card__action-row">
+      <span class="task-card__cta">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        Abrir tarea
+      </span>
+    </div>
+
+  </div>
+</div>

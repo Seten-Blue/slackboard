@@ -1,0 +1,415 @@
+// ─── Task Card: Futuristic Design ────────────────────────────────────────────
+
+@mixin priority-colors($accent, $glow, $bg-subtle) {
+  .task-card__accent {
+    background: linear-gradient(180deg, $accent, rgba($accent, 0.7));
+    box-shadow: 0 0 20px rgba($glow, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .task-card__glow {
+    background: radial-gradient(ellipse at 0% 50%, rgba($glow, 0.08), transparent 70%);
+  }
+
+  .task-card__type-dot {
+    background: $accent;
+    box-shadow: 0 0 6px rgba($glow, 0.5);
+  }
+
+  .task-card__title {
+    color: darken($accent, 12%);
+  }
+
+  .task-card__cta {
+    color: $accent;
+    border-color: rgba($accent, 0.25);
+
+    &:hover {
+      background: rgba($accent, 0.08);
+      border-color: rgba($accent, 0.5);
+      box-shadow: 0 0 12px rgba($glow, 0.15);
+    }
+  }
+}
+
+// ─── Base Card ───────────────────────────────────────────────────────────────
+
+.task-card {
+  position: relative;
+  display: flex;
+  max-width: 460px;
+  margin-top: 6px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(20, 17, 42, 0.08);
+  box-shadow:
+    0 1px 3px rgba(20, 17, 42, 0.04),
+    0 4px 16px rgba(20, 17, 42, 0.03);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    border-color: rgba(20, 17, 42, 0.12);
+    box-shadow:
+      0 2px 8px rgba(20, 17, 42, 0.06),
+      0 8px 32px rgba(20, 17, 42, 0.06);
+    transform: translateY(-1px);
+
+    .task-card__cta {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .task-card__accent {
+      box-shadow: 0 0 28px rgba(var(--glow-rgb), 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  // ─── Priority Variants ───────────────────────────────────────────────
+
+  &--urgent {
+    @include priority-colors(#ef4444, #ef4444, rgba(239, 68, 68, 0.04));
+    --glow-rgb: 239, 68, 68;
+  }
+
+  &--high {
+    @include priority-colors(#f59e0b, #f59e0b, rgba(245, 158, 11, 0.04));
+    --glow-rgb: 245, 158, 11;
+  }
+
+  &--medium {
+    @include priority-colors(#6366f1, #6366f1, rgba(99, 102, 241, 0.04));
+    --glow-rgb: 99, 102, 241;
+  }
+
+  &--low {
+    @include priority-colors(#94a3b8, #94a3b8, rgba(148, 163, 184, 0.04));
+    --glow-rgb: 148, 163, 184;
+  }
+
+  // ─── Completed / Cancelled states ────────────────────────────────────
+
+  &--completed {
+    opacity: 0.75;
+    .task-card__accent {
+      background: linear-gradient(180deg, #22c55e, rgba(34, 197, 94, 0.7)) !important;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    }
+    .task-card__title { color: #16a34a !important; }
+  }
+
+  &--cancelled {
+    opacity: 0.6;
+    .task-card__accent {
+      background: linear-gradient(180deg, #94a3b8, rgba(148, 163, 184, 0.7)) !important;
+      box-shadow: 0 0 20px rgba(148, 163, 184, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    }
+    .task-card__title { color: #64748b !important; text-decoration: line-through; }
+  }
+}
+
+// ─── Accent Bar (Left) ───────────────────────────────────────────────────────
+
+.task-card__accent {
+  width: 52px;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: box-shadow 0.25s ease;
+}
+
+.task-card__accent-icon {
+  font-size: 20px;
+  filter: saturate(1.2);
+}
+
+// ─── Glow Effect ─────────────────────────────────────────────────────────────
+
+.task-card__glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+// ─── Body ────────────────────────────────────────────────────────────────────
+
+.task-card__body {
+  flex: 1;
+  padding: 14px 16px 12px 14px;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+// ─── Header ──────────────────────────────────────────────────────────────────
+
+.task-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.task-card__type-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(20, 17, 42, 0.4);
+}
+
+.task-card__type-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.task-card__time {
+  font-size: 11px;
+  color: rgba(20, 17, 42, 0.3);
+  font-weight: 500;
+}
+
+// ─── Title ───────────────────────────────────────────────────────────────────
+
+.task-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// ─── Description ─────────────────────────────────────────────────────────────
+
+.task-card__description {
+  font-size: 13px;
+  color: rgba(20, 17, 42, 0.55);
+  margin: 0 0 10px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// ─── Status & Priority Chips ─────────────────────────────────────────────────
+
+.task-card__status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.task-card__status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.01em;
+}
+
+.chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chip--pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  .chip__dot { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
+}
+
+.chip--in_progress {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  .chip__dot { background: #3b82f6; box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); animation: pulse-dot 2s infinite; }
+}
+
+.chip--completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  .chip__dot { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+}
+
+.chip--cancelled {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  .chip__dot { background: #ef4444; }
+}
+
+.task-card__priority-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+  border: 1px solid;
+}
+
+.chip--urgent {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+.chip--high {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.chip--medium {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+.chip--low {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.task-card__overdue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  letter-spacing: 0.04em;
+}
+
+.chip__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse-dot 1.5s infinite;
+}
+
+// ─── Meta Row ────────────────────────────────────────────────────────────────
+
+.task-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(20, 17, 42, 0.06);
+}
+
+.task-card__assignee {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assignee__avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(20, 17, 42, 0.08);
+  flex-shrink: 0;
+
+  &--fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  &--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 17, 42, 0.06);
+    color: rgba(20, 17, 42, 0.3);
+    font-size: 10px;
+    font-weight: 600;
+  }
+}
+
+.assignee__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(20, 17, 42, 0.65);
+
+  &--muted {
+    color: rgba(20, 17, 42, 0.3);
+    font-style: italic;
+  }
+}
+
+.task-card__due {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(20, 17, 42, 0.4);
+
+  &--overdue {
+    color: #dc2626;
+    font-weight: 700;
+  }
+}
+
+// ─── CTA Button ──────────────────────────────────────────────────────────────
+
+.task-card__action-row {
+  margin-top: 10px;
+}
+
+.task-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.2s ease;
+
+  svg {
+    transition: transform 0.2s ease;
+  }
+
+  &:hover svg {
+    transform: translateX(2px);
+  }
+}
+
+// ─── Animations ──────────────────────────────────────────────────────────────
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

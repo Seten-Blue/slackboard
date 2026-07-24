@@ -156,3 +156,18 @@
   font-size: 11px;
   color: rgba(20, 17, 42, 0.35);
 }
+
+.poll-detail-link {
+  font-size: 11px;
+  color: #6366f1;
+  cursor: pointer;
+  margin-left: auto;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #4f46e5;
+    text-decoration: underline;
+  }
+}

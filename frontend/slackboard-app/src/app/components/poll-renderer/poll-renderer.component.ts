@@ -1,4 +1,5 @@
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Router } from '@angular/router';
 import { ChatService } from '../../services/chat.service';
 
 @Component({
@@ -17,7 +18,18 @@ export class PollRendererComponent implements OnChanges {
   expired = false;
   timeLeft = '';
 
-  constructor(private chatService: ChatService) {}
+  constructor(private chatService: ChatService, private router: Router) {}
+
+  get surveyId(): string | null {
+    return this.message?.surveyData?.surveyId || null;
+  }
+
+  goToSurvey(event: Event) {
+    event.stopPropagation();
+    if (this.surveyId) {
+      this.router.navigate(['/dashboard'], { queryParams: { view: 'surveys', id: this.surveyId } });
+    }
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['message'] || changes['currentUserId']) {

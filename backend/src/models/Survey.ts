@@ -73,4 +73,11 @@ const SurveySchema: Schema = new Schema(
 SurveySchema.index({ creator: 1, status: 1 });
 SurveySchema.index({ channel: 1 });
 
+SurveySchema.virtual('responseCount').get(function (this: ISurvey) {
+  return this.responses ? this.responses.length : 0;
+});
+
+SurveySchema.set('toJSON', { virtuals: true });
+SurveySchema.set('toObject', { virtuals: true });
+
 export default mongoose.models.Survey || mongoose.model<ISurvey>('Survey', SurveySchema);

@@ -25,6 +25,8 @@ import { PollModalComponent } from './components/poll-modal/poll-modal.component
 import { PollRendererComponent } from './components/poll-renderer/poll-renderer.component';
 import { ThreadModalComponent } from './components/thread-modal/thread-modal.component';
 import { ThreadRendererComponent } from './components/thread-renderer/thread-renderer.component';
+import { TaskRendererComponent } from './components/task-renderer/task-renderer.component';
+import { SurveyRendererComponent } from './components/survey-renderer/survey-renderer.component';
 import { ThreadPanelComponent } from './components/thread-panel/thread-panel.component';
 import { DashboardActivityComponent } from './components/dashboard-activity/dashboard-activity.component';
 import { DashboardTrafficComponent } from './components/dashboard-traffic/dashboard-traffic.component';
@@ -58,6 +60,8 @@ import { DashboardAuditComponent } from './components/dashboard-audit/dashboard-
     PollRendererComponent,
     ThreadModalComponent,
     ThreadRendererComponent,
+    TaskRendererComponent,
+    SurveyRendererComponent,
     ThreadPanelComponent,
     DashboardActivityComponent,
     DashboardTrafficComponent,

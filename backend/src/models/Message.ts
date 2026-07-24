@@ -25,11 +25,38 @@ export interface IThreadData {
   participants: mongoose.Types.ObjectId[];
 }
 
+export interface ITaskData {
+  taskId: mongoose.Types.ObjectId;
+  title: string;
+  status: string;
+  priority: string;
+  description?: string;
+  assigneeName?: string;
+  assigneeAvatar?: string;
+  dueDate?: Date | null;
+  action?: 'created' | 'status_changed';
+  newStatus?: string;
+  oldStatus?: string;
+}
+
+export interface ISurveyData {
+  surveyId: mongoose.Types.ObjectId;
+  title: string;
+  description?: string;
+  status: string;
+  questionsCount: number;
+  questionsPreview: { text: string; type: string }[];
+  responseCount: number;
+  expiresAt?: Date | null;
+  anonymous: boolean;
+  action?: 'created' | 'activated' | 'closed';
+}
+
 export interface IMessage extends Document {
   content: string;
   channel: mongoose.Types.ObjectId;
   sender: mongoose.Types.ObjectId;
-  type: 'text' | 'image' | 'file' | 'sticker' | 'poll' | 'thread';
+  type: 'text' | 'image' | 'file' | 'sticker' | 'poll' | 'thread' | 'task' | 'survey';
   isEdited: boolean;
   reactions: {
     emoji: string;
@@ -38,6 +65,8 @@ export interface IMessage extends Document {
   attachments?: string[];
   pollData?: IPollData;
   threadData?: IThreadData;
+  taskData?: ITaskData;
+  surveyData?: ISurveyData;
   threadParent?: mongoose.Types.ObjectId;
   discordMessageId?: string;
   discordThreadId?: string;
@@ -66,7 +95,7 @@ const MessageSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'image', 'file', 'sticker', 'poll', 'thread'],
+      enum: ['text', 'image', 'file', 'sticker', 'poll', 'thread', 'task', 'survey'],
       default: 'text',
     },
     isEdited: {
@@ -97,6 +126,16 @@ const MessageSchema: Schema = new Schema(
     },
     // ← NUEVO: datos estructurados para hilos
     threadData: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    // ← NUEVO: datos estructurados para tareas
+    taskData: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    // ← NUEVO: datos estructurados para encuestas
+    surveyData: {
       type: Schema.Types.Mixed,
       default: null,
     },

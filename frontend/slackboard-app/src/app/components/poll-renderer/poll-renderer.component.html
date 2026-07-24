@@ -29,5 +29,6 @@
     <span *ngIf="timeLeft" class="poll-time">⏱ {{ timeLeft }}</span>
     <span *ngIf="message.pollData.allowMultiple" class="poll-multi">☑ Multiples respuestas</span>
     <span *ngIf="message.pollData.isAnonymous" class="poll-anon">🔒 Anonima</span>
+    <a *ngIf="surveyId" (click)="goToSurvey($event)" class="poll-detail-link">Ver en dashboard →</a>
   </div>
 </div>

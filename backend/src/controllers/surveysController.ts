@@ -1,5 +1,8 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import Survey, { ISurvey } from '../models/Survey';
+import Message from '../models/Message';
+import Channel from '../models/Channel';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from './auditLogController';
@@ -42,13 +45,53 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
     const populated = await Survey.findById(survey._id)
       .populate('creator', 'username email avatar')
       .populate('channel', 'name platform')
-      .lean();
+      .lean() as any;
+
+    // Agregar responseCount manualmente (lean() no incluye virtuales)
+    populated.responseCount = 0;
 
     if (channel && io) {
       io.to(channel.toString()).emit('new-survey', {
         channelId: channel.toString(),
         survey: populated,
       });
+    }
+
+    // Crear mensaje en el chat (igual que las tareas)
+    const targetChannelId = channel ? (() => { try { return new mongoose.Types.ObjectId(channel); } catch { return null; } })() : null;
+    if (targetChannelId) {
+      const questionsPreview = (questions || []).slice(0, 3).map((q: any) => ({
+        text: q.text,
+        type: q.type,
+      }));
+
+      const chatMsg = await Message.create({
+        content: `📊 Nueva encuesta: ${title}`,
+        channel: targetChannelId,
+        sender: userId,
+        type: 'survey',
+        surveyData: {
+          surveyId: survey._id,
+          title,
+          description: description || '',
+          status: 'active',
+          questionsCount: questions.length,
+          questionsPreview,
+          responseCount: 0,
+          expiresAt: expiresAt || null,
+          anonymous: anonymous ?? false,
+          action: 'created',
+        },
+      });
+
+      if (io) {
+        const populatedMsg = await Message.findById(chatMsg._id)
+          .populate('sender', 'username email avatar status role');
+        io.to(targetChannelId.toString()).emit('new-message', {
+          channelId: targetChannelId.toString(),
+          message: populatedMsg,
+        });
+      }
     }
 
     logAction(userId, 'survey.created', 'create', survey._id.toString(), 'Survey',
@@ -98,9 +141,15 @@ export const getSurveys = async (req: AuthRequest, res: Response) => {
       Survey.countDocuments(filter),
     ]);
 
+    // Agregar responseCount manualmente (lean() no incluye virtuales)
+    const surveysWithCount = surveys.map((s: any) => ({
+      ...s,
+      responseCount: s.responses ? s.responses.length : 0,
+    }));
+
     res.json({
       success: true,
-      data: surveys,
+      data: surveysWithCount,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error: any) {
@@ -144,6 +193,9 @@ export const getSurvey = async (req: AuthRequest, res: Response) => {
     if (s.status === 'draft' && !isCreator) {
       return res.status(403).json({ success: false, message: 'Esta encuesta aun no esta activa' });
     }
+
+    // Agregar responseCount manualmente (lean() no incluye virtuales)
+    survey.responseCount = survey.responses ? survey.responses.length : 0;
 
     res.json({ success: true, data: survey });
   } catch (error: any) {
@@ -267,6 +319,21 @@ export const activateSurvey = async (req: AuthRequest, res: Response) => {
     survey.status = 'active';
     await survey.save();
 
+    // Actualizar mensaje en chat si existe
+    if (survey.channel) {
+      await Message.findOneAndUpdate(
+        { 'surveyData.surveyId': survey._id, type: 'survey' },
+        { $set: { 'surveyData.status': 'active', 'surveyData.action': 'activated' } }
+      );
+      const io = req.app.get('io');
+      if (io) {
+        io.to(survey.channel.toString()).emit('survey-status-changed', {
+          surveyId: survey._id,
+          status: 'active',
+        });
+      }
+    }
+
     logAction(userId, 'survey.activated', 'modify', surveyId, 'Survey',
       { title: survey.title },
       req.ip, req.headers['user-agent']);
@@ -307,6 +374,21 @@ export const closeSurvey = async (req: AuthRequest, res: Response) => {
 
     survey.status = 'closed';
     await survey.save();
+
+    // Actualizar mensaje en chat si existe
+    if (survey.channel) {
+      await Message.findOneAndUpdate(
+        { 'surveyData.surveyId': survey._id, type: 'survey' },
+        { $set: { 'surveyData.status': 'closed', 'surveyData.action': 'closed' } }
+      );
+      const io = req.app.get('io');
+      if (io) {
+        io.to(survey.channel.toString()).emit('survey-status-changed', {
+          surveyId: survey._id,
+          status: 'closed',
+        });
+      }
+    }
 
     logAction(userId, 'survey.closed', 'modify', surveyId, 'Survey',
       { title: survey.title, responsesCount: survey.responses.length },
@@ -432,6 +514,21 @@ export const submitResponse = async (req: AuthRequest, res: Response) => {
 
     await survey.save();
 
+    // Actualizar responseCount en el mensaje del chat
+    if (survey.channel) {
+      await Message.findOneAndUpdate(
+        { 'surveyData.surveyId': survey._id, type: 'survey' },
+        { $set: { 'surveyData.responseCount': survey.responses.length } }
+      );
+      const io = req.app.get('io');
+      if (io) {
+        io.to(survey.channel.toString()).emit('survey-response-updated', {
+          surveyId: survey._id,
+          responseCount: survey.responses.length,
+        });
+      }
+    }
+
     res.status(201).json({ success: true, message: 'Respuesta registrada exitosamente' });
   } catch (error: any) {
     res.status(500).json({
@@ -552,6 +649,7 @@ export const getSurveyResults = async (req: AuthRequest, res: Response) => {
           creator: survey.creator,
           channel: survey.channel,
           createdAt: survey.createdAt,
+          responseCount: totalResponses,
         },
         totalResponses,
         results,
@@ -574,7 +672,7 @@ export const getSurveyStats = async (req: AuthRequest, res: Response) => {
       $or: [{ creator: userId }, { targetUsers: userId }],
     };
 
-    const [totalSurveys, surveysByStatus, responseStats] = await Promise.all([
+    const [totalSurveys, surveysByStatus, responseStats, recentSurveys] = await Promise.all([
       Survey.countDocuments(filter),
       Survey.aggregate([
         { $match: filter },
@@ -591,6 +689,11 @@ export const getSurveyStats = async (req: AuthRequest, res: Response) => {
           },
         },
       ]),
+      Survey.find(filter)
+        .populate('creator', 'username email avatar')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
     ]);
 
     const statusMap: Record<string, number> = { draft: 0, active: 0, closed: 0 };
@@ -624,7 +727,6 @@ export const getSurveyStats = async (req: AuthRequest, res: Response) => {
         : 0;
 
     const activeSurveys = responseStats.filter((s: any) => {
-      const survey = surveysByStatus.find((st: any) => st._id === 'active');
       return s.responseCount > 0;
     });
 
@@ -637,16 +739,49 @@ export const getSurveyStats = async (req: AuthRequest, res: Response) => {
           ) / 100
         : 0;
 
+    // Formato que espera el frontend
+    const byStatus = Object.entries(statusMap).map(([status, count]) => ({ status, count }));
+
+    // Actividad reciente: encuestas creadas por mes
+    const recentActivityAgg = await Survey.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+          responses: { $sum: { $size: '$responses' } },
+        },
+      },
+      { $sort: { _id: -1 } },
+      { $limit: 14 },
+    ]);
+
+    const recentActivity = recentActivityAgg.map((a: any) => ({
+      date: a._id,
+      count: a.count,
+      responses: a.responses,
+    }));
+
+    // Agregar responseCount a las encuestas recientes
+    const recentSurveysWithCount = recentSurveys.map((s: any) => ({
+      ...s,
+      responseCount: s.responses ? s.responses.length : 0,
+    }));
+
     res.json({
       success: true,
       data: {
         totalSurveys,
         surveysByStatus: statusMap,
+        activeSurveys: statusMap.active || 0,
         totalResponses,
         avgResponsesPerSurvey,
         responseRate,
         completionRate,
         avgResponsesPerActiveSurvey,
+        byStatus,
+        recentActivity,
+        recentSurveys: recentSurveysWithCount,
       },
     });
   } catch (error: any) {

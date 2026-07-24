@@ -8,12 +8,14 @@ import { ActivatedRoute } from '@angular/router';
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   activeView = 'activity';
+  selectedId: string | null = null;
 
   constructor(private route: ActivatedRoute) {}
 
   ngOnInit() {
     this.route.queryParams.subscribe(params => {
       this.activeView = params['view'] || 'activity';
+      this.selectedId = params['id'] || null;
     });
   }
 

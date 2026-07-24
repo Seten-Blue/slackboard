@@ -70,8 +70,18 @@
           <app-thread-renderer [message]="message" (openThread)="openThreadPanel($event)"></app-thread-renderer>
         </div>
 
+        <!-- Task message -->
+        <div *ngIf="isTaskMessage(message)">
+          <app-task-renderer [message]="message" (openTask)="onOpenTask($event)"></app-task-renderer>
+        </div>
+
+        <!-- Survey message -->
+        <div *ngIf="isSurveyMessage(message)">
+          <app-survey-renderer [message]="message" (openSurvey)="onOpenSurvey($event)"></app-survey-renderer>
+        </div>
+
         <!-- Text message -->
-        <p *ngIf="!isStickerMessage(message) && !isPollMessage(message) && !isThreadMessage(message)" class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
+        <p *ngIf="!isStickerMessage(message) && !isPollMessage(message) && !isThreadMessage(message) && !isTaskMessage(message) && !isSurveyMessage(message)" class="text-[15px] text-ink-950/85 leading-relaxed break-words">{{ message.content }}</p>
 
         <!-- Adjuntos -->
         <div *ngIf="message.attachments?.length" class="mt-2 space-y-2">
@@ -107,7 +117,7 @@
           </button>
         </div>
 
-        <div *ngIf="!isStickerMessage(message) && !isPollMessage(message) && !isThreadMessage(message)" class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div *ngIf="!isStickerMessage(message) && !isPollMessage(message) && !isThreadMessage(message) && !isTaskMessage(message) && !isSurveyMessage(message)" class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button (click)="addReaction(message._id, '👍')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">👍</button>
           <button (click)="addReaction(message._id, '❤️')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">❤️</button>
           <button (click)="addReaction(message._id, '😂')" class="text-xs px-1.5 py-0.5 rounded hover:bg-ink-950/5" title="Reaccionar">😂</button>

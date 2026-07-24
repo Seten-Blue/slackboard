@@ -69,7 +69,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
     const priorityEmoji: Record<string, string> = { urgent: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
     const statusEmoji: Record<string, string> = { pending: '⏳', in_progress: '🔄', completed: '✅', cancelled: '❌' };
     const emoji = priorityEmoji[priority || 'medium'] || '🟡';
-    const assigneeUser = assigneeId ? await User.findById(assigneeId).select('username').lean() : null;
+    const assigneeUser = assigneeId ? await User.findById(assigneeId).select('username avatar').lean() : null;
 
     const taskText = [
       `${emoji} **Nueva tarea: ${title}**`,
@@ -84,19 +84,22 @@ export const createTask = async (req: AuthRequest, res: Response) => {
     if (targetChannel) {
       const chDoc: any = await Channel.findById(targetChannel);
 
-      const chatContent = [
-        `${emoji} **Nueva tarea: ${title}**`,
-        description ? `> ${description.substring(0, 120)}${description.length > 120 ? '...' : ''}` : '',
-        `📋 Estado: Pendiente  |  Prioridad: ${(priority || 'medium').toUpperCase()}`,
-        assigneeUser ? `👤 Asignada a: **${assigneeUser.username}**` : '👤 Sin asignar',
-        dueDate ? `📅 Fecha limite: ${new Date(dueDate).toLocaleDateString('es-ES')}` : '',
-      ].filter(Boolean).join('\n');
-
       const chatMsg = await Message.create({
-        content: chatContent,
+        content: `📋 Nueva tarea: ${title}`,
         channel: targetChannel,
         sender: userId,
-        type: 'text',
+        type: 'task',
+        taskData: {
+          taskId: task._id,
+          title,
+          status: 'pending',
+          priority: priority || 'medium',
+          description: description || '',
+          assigneeName: assigneeUser?.username || null,
+          assigneeAvatar: assigneeUser?.avatar || null,
+          dueDate: dueDate ? new Date(dueDate) : null,
+          action: 'created',
+        },
       });
 
       const io = req.app.get('io');
@@ -410,15 +413,31 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
         { before: { status: oldStatus }, after: { status }, title: task.title },
         req.ip, req.headers['user-agent']);
 
-      const statusEmoji: Record<string, string> = { pending: '⏳', in_progress: '🔄', completed: '✅', cancelled: '❌' };
-      const statusText = `${statusEmoji[status] || '📋'} **${task.title}** cambió a: **${status.replace('_', ' ')}**`;
       const targetChannelId = (task as any).assignmentChannel || task.channel;
       if (targetChannelId) {
+        const statusEmoji: Record<string, string> = { pending: '⏳', in_progress: '🔄', completed: '✅', cancelled: '❌' };
+        const statusText = `${statusEmoji[status] || '📋'} **${task.title}** cambió a: **${status.replace('_', ' ')}**`;
+
+        const assigneeDoc = task.assignee ? await User.findById(task.assignee).select('username avatar').lean() : null;
+
         const chatMsg = await Message.create({
-          content: statusText,
+          content: `${statusEmoji[status] || '📋'} ${task.title} → ${status.replace('_', ' ')}`,
           channel: targetChannelId,
           sender: userId,
-          type: 'text',
+          type: 'task',
+          taskData: {
+            taskId: task._id,
+            title: task.title,
+            status,
+            priority: task.priority,
+            description: task.description || '',
+            assigneeName: assigneeDoc?.username || null,
+            assigneeAvatar: assigneeDoc?.avatar || null,
+            dueDate: task.dueDate || null,
+            action: 'status_changed',
+            oldStatus,
+            newStatus: status,
+          },
         });
 
         const io = req.app.get('io');
