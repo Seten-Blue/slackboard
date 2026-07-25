@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { SurveysService } from '../../services/surveys.service';
 import { SocketService } from '../../services/socket.service';
+import { AuthService } from '../../services/auth.service';
 import { Subscription } from 'rxjs';
 import { ChartConfiguration } from 'chart.js';
 
@@ -20,6 +21,7 @@ export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
   selectedSurvey: any = null;
   activeTab: 'surveys' | 'stats' = 'surveys';
   results: any = null;
+  elapsedTime = '';
   stats: any = null;
   creating = false;
   submitting = false;
@@ -71,9 +73,15 @@ export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
     }
   };
 
-  private questionChartColors = ['#8b7cf6', '#2FD4A8', '#FF6B47', '#ECB22E', '#5865F2', '#6264A7', '#00AFF0', '#F472B6'];
+  questionChartColors = ['#8b7cf6', '#2FD4A8', '#FF6B47', '#ECB22E', '#5865F2', '#6264A7', '#00AFF0', '#F472B6'];
 
-  constructor(private surveysService: SurveysService, private socketService: SocketService) {}
+  constructor(
+    private surveysService: SurveysService,
+    private socketService: SocketService,
+    private authService: AuthService
+  ) {}
+
+  Math = Math;
 
   ngOnInit() {
     this.loadSurveys();
@@ -156,9 +164,11 @@ export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
     this.selectedSurvey = survey;
     this.showResultsModal = true;
     this.results = null;
+    this.elapsedTime = '';
     this.surveysService.getResults(survey._id).subscribe({
       next: (res) => {
         this.results = res.data || null;
+        this.elapsedTime = res.data?.elapsedTime || '—';
         if (this.results) this.buildResultCharts();
       }
     });
@@ -264,30 +274,65 @@ export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
   openRespond(survey: any) {
     this.selectedSurvey = survey;
     this.responseAnswers = {};
-    this.showRespondModal = true;
-    if (survey.questions) {
-      survey.questions.forEach((_: any, i: number) => {
-        this.responseAnswers[i] = '';
-      });
+
+    // Verificar si el usuario ya respondio
+    const userId = this.authService.currentUser?._id;
+    const hasResponded = userId && survey.responses?.some((r: any) =>
+      (r.respondent?._id || r.respondent) === userId
+    );
+
+    if (hasResponded) {
+      if (!confirm('Ya has respondido esta encuesta. Deseas cambiar tu respuesta?')) {
+        return;
+      }
     }
+
+    // Prellenar respuestas existentes si las hay
+    if (hasResponded && userId) {
+      const existingResponse = survey.responses.find((r: any) =>
+        (r.respondent?._id || r.respondent) === userId
+      );
+      if (existingResponse?.answers) {
+        existingResponse.answers.forEach((a: any) => {
+          this.responseAnswers[a.questionIndex] = a.value;
+        });
+      }
+    } else {
+      if (survey.questions) {
+        survey.questions.forEach((_: any, i: number) => {
+          this.responseAnswers[i] = '';
+        });
+      }
+    }
+
+    this.showRespondModal = true;
   }
 
   submitResponse() {
     if (!this.selectedSurvey) return;
     this.submitting = true;
+    this.errorMessage = '';
     const answers = Object.entries(this.responseAnswers).map(([idx, value]) => ({
       questionIndex: parseInt(idx),
       value
     }));
     this.surveysService.submitResponse(this.selectedSurvey._id, answers).subscribe({
-      next: () => {
+      next: (res) => {
         this.showRespondModal = false;
         this.submitting = false;
         const idx = this.surveys.findIndex(s => s._id === this.selectedSurvey._id);
-        if (idx !== -1) this.surveys[idx].responseCount = (this.surveys[idx].responseCount || 0) + 1;
+        if (idx !== -1) {
+          if (!this.surveys[idx].responseCount || this.surveys[idx].responseCount === 0) {
+            this.surveys[idx].responseCount = 1;
+          }
+        }
+        this.loadResults(this.selectedSurvey);
         this.loadStats();
       },
-      error: () => { this.submitting = false; }
+      error: (err) => {
+        this.submitting = false;
+        this.errorMessage = err.error?.message || 'Error al enviar respuesta';
+      }
     });
   }
 

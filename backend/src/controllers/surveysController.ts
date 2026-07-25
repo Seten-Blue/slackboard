@@ -513,14 +513,26 @@ export const submitResponse = async (req: AuthRequest, res: Response) => {
     }
 
     if (!survey.allowMultipleResponses) {
-      const alreadyResponded = survey.responses.some(
-        (r: any) => r.respondent.toString() === userId
+      const existingIndex = survey.responses.findIndex(
+        (r: any) => r.respondent && r.respondent.toString() === userId
       );
-      if (alreadyResponded) {
-        return res.status(400).json({
-          success: false,
-          message: 'Ya has respondido esta encuesta',
-        });
+      if (existingIndex !== -1) {
+        // Actualizar respuesta existente
+        survey.responses[existingIndex].answers = answers;
+        survey.responses[existingIndex].submittedAt = new Date();
+        await survey.save();
+
+        if (survey.channel) {
+          const io = req.app.get('io');
+          if (io) {
+            io.to(survey.channel.toString()).emit('survey-response-updated', {
+              surveyId: survey._id,
+              responseCount: survey.responses.length,
+            });
+          }
+        }
+
+        return res.status(200).json({ success: true, message: 'Respuesta actualizada exitosamente' });
       }
     }
 
@@ -634,6 +646,23 @@ export const getSurveyResults = async (req: AuthRequest, res: Response) => {
 
     const totalResponses = survey.responses.length;
 
+    // Calcular tiempo transcurrido desde la creacion
+    const createdAt = new Date(survey.createdAt);
+    const now = new Date();
+    const elapsedMs = now.getTime() - createdAt.getTime();
+    const elapsedHours = Math.floor(elapsedMs / (1000 * 60 * 60));
+    const elapsedDays = Math.floor(elapsedHours / 24);
+    let elapsedTime: string;
+    if (elapsedDays > 0) {
+      elapsedTime = `${elapsedDays}d ${elapsedHours % 24}h`;
+    } else if (elapsedHours > 0) {
+      const elapsedMins = Math.floor((elapsedMs % (1000 * 60 * 60)) / (1000 * 60));
+      elapsedTime = `${elapsedHours}h ${elapsedMins}m`;
+    } else {
+      const elapsedMins = Math.floor(elapsedMs / (1000 * 60));
+      elapsedTime = `${elapsedMins}m`;
+    }
+
     const results = survey.questions.map((question: any, index: number) => {
       const questionResponses = survey.responses
         .map((r: any) => r.answers.find((a: any) => a.questionIndex === index))
@@ -725,6 +754,7 @@ export const getSurveyResults = async (req: AuthRequest, res: Response) => {
           responseCount: totalResponses,
         },
         totalResponses,
+        elapsedTime,
         results,
       },
     });
