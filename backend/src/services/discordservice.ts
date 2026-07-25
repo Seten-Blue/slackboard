@@ -575,6 +575,44 @@ class discordService {
     existing.markModified('pollData');
     await existing.save();
 
+    // Sincronizar voto de Discord con la Survey vinculada
+    if (pollData.surveyId) {
+      try {
+        const SurveyModel = require('../models/Survey').default;
+        const selectedText = option.text;
+        const existingResponse = await SurveyModel.findOne({
+          _id: pollData.surveyId,
+          'responses.respondent': mongoUser._id,
+        });
+        if (action === 'add') {
+          if (existingResponse) {
+            await SurveyModel.updateOne(
+              { _id: pollData.surveyId, 'responses.respondent': mongoUser._id },
+              { $set: { 'responses.$.answers': [{ questionIndex: 0, value: selectedText }], 'responses.$.submittedAt': new Date() } }
+            );
+          } else {
+            await SurveyModel.findByIdAndUpdate(pollData.surveyId, {
+              $push: { responses: { respondent: mongoUser._id, answers: [{ questionIndex: 0, value: selectedText }], submittedAt: new Date() } },
+            });
+          }
+        } else {
+          // En remove: si el usuario no tiene mas votos en ninguna opcion, eliminar su respuesta
+          const hasAnyVote = pollData.options.some((o: any) => o.voters.some((v: any) => v.toString() === mongoUserId));
+          if (!hasAnyVote) {
+            await SurveyModel.findByIdAndUpdate(pollData.surveyId, {
+              $pull: { responses: { respondent: mongoUser._id } },
+            });
+          }
+        }
+        const updatedSurvey = await SurveyModel.findById(pollData.surveyId);
+        if (updatedSurvey) {
+          this.io?.emit('survey-response-updated', { surveyId: pollData.surveyId, responseCount: updatedSurvey.responses.length });
+        }
+      } catch (e: any) {
+        console.error('Error sincronizando voto Discord con Survey:', e.message);
+      }
+    }
+
     if (this.io) {
       this.io.to(existing.channel.toString()).emit('poll-voted', {
         messageId: existing._id,

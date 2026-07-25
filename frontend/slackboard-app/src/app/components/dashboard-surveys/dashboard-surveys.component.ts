@@ -1,5 +1,7 @@
-import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { SurveysService } from '../../services/surveys.service';
+import { SocketService } from '../../services/socket.service';
+import { Subscription } from 'rxjs';
 import { ChartConfiguration } from 'chart.js';
 
 @Component({
@@ -7,7 +9,7 @@ import { ChartConfiguration } from 'chart.js';
   templateUrl: './dashboard-surveys.component.html',
   styleUrls: ['./dashboard-surveys.component.scss']
 })
-export class DashboardSurveysComponent implements OnInit, OnChanges {
+export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedId: string | null = null;
   surveys: any[] = [];
   loading = true;
@@ -43,6 +45,7 @@ export class DashboardSurveysComponent implements OnInit, OnChanges {
 
   questionCharts: ChartConfiguration<'doughnut'>[] = [];
   ratingBarCharts: ChartConfiguration<'bar'>[] = [];
+  private socketSubs: Subscription[] = [];
 
   statsOverviewChart: ChartConfiguration<'doughnut'> = {
     type: 'doughnut',
@@ -70,12 +73,40 @@ export class DashboardSurveysComponent implements OnInit, OnChanges {
 
   private questionChartColors = ['#8b7cf6', '#2FD4A8', '#FF6B47', '#ECB22E', '#5865F2', '#6264A7', '#00AFF0', '#F472B6'];
 
-  constructor(private surveysService: SurveysService) {}
+  constructor(private surveysService: SurveysService, private socketService: SocketService) {}
 
   ngOnInit() {
     this.loadSurveys();
     this.loadStats();
     this.loadChannels();
+    this.setupSocketListeners();
+  }
+
+  ngOnDestroy() {
+    this.socketSubs.forEach(s => s.unsubscribe());
+  }
+
+  setupSocketListeners() {
+    this.socketSubs.push(
+      this.socketService.onNewSurvey().subscribe((data: any) => {
+        if (data.survey && !this.surveys.find(s => s._id === data.survey._id)) {
+          this.surveys.unshift(data.survey);
+          this.loadStats();
+        }
+      }),
+      this.socketService.onSurveyStatusChanged().subscribe((data: any) => {
+        const idx = this.surveys.findIndex(s => s._id === data.surveyId);
+        if (idx !== -1) {
+          this.surveys[idx].status = data.status;
+        }
+      }),
+      this.socketService.onSurveyResponseUpdated().subscribe((data: any) => {
+        const idx = this.surveys.findIndex(s => s._id === data.surveyId);
+        if (idx !== -1) {
+          this.surveys[idx].responseCount = data.responseCount;
+        }
+      })
+    );
   }
 
   ngOnChanges(changes: SimpleChanges) {

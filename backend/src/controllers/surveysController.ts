@@ -118,6 +118,51 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
           message: populatedMsg,
         });
       }
+
+      // Enviar a Discord y Slack en segundo plano
+      const channelDoc = await Channel.findById(targetChannelId);
+      const senderUser = await User.findById(userId).select('username avatar').lean() as any;
+      const senderUsername = senderUser?.username || 'SlackBoard';
+      const senderAvatar = senderUser?.avatar || undefined;
+
+      (async () => {
+        try {
+          if (channelDoc?.discordChannelId) {
+            const discordservice = require('../services/discordservice').default;
+            if (discordservice.isConfigured()) {
+              const discordMsgId = await discordservice.sendStructuredMessage(
+                String(channelDoc._id),
+                senderUsername,
+                senderAvatar,
+                {
+                  ...(chatMsg.pollData as any),
+                  options: (chatMsg.pollData as any).options.map((o: any) => ({ emoji: o.emoji, text: o.text, voters: [] })),
+                },
+                null,
+              );
+              if (discordMsgId) {
+                await Message.findByIdAndUpdate(chatMsg._id, { discordMessageId: discordMsgId });
+              }
+            }
+          }
+        } catch (e: any) {
+          console.error('Error enviando encuesta a Discord:', e.message);
+        }
+
+        try {
+          if (channelDoc?.slackChannelId) {
+            const slackService = require('../services/slackService').default;
+            if (slackService.isConfigured()) {
+              const slackTs = await slackService.sendPollMessage(channelDoc.name, chatMsg.pollData as any, senderUsername);
+              if (slackTs) {
+                await Message.findByIdAndUpdate(chatMsg._id, { slackMessageTs: slackTs });
+              }
+            }
+          }
+        } catch (e: any) {
+          console.error('Error enviando encuesta a Slack:', e.message);
+        }
+      })();
     }
 
     logAction(userId, 'survey.created', 'create', survey._id.toString(), 'Survey',
@@ -144,6 +189,12 @@ export const getSurveys = async (req: AuthRequest, res: Response) => {
     const filter: any = {
       $or: [{ creator: userId }, { targetUsers: userId }],
     };
+
+    // Incluir encuestas de canales a los que el usuario pertenece
+    const userChannels = await Channel.find({ members: userId }).select('_id').lean();
+    if (userChannels.length > 0) {
+      filter.$or.push({ channel: { $in: userChannels.map(c => c._id) } });
+    }
 
     if (req.query.status) {
       filter.status = req.query.status;

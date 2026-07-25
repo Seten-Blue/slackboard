@@ -107,6 +107,18 @@ const createMessage = async (req, res) => {
                 await Message_1.default.findByIdAndUpdate(message._id, {
                     $set: { 'pollData.surveyId': createdSurvey._id },
                 });
+                // Notificar al dashboard de la nueva encuesta via socket
+                const io = req.app.get('io');
+                if (io && channel) {
+                    const populatedSurvey = await Survey_1.default.findById(createdSurvey._id)
+                        .populate('creator', 'username email avatar')
+                        .populate('channel', 'name platform')
+                        .lean();
+                    if (populatedSurvey) {
+                        populatedSurvey.responseCount = 0;
+                        io.emit('new-survey', { channelId: String(channel), survey: populatedSurvey });
+                    }
+                }
             }
             catch (surveyErr) {
                 console.error('Error creando Survey desde poll:', surveyErr.message);
@@ -393,6 +405,45 @@ const votePoll = async (req, res) => {
         }
         message.markModified('pollData');
         await message.save();
+        // Sincronizar voto con la Survey vinculada en el dashboard
+        if (pollData.surveyId) {
+            try {
+                const selectedOption = pollData.options[optionIndex];
+                const SurveyModel = require('../models/Survey').default;
+                const existingResponse = await SurveyModel.findOne({
+                    _id: pollData.surveyId,
+                    'responses.respondent': userId,
+                });
+                if (existingResponse) {
+                    // Actualizar respuesta existente (single-choice)
+                    await SurveyModel.updateOne({ _id: pollData.surveyId, 'responses.respondent': userId }, { $set: { 'responses.$.answers': [{ questionIndex: 0, value: selectedOption.text }], 'responses.$.submittedAt': new Date() } });
+                }
+                else {
+                    // Nueva respuesta
+                    await SurveyModel.findByIdAndUpdate(pollData.surveyId, {
+                        $push: {
+                            responses: {
+                                respondent: userId,
+                                answers: [{ questionIndex: 0, value: selectedOption.text }],
+                                submittedAt: new Date(),
+                            },
+                        },
+                    });
+                }
+                // Emitir actualización de respuesta al dashboard
+                const updatedSurvey = await SurveyModel.findById(pollData.surveyId);
+                const io = req.app.get('io');
+                if (io && updatedSurvey) {
+                    io.emit('survey-response-updated', {
+                        surveyId: pollData.surveyId,
+                        responseCount: updatedSurvey.responses.length,
+                    });
+                }
+            }
+            catch (surveyErr) {
+                console.error('Error sincronizando voto con Survey:', surveyErr.message);
+            }
+        }
         // Sync vote to Discord: add new reaction, remove old reaction if changing option
         if (message.discordMessageId && message.channel) {
             try {
