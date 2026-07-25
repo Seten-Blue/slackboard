@@ -51,7 +51,7 @@ const MessageSchema = new mongoose_1.Schema({
     },
     type: {
         type: String,
-        enum: ['text', 'image', 'file', 'sticker', 'poll', 'thread'],
+        enum: ['text', 'image', 'file', 'sticker', 'poll', 'thread', 'task', 'survey'],
         default: 'text',
     },
     isEdited: {
@@ -85,6 +85,16 @@ const MessageSchema = new mongoose_1.Schema({
         type: mongoose_1.Schema.Types.Mixed,
         default: null,
     },
+    // ← NUEVO: datos estructurados para tareas
+    taskData: {
+        type: mongoose_1.Schema.Types.Mixed,
+        default: null,
+    },
+    // ← NUEVO: datos estructurados para encuestas
+    surveyData: {
+        type: mongoose_1.Schema.Types.Mixed,
+        default: null,
+    },
     // ← NUEVO: ref al mensaje padre (para respuestas dentro de un thread)
     threadParent: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -101,6 +111,11 @@ const MessageSchema = new mongoose_1.Schema({
     },
     // ← NUEVO: id del thread en Discord (solo en mensajes raíz de thread)
     discordThreadId: {
+        type: String,
+        default: null,
+        index: true,
+    },
+    slackMessageTs: {
         type: String,
         default: null,
         index: true,

@@ -39,6 +39,7 @@ export class DashboardTasksComponent implements OnInit, OnDestroy {
   elapsedTime: string = '00:00:00';
   timerExceeded = false;
   timerStartedAt: Date | null = null;
+  liveTrackedMinutes: number = 0;
 
   priorityChart: ChartConfiguration<'doughnut'> = {
     type: 'doughnut',
@@ -169,8 +170,14 @@ export class DashboardTasksComponent implements OnInit, OnDestroy {
     if (this.filterPriority) params.priority = this.filterPriority;
     if (this.filterAssignee) params.assignee = this.filterAssignee;
     this.tasksService.getTasks(params).subscribe({
-      next: (res) => { this.tasks = res.data || []; this.loading = false; },
-      error: () => { this.loading = false; }
+      next: (res) => {
+        this.tasks = res.data || [];
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Error cargando tareas:', err);
+        this.loading = false;
+      }
     });
   }
 
@@ -278,6 +285,7 @@ export class DashboardTasksComponent implements OnInit, OnDestroy {
       const mins = Math.floor((elapsed % 3600000) / 60000);
       const secs = Math.floor((elapsed % 60000) / 1000);
       this.elapsedTime = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      this.liveTrackedMinutes = this.totalTrackedMinutes(this.selectedTask) + elapsed / 60000;
 
       if (this.selectedTask?.estimatedHours && elapsed > this.selectedTask.estimatedHours * 3600000) {
         this.timerExceeded = true;
@@ -287,10 +295,27 @@ export class DashboardTasksComponent implements OnInit, OnDestroy {
 
   changeStatus(taskId: string, status: string) {
     this.tasksService.updateStatus(taskId, status).subscribe({
-      next: () => {
+      next: (res) => {
+        const updated = res.data;
         const idx = this.tasks.findIndex(t => t._id === taskId);
-        if (idx !== -1) this.tasks[idx] = { ...this.tasks[idx], status, completedAt: status === 'completed' ? new Date().toISOString() : null };
-        if (this.selectedTask?._id === taskId) this.selectedTask = { ...this.selectedTask, status };
+        if (idx !== -1) this.tasks[idx] = { ...this.tasks[idx], status, completedAt: updated?.completedAt || (status === 'completed' ? new Date().toISOString() : null), actualHours: updated?.actualHours };
+        if (this.selectedTask?._id === taskId) {
+          this.selectedTask = { ...this.selectedTask, ...updated };
+          if (status === 'in_progress') {
+            this.checkRunningTimer();
+          }
+          if (status === 'completed') {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            this.runningTimers[taskId] = false;
+            this.timerStartedAt = null;
+            this.elapsedTime = '00:00:00';
+          }
+          if (status === 'cancelled' || status === 'pending') {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            this.runningTimers[taskId] = false;
+            this.timerStartedAt = null;
+          }
+        }
       }
     });
   }
@@ -326,21 +351,27 @@ export class DashboardTasksComponent implements OnInit, OnDestroy {
 
   addComment() {
     if (!this.selectedTask || !this.selectedTask._newComment) return;
-    this.tasksService.addComment(this.selectedTask._id, this.selectedTask._newComment).subscribe({
+    const commentText = this.selectedTask._newComment;
+    this.selectedTask._newComment = '';
+    this.tasksService.addComment(this.selectedTask._id, commentText).subscribe({
       next: (res) => {
-        this.selectedTask.comments = res.data?.comments || this.selectedTask.comments;
-        this.selectedTask._newComment = '';
-      }
+        this.selectedTask.comments = res.data || this.selectedTask.comments;
+      },
+      error: () => { this.selectedTask._newComment = commentText; }
     });
   }
 
   addSubtask() {
     if (!this.selectedTask || !this.selectedTask._newSubtask) return;
-    this.tasksService.addSubtask(this.selectedTask._id, this.selectedTask._newSubtask).subscribe({
+    const title = this.selectedTask._newSubtask;
+    this.selectedTask._newSubtask = '';
+    this.tasksService.addSubtask(this.selectedTask._id, title).subscribe({
       next: (res) => {
-        this.selectedTask.subtasks = res.data?.subtasks || this.selectedTask.subtasks;
-        this.selectedTask._newSubtask = '';
-      }
+        if (Array.isArray(res.data)) {
+          this.selectedTask.subtasks = res.data;
+        }
+      },
+      error: () => { this.selectedTask._newSubtask = title; }
     });
   }
 
@@ -401,7 +432,15 @@ export class DashboardTasksComponent implements OnInit, OnDestroy {
 
   totalTrackedMinutes(task: any): number {
     if (!task.timeEntries?.length) return 0;
-    return task.timeEntries.reduce((sum: number, e: any) => sum + (e.duration || 0), 0);
+    return task.timeEntries.reduce((sum: number, e: any) => {
+      if (e.start && e.end) {
+        return sum + (new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000;
+      }
+      if (e.start && !e.end) {
+        return sum + (Date.now() - new Date(e.start).getTime()) / 60000;
+      }
+      return sum;
+    }, 0);
   }
 
   closeAll() {

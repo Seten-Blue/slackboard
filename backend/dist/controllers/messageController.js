@@ -6,22 +6,30 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getThreadReplies = exports.replyToThread = exports.votePoll = exports.addReaction = exports.deleteMessage = exports.updateMessage = exports.createMessage = exports.getMessagesByChannel = void 0;
 const Message_1 = __importDefault(require("../models/Message"));
 const Channel_1 = __importDefault(require("../models/Channel"));
+const Survey_1 = __importDefault(require("../models/Survey"));
 const aiService_1 = __importDefault(require("../services/aiService"));
-// Obtener mensajes de un canal — solo si el usuario autenticado es miembro
+const auditLogController_1 = require("./auditLogController");
+// Obtener mensajes de un canal — cualquier usuario autenticado puede leer
+// Si el canal existe pero el usuario no es miembro, se agrega automaticamente
 const getMessagesByChannel = async (req, res) => {
     try {
         const { channelId } = req.params;
         const { limit = 50, skip = 0 } = req.query;
-        const channel = await Channel_1.default.findOne({ _id: channelId, members: req.userId });
+        const channel = await Channel_1.default.findById(channelId);
         if (!channel) {
             return res.status(404).json({ success: false, message: 'Canal no encontrado' });
         }
-        const messages = await Message_1.default.find({ channel: channelId })
-            .populate('sender', 'username email avatar status')
+        // Auto-agregar como miembro si falta
+        if (req.userId && channel.members && !channel.members.some((m) => m.toString() === req.userId)) {
+            channel.members.push(req.userId);
+            await channel.save();
+        }
+        const messages = await Message_1.default.find({ channel: channelId, threadParent: null })
+            .populate('sender', 'username email avatar status role')
             .sort({ createdAt: -1 })
             .limit(Number(limit))
             .skip(Number(skip));
-        const total = await Message_1.default.countDocuments({ channel: channelId });
+        const total = await Message_1.default.countDocuments({ channel: channelId, threadParent: null });
         res.json({
             success: true,
             count: messages.length,
@@ -45,13 +53,25 @@ const createMessage = async (req, res) => {
         if (!req.userId) {
             return res.status(401).json({ success: false, message: 'No autenticado' });
         }
-        // ← el canal debe existir Y el usuario autenticado debe ser miembro
-        const channelExists = await Channel_1.default.findOne({ _id: channel, members: req.userId });
+        const DEFAULT_POLL_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+        if (pollData && pollData.options) {
+            for (let i = 0; i < pollData.options.length; i++) {
+                if (!pollData.options[i].emoji || !pollData.options[i].emoji.trim()) {
+                    pollData.options[i].emoji = DEFAULT_POLL_EMOJIS[i] || `⃣${i + 1}`;
+                }
+            }
+        }
+        // ← el canal debe existir; si el usuario no es miembro, se agrega automaticamente
+        const channelExists = await Channel_1.default.findById(channel);
         if (!channelExists) {
             return res.status(404).json({
                 success: false,
                 message: 'Canal no encontrado',
             });
+        }
+        if (req.userId && channelExists.members && !channelExists.members.some((m) => m.toString() === req.userId)) {
+            channelExists.members.push(req.userId);
+            await channelExists.save();
         }
         const message = await Message_1.default.create({
             content,
@@ -62,14 +82,48 @@ const createMessage = async (req, res) => {
             pollData: pollData || undefined,
             threadData: threadData || undefined,
         });
+        // Si es un poll, tambien crear un Survey en el dashboard
+        let createdSurvey = null;
+        if (type === 'poll' && pollData) {
+            try {
+                const questions = [{
+                        text: pollData.question,
+                        type: 'single_choice',
+                        options: pollData.options.map((o) => o.text || ''),
+                        required: true,
+                    }];
+                createdSurvey = await Survey_1.default.create({
+                    title: pollData.question,
+                    description: pollData.isAnonymous ? 'Encuesta anonima creada desde el chat' : 'Encuesta creada desde el chat',
+                    creator: req.userId,
+                    channel: channel,
+                    questions,
+                    anonymous: pollData.isAnonymous || false,
+                    allowMultipleResponses: pollData.allowMultiple || false,
+                    expiresAt: pollData.expiresAt || null,
+                    status: 'active',
+                });
+                // Actualizar el message con el surveyId en pollData
+                await Message_1.default.findByIdAndUpdate(message._id, {
+                    $set: { 'pollData.surveyId': createdSurvey._id },
+                });
+            }
+            catch (surveyErr) {
+                console.error('Error creando Survey desde poll:', surveyErr.message);
+            }
+        }
         const populatedMessage = await Message_1.default.findById(message._id)
-            .populate('sender', 'username email avatar status');
+            .populate('sender', 'username email avatar status role');
         // ← respondemos YA, antes de tocar Slack/Discord/WhatsApp/IA — elimina la condicion de carrera
         res.status(201).json({
             success: true,
             message: 'Mensaje enviado',
             data: populatedMessage,
         });
+        // Don't audit every message to avoid noise, but audit polls and threads
+        if (type === 'poll' || type === 'thread') {
+            (0, auditLogController_1.logAction)(req.userId, `message.${type}_created`, 'create', message._id.toString(), 'Message', { channel: channelExists.name, type }, req.ip, req.headers['user-agent']);
+        }
         const senderUsername = populatedMessage?.sender?.username || 'Usuario de SlackBoard';
         const senderAvatar = populatedMessage?.sender?.avatar || undefined;
         // Todo lo que sigue corre en segundo plano, sin bloquear la respuesta
@@ -79,7 +133,15 @@ const createMessage = async (req, res) => {
                 if (channelExists.slackChannelId) {
                     const slackService = require('../services/slackService').default;
                     if (slackService.isConfigured()) {
-                        await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
+                        if (pollData) {
+                            const slackResult = await slackService.sendPollMessage(channelExists.name, pollData, senderUsername);
+                            if (slackResult) {
+                                await Message_1.default.findByIdAndUpdate(message._id, { slackMessageTs: slackResult });
+                            }
+                        }
+                        else {
+                            await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
+                        }
                         console.log('✅ Mensaje sincronizado con Slack');
                     }
                 }
@@ -93,10 +155,21 @@ const createMessage = async (req, res) => {
                     const discordservice = require('../services/discordservice').default;
                     if (discordservice.isConfigured()) {
                         if (pollData || threadData) {
-                            const discordThreadId = await discordservice.sendStructuredMessage(String(channelExists._id), senderUsername, senderAvatar, pollData || null, threadData || null);
-                            // Guardar discordThreadId si se creó un thread en Discord
-                            if (discordThreadId && threadData) {
-                                await Message_1.default.findByIdAndUpdate(message._id, { discordThreadId });
+                            console.log(`[DEBUG] sendStructuredMessage llamado para ${pollData ? 'POLL' : 'THREAD'}`);
+                            const discordMsgId = await discordservice.sendStructuredMessage(String(channelExists._id), senderUsername, senderAvatar, pollData || null, threadData || null);
+                            console.log(`[DEBUG] sendStructuredMessage retornó: ${discordMsgId}`);
+                            if (discordMsgId) {
+                                if (threadData) {
+                                    await Message_1.default.findByIdAndUpdate(message._id, { discordThreadId: discordMsgId });
+                                    console.log(`[DEBUG] Guardado discordThreadId: ${discordMsgId}`);
+                                }
+                                if (pollData) {
+                                    await Message_1.default.findByIdAndUpdate(message._id, { discordMessageId: discordMsgId });
+                                    console.log(`[DEBUG] Guardado discordMessageId: ${discordMsgId}`);
+                                }
+                            }
+                            else {
+                                console.warn(`[DEBUG] sendStructuredMessage retornó null/undefined`);
                             }
                         }
                         else {
@@ -161,7 +234,7 @@ const updateMessage = async (req, res) => {
         existing.content = content;
         existing.isEdited = true;
         await existing.save();
-        const populated = await Message_1.default.findById(id).populate('sender', 'username email avatar status');
+        const populated = await Message_1.default.findById(id).populate('sender', 'username email avatar status role');
         res.json({
             success: true,
             message: 'Mensaje actualizado',
@@ -235,7 +308,27 @@ const addReaction = async (req, res) => {
         }
         await message.save();
         const updatedMessage = await Message_1.default.findById(messageId)
-            .populate('sender', 'username email avatar status');
+            .populate('sender', 'username email avatar status role');
+        // Sync reaction to Discord
+        if (message.discordMessageId && message.channel) {
+            try {
+                const discordservice = require('../services/discordservice').default;
+                if (discordservice.isConfigured()) {
+                    await discordservice.addReactionToMessage(String(message.channel), message.discordMessageId, emoji);
+                }
+            }
+            catch (discordErr) {
+                console.error('⚠️ Error sincronizando reacción a Discord:', discordErr.message);
+            }
+        }
+        // Emit socket for real-time update
+        const io = req.app.get('io');
+        if (io && updatedMessage) {
+            io.to(String(message.channel)).emit('message-reaction', {
+                messageId: updatedMessage._id,
+                reactions: updatedMessage.reactions,
+            });
+        }
         res.json({
             success: true,
             message: 'Reaccion actualizada',
@@ -274,6 +367,11 @@ const votePoll = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Opcion invalida' });
         }
         const pollData = message.pollData;
+        // Track the old voted option index before changing (for single-choice)
+        let previousOptionIndex = -1;
+        if (!pollData.allowMultiple) {
+            previousOptionIndex = pollData.options.findIndex((opt) => opt.voters.some((v) => v.toString() === userId));
+        }
         if (pollData.allowMultiple) {
             const option = pollData.options[optionIndex];
             const alreadyVoted = option.voters.some((v) => v.toString() === userId);
@@ -285,22 +383,76 @@ const votePoll = async (req, res) => {
             }
         }
         else {
-            let hadVotedBefore = false;
             for (const opt of pollData.options) {
                 const idx = opt.voters.findIndex((v) => v.toString() === userId);
                 if (idx !== -1) {
                     opt.voters.splice(idx, 1);
-                    hadVotedBefore = true;
                 }
             }
-            if (!hadVotedBefore || true) {
-                pollData.options[optionIndex].voters.push(userId);
-            }
+            pollData.options[optionIndex].voters.push(userId);
         }
         message.markModified('pollData');
         await message.save();
+        // Sync vote to Discord: add new reaction, remove old reaction if changing option
+        if (message.discordMessageId && message.channel) {
+            try {
+                const discordservice = require('../services/discordservice').default;
+                if (discordservice.isConfigured()) {
+                    const discordMsgId = message.discordMessageId;
+                    const channelStr = String(message.channel);
+                    if (!pollData.allowMultiple && previousOptionIndex !== -1 && previousOptionIndex !== optionIndex) {
+                        const oldOption = pollData.options[previousOptionIndex];
+                        const oldEmoji = (oldOption.emoji || '').trim();
+                        if (oldEmoji) {
+                            await discordservice.removeReactionFromMessage(channelStr, discordMsgId, oldEmoji);
+                        }
+                    }
+                    const newOption = pollData.options[optionIndex];
+                    const newEmoji = (newOption.emoji || '').trim();
+                    if (newEmoji) {
+                        await discordservice.addReactionToMessage(channelStr, discordMsgId, newEmoji);
+                    }
+                }
+            }
+            catch (discordErr) {
+                console.error('⚠️ Error sincronizando voto a Discord:', discordErr.message);
+            }
+        }
+        // Sync vote to Slack: add number emoji reaction, remove old if changing option
+        const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+        if (message.slackMessageTs && message.channel) {
+            try {
+                const slackService = require('../services/slackService').default;
+                if (slackService.isConfigured()) {
+                    const slackTs = message.slackMessageTs;
+                    const channelObj = await Channel_1.default.findById(message.channel);
+                    if (channelObj?.slackChannelId) {
+                        if (!pollData.allowMultiple && previousOptionIndex !== -1 && previousOptionIndex !== optionIndex) {
+                            const oldEmoji = NUM_EMOJIS[previousOptionIndex];
+                            if (oldEmoji) {
+                                await slackService.removeReactionFromSlackMessage(channelObj.slackChannelId, slackTs, oldEmoji);
+                            }
+                        }
+                        const newEmoji = NUM_EMOJIS[optionIndex];
+                        if (newEmoji) {
+                            await slackService.addReactionToSlackMessage(channelObj.slackChannelId, slackTs, newEmoji);
+                        }
+                    }
+                }
+            }
+            catch (slackErr) {
+                console.error('⚠️ Error sincronizando voto a Slack:', slackErr.message);
+            }
+        }
         const populated = await Message_1.default.findById(messageId)
-            .populate('sender', 'username email avatar status');
+            .populate('sender', 'username email avatar status role');
+        const io = req.app.get('io');
+        if (io && populated) {
+            io.to(String(message.channel)).emit('poll-voted', {
+                messageId: populated._id,
+                pollData: populated.pollData,
+            });
+        }
         res.json({ success: true, data: populated });
     }
     catch (error) {
@@ -346,7 +498,7 @@ const replyToThread = async (req, res) => {
         parentMessage.threadData = threadData;
         await parentMessage.save();
         const populated = await Message_1.default.findById(reply._id)
-            .populate('sender', 'username email avatar status');
+            .populate('sender', 'username email avatar status role');
         // Enviar respuesta al thread de Discord si existe
         (async () => {
             try {
@@ -395,7 +547,7 @@ const getThreadReplies = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Hilo no encontrado' });
         }
         const replies = await Message_1.default.find({ threadParent: messageId })
-            .populate('sender', 'username email avatar status')
+            .populate('sender', 'username email avatar status role')
             .sort({ createdAt: 1 })
             .limit(Number(limit))
             .skip(Number(skip));

@@ -79,6 +79,44 @@ const UserSchema = new mongoose_1.Schema({
         default: null,
         trim: true,
     },
+    bio: {
+        type: String,
+        default: null,
+        trim: true,
+        maxlength: 500,
+    },
+    ubicacion: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    intereses: {
+        type: [String],
+        default: [],
+    },
+    github: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    linkedin: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    website: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    trelloApiKey: {
+        type: String,
+        default: null,
+    },
+    trelloToken: {
+        type: String,
+        default: null,
+    },
     status: {
         type: String,
         enum: ['online', 'offline', 'away'],
@@ -86,8 +124,8 @@ const UserSchema = new mongoose_1.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'user'],
-        default: 'user',
+        enum: ['owner', 'admin', 'manager', 'member', 'guest'],
+        default: 'member',
     },
     googleId: {
         type: String,

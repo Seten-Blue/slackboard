@@ -189,7 +189,7 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
         .populate('creator', 'username email avatar role')
         .populate('assignee', 'username email avatar')
         .populate('assignedBy', 'username email avatar role')
-        .populate('completedBy', 'username email avatar')
+        .populate({ path: 'completedBy', select: 'username email avatar', strictPopulate: false })
         .populate('channel', 'name platform')
         .populate('assignmentChannel', 'name platform')
         .sort({ [sortField]: sortDir })
@@ -218,12 +218,12 @@ export const getTask = async (req: AuthRequest, res: Response) => {
       .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
       .populate('assignedBy', 'username email avatar role')
-      .populate('completedBy', 'username email avatar')
+      .populate({ path: 'completedBy', select: 'username email avatar', strictPopulate: false })
       .populate('channel', 'name platform')
       .populate('assignmentChannel', 'name platform')
       .populate('comments.user', 'username email avatar')
       .populate('timeEntries.user', 'username email avatar')
-      .populate('subtasks.completedBy', 'username email avatar')
+      .populate({ path: 'subtasks.completedBy', select: 'username email avatar', strictPopulate: false })
       .lean();
 
     if (!task) {
@@ -248,9 +248,10 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
 
     const user = await User.findById(userId).select('role').lean();
     const isCreator = task.creator.toString() === userId;
+    const isAssignee = task.assignee?.toString() === userId;
 
-    if (!isCreator) {
-      return res.status(403).json({ success: false, message: 'Solo el creador puede editar esta tarea' });
+    if (!isCreator && !isAssignee) {
+      return res.status(403).json({ success: false, message: 'Solo el creador o asignado pueden editar esta tarea' });
     }
 
     const allowedFields = [
@@ -398,19 +399,35 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ success: false, message: 'No tienes permiso para cambiar el estado de esta tarea' });
     }
 
-    if ((status === 'in_progress' || status === 'completed') && !isAssignee) {
-      return res.status(403).json({ success: false, message: 'Solo el asignado puede cambiar a en progreso o completado' });
-    }
-
     if (status === 'cancelled' && !isCreator) {
       return res.status(403).json({ success: false, message: 'Solo el creador puede cancelar la tarea' });
     }
 
     const oldStatus = task.status;
     task.status = status;
+
+    if (status === 'in_progress' && oldStatus !== 'in_progress') {
+      const hasRunning = task.timeEntries.some((e: any) => e.user.toString() === userId && !e.end);
+      if (!hasRunning) {
+        task.timeEntries.push({
+          user: new mongoose.Types.ObjectId(userId),
+          start: new Date(),
+          end: undefined,
+          description: '',
+        });
+      }
+    }
+
     if (status === 'completed') {
       task.completedAt = new Date();
       task.completedBy = new mongoose.Types.ObjectId(userId);
+      const runningEntry = task.timeEntries.find((e: any) => e.user.toString() === userId && !e.end);
+      if (runningEntry) {
+        runningEntry.end = new Date();
+        const durationMs = runningEntry.end.getTime() - runningEntry.start.getTime();
+        const durationHours = durationMs / (1000 * 60 * 60);
+        task.actualHours += durationHours;
+      }
     } else if (status !== 'completed') {
       task.completedAt = undefined;
       task.completedBy = undefined;
@@ -482,9 +499,12 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
       .populate('creator', 'username email avatar role')
       .populate('assignee', 'username email avatar')
       .populate('assignedBy', 'username email avatar role')
-      .populate('completedBy', 'username email avatar')
+      .populate({ path: 'completedBy', select: 'username email avatar', strictPopulate: false })
       .populate('channel', 'name platform')
-      .populate('assignmentChannel', 'name platform');
+      .populate('assignmentChannel', 'name platform')
+      .populate('timeEntries.user', 'username email avatar')
+      .populate('comments.user', 'username email avatar')
+      .populate({ path: 'subtasks.completedBy', select: 'username email avatar', strictPopulate: false });
 
     res.json({ success: true, data: populated });
   } catch (error: any) {
@@ -913,10 +933,10 @@ export const getTaskPermissions = async (req: AuthRequest, res: Response) => {
     res.json({
       success: true,
       data: {
-        canEdit: isCreator,
+        canEdit: isCreator || isAssignee,
         canChangeStatus: isCreator || isAssignee,
-        canStartProgress: isAssignee,
-        canComplete: isAssignee,
+        canStartProgress: isCreator || isAssignee,
+        canComplete: isCreator || isAssignee,
         canCancel: isCreator,
         canComment: true,
         canAddSubtask: isCreator || isAssignee,

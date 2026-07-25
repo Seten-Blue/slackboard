@@ -4,14 +4,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const auth_1 = require("../middleware/auth");
 const analyticsController_1 = require("../controllers/analyticsController");
 const router = express_1.default.Router();
-// GET /api/analytics - Obtener estadisticas generales
+// Dashboard submodules (user-scoped, require auth)
+router.get('/activity', auth_1.requireAuth, analyticsController_1.getActivity);
+router.get('/traffic', auth_1.requireAuth, analyticsController_1.getTraffic);
+router.get('/stats', auth_1.requireAuth, analyticsController_1.getStatistics);
+// Legacy (global, no auth needed for backward compat)
 router.get('/', analyticsController_1.getGeneralStats);
-// GET /api/analytics/by-date - Obtener estadisticas por fecha
 router.get('/by-date', analyticsController_1.getStatsByDate);
-// GET /api/analytics/trends - Obtener tendencias de mensajes
 router.get('/trends', analyticsController_1.getMessageTrends);
-// POST /api/analytics/generate-report - Generar reporte diario
 router.post('/generate-report', analyticsController_1.generateDailyReport);
 exports.default = router;

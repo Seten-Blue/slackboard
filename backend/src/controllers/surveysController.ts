@@ -55,6 +55,10 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
         channelId: channel.toString(),
         survey: populated,
       });
+      io.to(channel.toString()).emit('survey-response-updated', {
+        surveyId: survey._id,
+        responseCount: 0,
+      });
     }
 
     // Crear mensaje tipo poll en el chat

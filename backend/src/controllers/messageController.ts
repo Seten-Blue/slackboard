@@ -91,6 +91,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
     });
 
     // Si es un poll, tambien crear un Survey en el dashboard
+    let createdSurvey: any = null;
     if (type === 'poll' && pollData) {
       try {
         const questions = [{
@@ -99,7 +100,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
           options: pollData.options.map((o: any) => o.text || ''),
           required: true,
         }];
-        const survey = await Survey.create({
+        createdSurvey = await Survey.create({
           title: pollData.question,
           description: pollData.isAnonymous ? 'Encuesta anonima creada desde el chat' : 'Encuesta creada desde el chat',
           creator: req.userId,
@@ -112,7 +113,7 @@ export const createMessage = async (req: AuthRequest, res: Response) => {
         });
         // Actualizar el message con el surveyId en pollData
         await Message.findByIdAndUpdate(message._id, {
-          $set: { 'pollData.surveyId': survey._id },
+          $set: { 'pollData.surveyId': createdSurvey._id },
         });
       } catch (surveyErr: any) {
         console.error('Error creando Survey desde poll:', surveyErr.message);

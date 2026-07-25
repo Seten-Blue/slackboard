@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,7 +51,7 @@ const normalizeChannelName = (name) => (name || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-');
 // ← CORREGIDO: matching por nombre normalizado en vez de comparacion exacta
-const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
+const resolveOrCreateSlackChannel = async (slackChannelId, channelName, requestingUserId) => {
     const fallbackName = channelName || `slack-${slackChannelId}`;
     const normalizedIncoming = normalizeChannelName(fallbackName);
     // 1. Buscar primero por slackChannelId (la forma mas confiable una vez vinculado)
@@ -38,6 +71,11 @@ const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
             await channel.save();
             console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannelId})`);
         }
+        if (requestingUserId && channel.members && !channel.members.some((m) => m.toString() === requestingUserId)) {
+            channel.members.push(requestingUserId);
+            await channel.save();
+            console.log(`👤 Usuario ${requestingUserId} agregado como miembro del canal "${channel.name}"`);
+        }
         return channel;
     }
     // 4. Si de verdad no existe en ningun lado, ahi si se crea uno nuevo
@@ -45,11 +83,15 @@ const resolveOrCreateSlackChannel = async (slackChannelId, channelName) => {
     if (!adminUser) {
         throw new Error('No existe un usuario admin para crear el canal sincronizado desde Slack');
     }
+    const creatorMembers = [adminUser._id];
+    if (requestingUserId && adminUser._id?.toString() !== requestingUserId) {
+        creatorMembers.push(requestingUserId);
+    }
     channel = await Channel_1.default.create({
         name: fallbackName,
         description: `Canal sincronizado desde Slack (${fallbackName})`,
         isPrivate: false,
-        members: [adminUser._id],
+        members: creatorMembers,
         createdBy: adminUser._id,
         slackChannelId
     });
@@ -178,9 +220,56 @@ router.post('/send-message', async (req, res) => {
         });
     }
 });
-// Endpoint para eventos de Slack (webhooks)
+// Endpoint para eventos de Slack (webhooks) — maneja tanto eventos como interactive payloads
 router.post('/events', async (req, res) => {
     try {
+        // Slack interactive payloads (button clicks) vienen como payload JSON codificado en form
+        const payload = req.body.payload ? JSON.parse(req.body.payload) : null;
+        if (payload && payload.type === 'block_actions') {
+            console.log('🔘 Interactive payload recibido de Slack:', payload.type);
+            const actions = payload.actions || [];
+            const userId = payload.user?.id;
+            for (const action of actions) {
+                const [actionId, friendshipId] = (action.action_id || '').split(':');
+                if (!friendshipId || !['friend_accept', 'friend_reject'].includes(actionId))
+                    continue;
+                const Friendship = (await Promise.resolve().then(() => __importStar(require('../models/Friendship')))).default;
+                const friendship = await Friendship.findById(friendshipId);
+                if (!friendship) {
+                    return res.status(200).json({ text: 'Esta solicitud ya no existe.' });
+                }
+                if (friendship.status !== 'pending') {
+                    return res.status(200).json({ text: 'Esta solicitud ya fue procesada.' });
+                }
+                // Verify the clicking user is the recipient
+                const slackUser = await slackService_1.default.getUserInfo(userId);
+                const mongoUser = slackUser ? await User_1.default.findOne({ email: slackUser.profile?.email }) : null;
+                if (!mongoUser || !friendship.userB.equals(mongoUser._id)) {
+                    return res.status(200).json({ text: 'Esta solicitud no es para vos.' });
+                }
+                if (actionId === 'friend_accept') {
+                    friendship.status = 'accepted';
+                    await friendship.save();
+                    const initiatorUser = await User_1.default.findById(friendship.initiator);
+                    if (initiatorUser?.slackWorkspaces?.length) {
+                        await slackService_1.default.sendFriendAcceptedDM(initiatorUser.email, mongoUser.username);
+                    }
+                    const io = req.app.get('io');
+                    if (io) {
+                        io.to(`user:${friendship.userA}`).emit('friendship:update', { friendshipId, status: 'accepted' });
+                        io.to(`user:${friendship.userB}`).emit('friendship:update', { friendshipId, status: 'accepted' });
+                    }
+                    return res.status(200).json({ text: '✅ Solicitud aceptada!' });
+                }
+                else {
+                    friendship.status = 'rejected';
+                    await friendship.save();
+                    return res.status(200).json({ text: '❌ Solicitud rechazada.' });
+                }
+            }
+            return res.status(200).send('OK');
+        }
+        // Resto: eventos de Slack (event_callback)
         console.log('📨 Recibido evento de Slack:', JSON.stringify(req.body, null, 2));
         const { type, challenge, event } = req.body;
         // Verificar que la peticion realmente venga de Slack
@@ -242,11 +331,81 @@ router.post('/events', async (req, res) => {
                 return res.status(200).send('OK');
             }
             const channelType = (event.channel_type || 'channel').toString();
+            // Manejar reacciones entrantes de Slack
+            if (event.type === 'reaction_added' || event.type === 'reaction_removed') {
+                const isAdd = event.type === 'reaction_added';
+                const emoji = event.reaction;
+                const slackMessageTs = event.item?.ts;
+                const slackUserId = event.user;
+                if (!emoji || !slackMessageTs || !slackUserId) {
+                    return res.status(200).send('OK');
+                }
+                console.log(`👍 Reacción de Slack: ${event.type} emoji=${emoji} ts=${slackMessageTs} user=${slackUserId}`);
+                try {
+                    const slackUser = await slackService_1.default.getUserInfo(slackUserId);
+                    const user = slackUser ? await User_1.default.findOne({ email: slackUser.profile?.email }) : null;
+                    if (!user) {
+                        console.log('⚠️  Usuario de reacción no encontrado en SlackBoard');
+                        return res.status(200).send('OK');
+                    }
+                    // Buscar el mensaje de SlackBoard por slackMessageTs
+                    const message = await Message_1.default.findOne({ slackMessageTs });
+                    if (!message || message.type !== 'poll' || !message.pollData) {
+                        return res.status(200).send('OK');
+                    }
+                    const pollData = message.pollData;
+                    const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+                    const SLACK_EMOJI_MAP = {
+                        'one': 0, 'two': 1, 'three': 2, 'four': 3, 'five': 4,
+                        'six': 5, 'seven': 6, 'eight': 7, 'nine': 8, 'keycap_ten': 9,
+                    };
+                    const optionIndex = SLACK_EMOJI_MAP[emoji] ?? NUM_EMOJIS.indexOf(emoji);
+                    if (optionIndex === -1 || optionIndex >= pollData.options.length) {
+                        return res.status(200).send('OK');
+                    }
+                    const option = pollData.options[optionIndex];
+                    const mongoUserId = String(user._id);
+                    if (isAdd) {
+                        if (pollData.allowMultiple) {
+                            const alreadyVoted = option.voters.some((v) => v.toString() === mongoUserId);
+                            if (!alreadyVoted)
+                                option.voters.push(user._id);
+                        }
+                        else {
+                            for (const opt of pollData.options) {
+                                const idx = opt.voters.findIndex((v) => v.toString() === mongoUserId);
+                                if (idx !== -1)
+                                    opt.voters.splice(idx, 1);
+                            }
+                            const alreadyVoted = option.voters.some((v) => v.toString() === mongoUserId);
+                            if (!alreadyVoted)
+                                option.voters.push(user._id);
+                        }
+                    }
+                    else {
+                        option.voters = option.voters.filter((v) => v.toString() !== mongoUserId);
+                    }
+                    message.markModified('pollData');
+                    await message.save();
+                    const io = req.app.get('io');
+                    if (io) {
+                        io.to(String(message.channel)).emit('poll-voted', {
+                            messageId: message._id,
+                            pollData: message.pollData,
+                        });
+                    }
+                    console.log(`✅ Voto ${isAdd ? 'agregado' : 'removido'} desde Slack: user=${mongoUserId}, option=${optionIndex}`);
+                }
+                catch (err) {
+                    console.error('❌ Error procesando reacción de Slack:', err.message);
+                }
+                return res.status(200).send('OK');
+            }
             // Manejar mensaje de canal publico, privado o DM sin depender de un payload exacto
             if (event.type === 'message' && ['channel', 'group', 'im'].includes(channelType)) {
                 console.log('💬 Procesando mensaje de Slack');
-                if (event.subtype) {
-                    console.log(`⏭️  Ignorando mensaje con subtype: ${event.subtype}`);
+                if (event.subtype || event.bot_id) {
+                    console.log(`⏭️  Ignorando mensaje con subtype/bot_id: ${event.subtype || event.bot_id}`);
                     return res.status(200).send('OK');
                 }
                 if (!event.text || !event.channel) {
@@ -275,7 +434,7 @@ router.post('/events', async (req, res) => {
                     catch (channelInfoError) {
                         console.warn('⚠️  No se pudo obtener informacion del canal de Slack:', channelInfoError.message);
                     }
-                    const channel = await resolveOrCreateSlackChannel(event.channel, channelName);
+                    const channel = await resolveOrCreateSlackChannel(event.channel, channelName, user?._id?.toString());
                     if (channel && user) {
                         const createdMessage = await Message_1.default.create({
                             content: event.text,

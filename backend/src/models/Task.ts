@@ -68,6 +68,7 @@ const TaskSchema: Schema = new Schema(
       },
     ],
     completedAt: { type: Date, default: null },
+    completedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     comments: [
       {
         user: { type: Schema.Types.ObjectId, ref: 'User' },

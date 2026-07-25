@@ -23,6 +23,13 @@ const whatsapp_1 = __importDefault(require("./routes/whatsapp"));
 const aiService_1 = require("./services/aiService");
 const discordservice_1 = __importDefault(require("./services/discordservice"));
 const auth_1 = __importDefault(require("./routes/auth"));
+const friendship_1 = __importDefault(require("./routes/friendship"));
+const reports_1 = __importDefault(require("./routes/reports"));
+const performance_1 = __importDefault(require("./routes/performance"));
+const tasks_1 = __importDefault(require("./routes/tasks"));
+const surveys_1 = __importDefault(require("./routes/surveys"));
+const auditLog_1 = __importDefault(require("./routes/auditLog"));
+const aiMetrics_1 = __importDefault(require("./routes/aiMetrics"));
 // Configurar variables de entorno
 dotenv_1.default.config();
 // Inicializar Express
@@ -105,6 +112,13 @@ app.use('/api/upload', upload_1.default);
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '..', 'uploads')));
 app.use('/api/whatsapp', whatsapp_1.default);
 app.use('/api/auth', auth_1.default);
+app.use('/api/friendship', friendship_1.default);
+app.use('/api/reports', reports_1.default);
+app.use('/api/performance', performance_1.default);
+app.use('/api/tasks', tasks_1.default);
+app.use('/api/surveys', surveys_1.default);
+app.use('/api/audit', auditLog_1.default);
+app.use('/api/ai-metrics', aiMetrics_1.default);
 // Socket.IO para mensajes en tiempo real
 io.on('connection', (socket) => {
     console.log('👤 Usuario conectado:', socket.id);
@@ -113,9 +127,14 @@ io.on('connection', (socket) => {
         socket.join(channelId);
         console.log(`Usuario ${socket.id} se unio al canal: ${channelId}`);
     });
+    // Unirse a la sala personal del usuario (para notificaciones de amistad)
+    socket.on('join-user', (userId) => {
+        socket.join(`user:${userId}`);
+        console.log(`Usuario ${socket.id} se unio a su sala: user:${userId}`);
+    });
     // Enviar mensaje
     socket.on('send-message', (data) => {
-        io.to(data.channelId).emit('new-message', data);
+        socket.to(data.channelId).emit('new-message', data);
     });
     // Usuario escribiendo
     socket.on('typing', (data) => {

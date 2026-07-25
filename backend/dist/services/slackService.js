@@ -254,7 +254,163 @@ class SlackService {
             throw error;
         }
     }
-    // ← NUEVO: verifica que la peticion realmente venga de Slack usando el Signing Secret
+    // ========== Polls: enviar encuesta en texto plano a Slack ==========
+    async sendPollMessage(channelName, pollData, username) {
+        if (!this.isConfigured() || !pollData)
+            return null;
+        const normalizedChannelName = this.normalizeChannelName(channelName);
+        let slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
+        if (!slackChannelId) {
+            await this.initializeChannelMap();
+            slackChannelId = this.channelMap.get(normalizedChannelName) || this.channelMap.get(channelName.toLowerCase());
+        }
+        if (!slackChannelId)
+            return null;
+        const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+        const optionLines = (pollData.options || [])
+            .map((opt, i) => {
+            const emoji = NUM_EMOJIS[i] || `${i + 1}\uFE0F\u20E3`;
+            const text = (opt.text || '').trim() || `Opcion ${i + 1}`;
+            return `${emoji} ${text}`;
+        })
+            .join('\n');
+        const lines = [
+            `📊 ${pollData.question || 'Encuesta'}`,
+            '',
+            optionLines,
+            '',
+        ];
+        if (pollData.allowMultiple)
+            lines.push('☑ Multiple respuesta');
+        if (pollData.isAnonymous)
+            lines.push('🔒 Anonima');
+        if (pollData.duration)
+            lines.push(`⏱ ${pollData.duration}h`);
+        lines.push('', 'Reacciona con el numero de tu opcion para votar');
+        const text = lines.join('\n');
+        try {
+            const result = await this.client.chat.postMessage({
+                channel: slackChannelId,
+                text,
+                username: username || 'SlackBoard Bot',
+                icon_emoji: ':robot_face:',
+            });
+            console.log(`✅ Encuesta enviada a Slack: ${result.ts}`);
+            return result.ts || null;
+        }
+        catch (error) {
+            console.error('❌ Error enviando encuesta a Slack:', error.message);
+            return null;
+        }
+    }
+    // ========== Reacciones en Slack ==========
+    async addReactionToSlackMessage(slackChannelId, slackMessageTs, emoji) {
+        if (!this.isConfigured())
+            return;
+        try {
+            await this.client.reactions.add({
+                channel: slackChannelId,
+                timestamp: slackMessageTs,
+                name: emoji,
+            });
+        }
+        catch (error) {
+            if (error?.data?.error === 'already_reacted')
+                return;
+            console.error('❌ Error agregando reacción en Slack:', error.message);
+        }
+    }
+    async removeReactionFromSlackMessage(slackChannelId, slackMessageTs, emoji) {
+        if (!this.isConfigured())
+            return;
+        try {
+            await this.client.reactions.remove({
+                channel: slackChannelId,
+                timestamp: slackMessageTs,
+                name: emoji,
+            });
+        }
+        catch (error) {
+            if (error?.data?.error === 'no_reaction')
+                return;
+            console.error('❌ Error removiendo reacción de Slack:', error.message);
+        }
+    }
+    async resolveChannelIdByName(channelName) {
+        const normalized = this.normalizeChannelName(channelName);
+        let id = this.channelMap.get(normalized) || this.channelMap.get(channelName.toLowerCase());
+        if (!id) {
+            await this.initializeChannelMap();
+            id = this.channelMap.get(normalized) || this.channelMap.get(channelName.toLowerCase());
+        }
+        return id || null;
+    }
+    // ========== Friend Request DMs ==========
+    async sendFriendRequestDM(toEmail, fromUsername, friendshipId) {
+        if (!this.isConfigured())
+            return;
+        try {
+            const userRes = await this.client.users.lookupByEmail({ email: toEmail });
+            if (!userRes?.ok || !userRes.user?.id) {
+                console.warn(`[SlackService] No se pudo resolver email ${toEmail} a Slack user ID`);
+                return;
+            }
+            const slackUserId = userRes.user.id;
+            const result = await this.client.chat.postMessage({
+                channel: slackUserId,
+                text: `👤 *${fromUsername}* te envio una solicitud de amistad en SlackBoard.`,
+                blocks: [
+                    {
+                        type: 'section',
+                        text: {
+                            type: 'mrkdwn',
+                            text: `👤 *${fromUsername}* te envio una solicitud de amistad en SlackBoard.`,
+                        },
+                    },
+                    {
+                        type: 'actions',
+                        elements: [
+                            {
+                                type: 'button',
+                                text: { type: 'plain_text', text: 'Aceptar', emoji: true },
+                                style: 'primary',
+                                action_id: `friend_accept:${friendshipId}`,
+                            },
+                            {
+                                type: 'button',
+                                text: { type: 'plain_text', text: 'Rechazar', emoji: true },
+                                style: 'danger',
+                                action_id: `friend_reject:${friendshipId}`,
+                            },
+                        ],
+                    },
+                ],
+            });
+            console.log(`[SlackService] Friend request DM sent to ${slackUserId} (from ${toEmail}) from ${fromUsername}`);
+        }
+        catch (err) {
+            console.warn(`[SlackService] No se pudo enviar DM de friend request a ${toEmail}:`, err.message);
+        }
+    }
+    async sendFriendAcceptedDM(toEmail, acceptedByUsername) {
+        if (!this.isConfigured())
+            return;
+        try {
+            const userRes = await this.client.users.lookupByEmail({ email: toEmail });
+            if (!userRes?.ok || !userRes.user?.id) {
+                console.warn(`[SlackService] No se pudo resolver email ${toEmail} a Slack user ID`);
+                return;
+            }
+            const slackUserId = userRes.user.id;
+            await this.client.chat.postMessage({
+                channel: slackUserId,
+                text: `✅ *${acceptedByUsername}* acepto tu solicitud de amistad en SlackBoard. Ya son amigos!`,
+            });
+        }
+        catch (err) {
+            console.warn(`[SlackService] No se pudo enviar DM de friend accepted a ${toEmail}:`, err.message);
+        }
+    }
     verifySignature(rawBody, timestamp, signature) {
         if (!this.signingSecret) {
             console.warn('⚠️  SLACK_SIGNING_SECRET no configurado, se omite verificacion de firma (inseguro, configuralo pronto).');
