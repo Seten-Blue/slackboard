@@ -23,7 +23,7 @@
         </button>
       </div>
       <button
-        (click)="showCreateModal = true"
+        (click)="openCreateModal()"
         class="px-4 py-2 bg-signal hover:bg-signal/80 text-white text-sm font-medium rounded-xl transition-colors">
         + Nuevo Reporte
       </button>
@@ -48,7 +48,7 @@
       </div>
       <p class="text-white/60 font-medium">Sin reportes aun</p>
       <p class="text-white/30 text-sm mt-1">Crea tu primer reporte para analizar los datos de tus canales</p>
-      <button (click)="showCreateModal = true" class="mt-4 px-4 py-2 bg-signal/10 hover:bg-signal/20 text-signal text-sm font-medium rounded-xl transition-colors border border-signal/20">
+      <button (click)="openCreateModal()" class="mt-4 px-4 py-2 bg-signal/10 hover:bg-signal/20 text-signal text-sm font-medium rounded-xl transition-colors border border-signal/20">
         + Crear reporte
       </button>
     </div>
@@ -112,14 +112,20 @@
           <button (click)="viewReport(report)" class="flex-1 px-2 py-1.5 text-[11px] text-white/60 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors font-medium">
             Ver
           </button>
+          <button (click)="exportPdf(report)" class="px-2 py-1.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors font-medium" title="Exportar PDF">
+            PDF
+          </button>
           <button (click)="exportReport(report._id, 'csv')" class="px-2 py-1.5 text-[11px] text-white/40 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors" title="Exportar CSV">
             CSV
           </button>
           <button (click)="exportReport(report._id, 'json')" class="px-2 py-1.5 text-[11px] text-white/40 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors" title="Exportar JSON">
             JSON
           </button>
-          <button *ngIf="!report.signed" (click)="signReport(report._id)" class="px-2 py-1.5 text-[11px] text-amber-400/60 hover:text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors" title="Firmar">
-            ✍
+          <button *ngIf="!report.signature" (click)="signReport(report._id)" class="px-2 py-1.5 text-[11px] text-amber-400/60 hover:text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors" title="Firmar y descargar PDF">
+            ✍ Firmar
+          </button>
+          <button *ngIf="report.signature" (click)="signReport(report._id)" class="px-2 py-1.5 text-[11px] text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors" title="Descargar PDF firmado">
+            ✓ Firmado
           </button>
           <button (click)="openShare(report._id)" class="px-2 py-1.5 text-[11px] text-[#0079BF]/60 hover:text-[#0079BF] hover:bg-[#0079BF]/10 rounded-lg transition-colors" title="Compartir">
             ↗
@@ -179,89 +185,102 @@
 
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
 
-  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl" (click)="$event.stopPropagation()">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="font-display font-bold text-lg text-white">Nuevo Reporte</h2>
-        <button (click)="showCreateModal = false" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+  <div class="relative bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" (click)="$event.stopPropagation()">
+    <!-- Header (fixed) -->
+    <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-white/[0.06] flex-shrink-0">
+      <h2 class="font-display font-bold text-lg text-white">Nuevo Reporte</h2>
+      <button (click)="showCreateModal = false" class="w-8 h-8 rounded-lg text-white/30 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+    </div>
+
+    <!-- Scrollable body -->
+    <div class="overflow-y-auto flex-1 px-6 py-4 space-y-4" style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+      <div>
+        <label class="block text-xs font-medium text-white/50 mb-1.5">Titulo</label>
+        <input type="text" [(ngModel)]="newReport.title"
+          placeholder="Reporte semanal de actividad"
+          class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
       </div>
 
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs font-medium text-white/50 mb-1.5">Titulo</label>
-          <input type="text" [(ngModel)]="newReport.title"
-            placeholder="Reporte semanal de actividad"
-            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
-        </div>
+      <div>
+        <label class="block text-xs font-medium text-white/50 mb-1.5">Descripcion</label>
+        <textarea [(ngModel)]="newReport.description"
+          placeholder="Descripcion opcional del reporte..."
+          rows="2"
+          class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all resize-none"></textarea>
+      </div>
 
-        <div>
-          <label class="block text-xs font-medium text-white/50 mb-1.5">Descripcion</label>
-          <textarea [(ngModel)]="newReport.description"
-            placeholder="Descripcion opcional del reporte..."
-            rows="2"
-            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all resize-none"></textarea>
-        </div>
+      <div>
+        <label class="block text-xs font-medium text-white/50 mb-1.5">Tipo</label>
+        <select [(ngModel)]="newReport.type"
+          class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all appearance-none">
+          <option value="daily" class="bg-[#1a1a2e]">Diario</option>
+          <option value="weekly" class="bg-[#1a1a2e]">Semanal</option>
+          <option value="monthly" class="bg-[#1a1a2e]">Mensual</option>
+          <option value="custom" class="bg-[#1a1a2e]">Personalizado</option>
+        </select>
+      </div>
 
-        <div>
-          <label class="block text-xs font-medium text-white/50 mb-1.5">Tipo</label>
-          <select [(ngModel)]="newReport.type"
-            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all appearance-none">
-            <option value="daily" class="bg-[#1a1a2e]">Diario</option>
-            <option value="weekly" class="bg-[#1a1a2e]">Semanal</option>
-            <option value="monthly" class="bg-[#1a1a2e]">Mensual</option>
-            <option value="custom" class="bg-[#1a1a2e]">Personalizado</option>
-          </select>
-        </div>
+      <div>
+        <label class="block text-xs font-medium text-white/50 mb-1.5">Categoria</label>
+        <select [(ngModel)]="newReport.reportCategory" (ngModelChange)="onCategoryChange()"
+          class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all appearance-none">
+          <option value="full" class="bg-[#1a1a2e]">Completo (todos los datos)</option>
+          <option value="executive" class="bg-[#1a1a2e]">Ejecutivo</option>
+          <option value="productivity" class="bg-[#1a1a2e]">Productividad (tareas)</option>
+          <option value="engagement" class="bg-[#1a1a2e]">Participacion (mensajes)</option>
+          <option value="ai" class="bg-[#1a1a2e]">IA (metricas)</option>
+          <option value="security" class="bg-[#1a1a2e]">Seguridad (auditoria)</option>
+        </select>
+      </div>
 
-        <div>
-          <label class="block text-xs font-medium text-white/50 mb-1.5">Categoria</label>
-          <select [(ngModel)]="newReport.reportCategory"
-            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all appearance-none">
-            <option value="full" class="bg-[#1a1a2e]">Completo (todos los datos)</option>
-            <option value="executive" class="bg-[#1a1a2e]">Ejecutivo</option>
-            <option value="productivity" class="bg-[#1a1a2e]">Productividad (tareas)</option>
-            <option value="engagement" class="bg-[#1a1a2e]">Participacion (mensajes)</option>
-            <option value="ai" class="bg-[#1a1a2e]">IA (metricas)</option>
-            <option value="security" class="bg-[#1a1a2e]">Seguridad (auditoria)</option>
-          </select>
-        </div>
-
-        <!-- Date presets -->
-        <div>
-          <label class="block text-xs font-medium text-white/50 mb-1.5">Rapido</label>
-          <div class="flex flex-wrap gap-1.5">
-            <button *ngFor="let preset of datePresets" (click)="applyPreset(preset)"
-              class="px-2.5 py-1 text-[10px] text-white/40 hover:text-signal hover:bg-signal/10 border border-white/10 hover:border-signal/20 rounded-lg transition-colors">
-              {{ preset.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha inicio</label>
-            <input type="date" [(ngModel)]="newReport.dateRange.start"
-              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha fin</label>
-            <input type="date" [(ngModel)]="newReport.dateRange.end"
-              class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
-          </div>
+      <!-- Category-specific params -->
+      <div *ngIf="currentCategoryFields.length > 0" class="bg-white/[0.03] rounded-xl p-3 border border-white/[0.06]">
+        <p class="text-[10px] text-white/30 uppercase tracking-wider font-medium mb-2.5">Opciones de {{ newReport.reportCategory }}</p>
+        <div class="space-y-2">
+          <label *ngFor="let field of currentCategoryFields" class="flex items-center gap-2.5 cursor-pointer group">
+            <input type="checkbox" [(ngModel)]="newReport.params[field.key]"
+              class="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.06] text-signal focus:ring-signal/20 focus:ring-offset-0 cursor-pointer" />
+            <span class="text-xs text-white/50 group-hover:text-white/70 transition-colors">{{ field.label }}</span>
+          </label>
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/[0.06]">
-        <button (click)="showCreateModal = false"
-          class="px-4 py-2 text-sm text-white/50 hover:text-white transition-colors">
-          Cancelar
-        </button>
-        <button (click)="createReport()"
-          [disabled]="!newReport.title || !newReport.dateRange.start || !newReport.dateRange.end || creating"
-          class="px-5 py-2 bg-signal hover:bg-signal/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors">
-          {{ creating ? 'Creando…' : 'Crear Reporte' }}
-        </button>
+      <!-- Date presets -->
+      <div>
+        <label class="block text-xs font-medium text-white/50 mb-1.5">Rapido</label>
+        <div class="flex flex-wrap gap-1.5">
+          <button *ngFor="let preset of datePresets" (click)="applyPreset(preset)"
+            class="px-2.5 py-1 text-[10px] text-white/40 hover:text-signal hover:bg-signal/10 border border-white/10 hover:border-signal/20 rounded-lg transition-colors">
+            {{ preset.label }}
+          </button>
+        </div>
       </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha inicio</label>
+          <input type="date" [(ngModel)]="newReport.dateRange.start"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-white/50 mb-1.5">Fecha fin</label>
+          <input type="date" [(ngModel)]="newReport.dateRange.end"
+            class="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20 transition-all" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer (fixed) -->
+    <div class="flex items-center justify-end gap-3 px-6 pt-4 pb-5 border-t border-white/[0.06] flex-shrink-0">
+      <button (click)="showCreateModal = false"
+        class="px-4 py-2 text-sm text-white/50 hover:text-white transition-colors">
+        Cancelar
+      </button>
+      <button (click)="createReport()"
+        [disabled]="!newReport.title || !newReport.dateRange.start || !newReport.dateRange.end || creating"
+        class="px-5 py-2 bg-signal hover:bg-signal/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors">
+        {{ creating ? 'Creando…' : 'Crear Reporte' }}
+      </button>
     </div>
   </div>
 </div>
@@ -293,6 +312,10 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
+        <button (click)="exportPdf(selectedReport)"
+          class="px-3 py-1.5 text-xs text-red-400 bg-red-400/10 hover:bg-red-400/20 border border-red-400/20 rounded-lg transition-colors font-medium">
+          PDF
+        </button>
         <button (click)="exportReport(selectedReport._id, 'csv')"
           class="px-3 py-1.5 text-xs text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/10 border border-white/10 rounded-lg transition-colors">
           CSV
@@ -402,7 +425,7 @@
       <!-- Tasks breakdown -->
       <div *ngIf="selectedReport.data.tasks" class="bg-white/[0.06] rounded-xl p-5 border border-white/[0.06]">
         <h3 class="text-sm font-semibold text-white mb-4">Desglose de tareas</h3>
-        <div class="grid grid-cols-4 gap-3">
+        <div class="grid grid-cols-4 gap-3 mb-4">
           <div class="text-center">
             <p class="text-lg font-bold text-white">{{ selectedReport.data.tasks.byStatus?.pending || 0 }}</p>
             <p class="text-[10px] text-white/30">Pendientes</p>
@@ -418,6 +441,50 @@
           <div class="text-center">
             <p class="text-lg font-bold text-red-400">{{ selectedReport.data.tasks.overdue || 0 }}</p>
             <p class="text-[10px] text-white/30">Vencidas</p>
+          </div>
+        </div>
+        <div *ngIf="selectedReport.data.tasks.subtasks && selectedReport.data.tasks.subtasks.total > 0" class="mb-4 p-3 bg-white/[0.04] rounded-lg">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs text-white/40">Subtareas</span>
+            <span class="text-xs text-white/60 font-medium">{{ selectedReport.data.tasks.subtasks.completed }} / {{ selectedReport.data.tasks.subtasks.total }}</span>
+          </div>
+          <div class="w-full bg-white/[0.06] rounded-full h-2">
+            <div class="bg-signal h-2 rounded-full transition-all" [style.width.%]="selectedReport.data.tasks.subtasks.total > 0 ? (selectedReport.data.tasks.subtasks.completed / selectedReport.data.tasks.subtasks.total * 100) : 0"></div>
+          </div>
+        </div>
+        <div *ngIf="selectedReport.data.tasks.byPriority" class="grid grid-cols-4 gap-2 mb-4">
+          <div class="text-center bg-white/[0.03] rounded-lg p-2">
+            <p class="text-sm font-bold text-blue-400">{{ selectedReport.data.tasks.byPriority.low || 0 }}</p>
+            <p class="text-[10px] text-white/30">Baja</p>
+          </div>
+          <div class="text-center bg-white/[0.03] rounded-lg p-2">
+            <p class="text-sm font-bold text-white">{{ selectedReport.data.tasks.byPriority.medium || 0 }}</p>
+            <p class="text-[10px] text-white/30">Media</p>
+          </div>
+          <div class="text-center bg-white/[0.03] rounded-lg p-2">
+            <p class="text-sm font-bold text-amber-400">{{ selectedReport.data.tasks.byPriority.high || 0 }}</p>
+            <p class="text-[10px] text-white/30">Alta</p>
+          </div>
+          <div class="text-center bg-white/[0.03] rounded-lg p-2">
+            <p class="text-sm font-bold text-red-400">{{ selectedReport.data.tasks.byPriority.urgent || 0 }}</p>
+            <p class="text-[10px] text-white/30">Urgente</p>
+          </div>
+        </div>
+
+        <!-- Task list -->
+        <div *ngIf="selectedReport.data.tasks.taskList?.length">
+          <h4 class="text-xs font-medium text-white/40 mb-2">Lista de tareas</h4>
+          <div class="space-y-1.5 max-h-64 overflow-y-auto" style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;">
+            <div *ngFor="let task of selectedReport.data.tasks.taskList"
+              class="flex items-center gap-2 py-1.5 px-2 bg-white/[0.03] rounded-lg text-xs">
+              <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                [class]="task.status === 'completed' ? 'bg-emerald-400' : task.status === 'in_progress' ? 'bg-amber-400' : task.status === 'cancelled' ? 'bg-red-400' : 'bg-white/30'"></span>
+              <span class="flex-1 text-white truncate">{{ task.title }}</span>
+              <span *ngIf="task.channelName" class="text-white/20 truncate max-w-[80px]">#{{ task.channelName }}</span>
+              <span *ngIf="task.assigneeName" class="text-white/30 truncate max-w-[80px]">{{ task.assigneeName }}</span>
+              <span class="text-white/20 flex-shrink-0">{{ task.subtaskCompleted || 0 }}/{{ task.subtaskTotal || 0 }}</span>
+              <span *ngIf="task.dueDate && isOverdue(task.dueDate, task.status)" class="text-red-400 text-[10px] flex-shrink-0">VENCIDA</span>
+            </div>
           </div>
         </div>
       </div>
@@ -467,7 +534,11 @@
         <div class="flex items-center gap-2">
           <button *ngIf="!selectedReport.signature" (click)="signReport(selectedReport._id)"
             class="px-3 py-1.5 text-xs text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/20 rounded-lg transition-colors font-medium">
-            ✍ Firmar reporte
+            ✍ Firmar y descargar PDF
+          </button>
+          <button *ngIf="selectedReport.signature" (click)="signReport(selectedReport._id)"
+            class="px-3 py-1.5 text-xs text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20 border border-emerald-400/20 rounded-lg transition-colors font-medium">
+            ✓ Descargar PDF firmado
           </button>
           <button (click)="openShare(selectedReport._id)"
             class="px-3 py-1.5 text-xs text-[#0079BF] bg-[#0079BF]/10 hover:bg-[#0079BF]/20 border border-[#0079BF]/20 rounded-lg transition-colors font-medium">

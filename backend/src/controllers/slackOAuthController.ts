@@ -106,7 +106,19 @@ export const syncMyWorkspace = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'No encontramos ese workspace vinculado a tu cuenta.' });
     }
 
-    const slackChannels = await slackOAuthService.fetchWorkspaceChannels(workspace.botAccessToken);
+    let slackChannels: any[] = [];
+    try {
+      slackChannels = await slackOAuthService.fetchWorkspaceChannels(workspace.botAccessToken);
+    } catch (syncErr: any) {
+      if (/invalid_auth|account_inactive|token_revoked|not_authed/i.test(syncErr.message || '')) {
+        return res.status(401).json({
+          success: false,
+          message: 'El acceso al workspace de Slack vencio (el token fue revocado o ya no es valido). Desvincula el workspace y vuelve a conectarlo.',
+          error: syncErr.message,
+        });
+      }
+      throw syncErr;
+    }
 
     const synced: any[] = [];
     for (const sc of slackChannels) {

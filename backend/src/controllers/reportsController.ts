@@ -27,7 +27,7 @@ export interface IReport extends Document {
   };
   data: any;
   status: 'pending' | 'completed' | 'failed';
-  signature?: { hash: string; timestamp: Date };
+  signature?: { hash: string; timestamp: Date; signedBy: string };
   sharedWith: { user: mongoose.Types.ObjectId; permission: 'view' | 'edit' }[];
   createdAt: Date;
   updatedAt: Date;
@@ -81,6 +81,7 @@ const ReportSchema: Schema = new Schema(
     signature: {
       hash: { type: String, default: null },
       timestamp: { type: Date, default: null },
+      signedBy: { type: String, default: null },
     },
     sharedWith: [
       {
@@ -145,7 +146,8 @@ async function generateReportData(
   userId: string,
   dateRange: { start: Date; end: Date },
   filters: { platforms: string[]; channels: string[]; users: string[] },
-  reportCategory: string = 'full'
+  reportCategory: string = 'full',
+  params: Record<string, any> = {}
 ): Promise<any> {
   const userChannelIds = await getUserChannelIds(userId);
   const matchStage: any = {
@@ -234,37 +236,108 @@ async function generateReportData(
   }
 
   if (includeTasks) {
-    const taskMatch: any = { createdAt: { $gte: dateRange.start, $lte: dateRange.end } };
+    const taskChannelIds = userChannelIds.map(id => id.toString());
+
+    const taskMatch: any = {
+      $or: [
+        { channel: { $in: userChannelIds } },
+        { creator: userId },
+        { assignee: userId },
+      ],
+    };
+
+    if (filters.channels?.length) {
+      const filteredChannelIds = userChannelIds.filter(id => filters.channels.includes(id.toString()));
+      taskMatch.$or = [
+        { channel: { $in: filteredChannelIds } },
+        { creator: userId },
+        { assignee: userId },
+      ];
+    }
     if (filters.users?.length) {
-      taskMatch.$or = [{ creator: { $in: filters.users } }, { assignee: { $in: filters.users } }];
-    } else {
-      taskMatch.$or = [{ creator: userId }, { assignee: userId }];
+      taskMatch.$or = [
+        { creator: { $in: filters.users } },
+        { assignee: { $in: filters.users } },
+        { channel: { $in: userChannelIds } },
+      ];
     }
 
-    const [totalTasks, taskStatusCounts, taskPriorityCounts, overdueTasks, completedTasks, avgCompletionAgg, tasksByUserAgg, hoursAgg] = await Promise.all([
-      Task.countDocuments(taskMatch),
-      Task.aggregate([{ $match: taskMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
-      Task.aggregate([{ $match: taskMatch }, { $group: { _id: '$priority', count: { $sum: 1 } } }]),
-      Task.countDocuments({ ...taskMatch, dueDate: { $lt: new Date() }, status: { $nin: ['completed', 'cancelled'] } }),
-      Task.countDocuments({ ...taskMatch, status: 'completed' }),
+    const dateMatch = {
+      $or: [
+        { createdAt: { $gte: dateRange.start, $lte: dateRange.end } },
+        { updatedAt: { $gte: dateRange.start, $lte: dateRange.end } },
+        { status: { $in: ['pending', 'in_progress'] } },
+      ]
+    };
+
+    const fullTaskMatch = { $and: [taskMatch, dateMatch] };
+
+    const wantStatusBreakdown = params.statusBreakdown !== false;
+    const wantPriorityAnalysis = params.priorityAnalysis !== false;
+    const wantAssigneeStats = params.assigneeStats !== false;
+    const wantOverdueAnalysis = params.overdueAnalysis !== false;
+    const wantHoursTracking = params.hoursTracking !== false;
+
+    const aggs: Promise<any>[] = [
+      Task.countDocuments(fullTaskMatch),
+      wantStatusBreakdown ? Task.aggregate([{ $match: fullTaskMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]) : Promise.resolve([]),
+      wantPriorityAnalysis ? Task.aggregate([{ $match: fullTaskMatch }, { $group: { _id: '$priority', count: { $sum: 1 } } }]) : Promise.resolve([]),
+      wantOverdueAnalysis ? Task.countDocuments({ ...fullTaskMatch, dueDate: { $lt: new Date() }, status: { $nin: ['completed', 'cancelled'] } }) : Promise.resolve(0),
+      Task.countDocuments({ ...fullTaskMatch, status: 'completed' }),
       Task.aggregate([
-        { $match: { ...taskMatch, status: 'completed', completedAt: { $ne: null }, createdAt: { $ne: null } } },
+        { $match: { ...fullTaskMatch, status: 'completed', completedAt: { $ne: null }, createdAt: { $ne: null } } },
         { $project: { durationMs: { $subtract: ['$completedAt', '$createdAt'] } } },
         { $group: { _id: null, avgMs: { $avg: '$durationMs' } } },
       ]),
-      Task.aggregate([
-        { $match: taskMatch },
+      wantAssigneeStats ? Task.aggregate([
+        { $match: fullTaskMatch },
         { $group: { _id: '$assignee', count: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } } } },
         { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
         { $project: { username: '$user.username', count: 1, completed: 1, _id: 0 } },
         { $sort: { count: -1 } },
+      ]) : Promise.resolve([]),
+      wantHoursTracking ? Task.aggregate([
+        { $match: { ...fullTaskMatch, actualHours: { $gt: 0 } } },
+        { $group: { _id: null, totalActual: { $sum: '$actualHours' }, totalEstimated: { $sum: { $ifNull: ['$estimatedHours', 0] } } } },
+      ]) : Promise.resolve([]),
+      Task.aggregate([
+        { $match: fullTaskMatch },
+        { $unwind: { path: '$subtasks', preserveNullAndEmptyArrays: false } },
+        { $group: {
+          _id: null,
+          totalSubtasks: { $sum: 1 },
+          completedSubtasks: { $sum: { $cond: ['$subtasks.completed', 1, 0] } }
+        }}
       ]),
       Task.aggregate([
-        { $match: { ...taskMatch, actualHours: { $gt: 0 } } },
-        { $group: { _id: null, totalActual: { $sum: '$actualHours' }, totalEstimated: { $sum: { $ifNull: ['$estimatedHours', 0] } } } },
+        { $match: fullTaskMatch },
+        { $lookup: { from: 'channels', localField: 'channel', foreignField: '_id', as: 'channelInfo' } },
+        { $unwind: { path: '$channelInfo', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: 'users', localField: 'assignee', foreignField: '_id', as: 'assigneeInfo' } },
+        { $unwind: { path: '$assigneeInfo', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: 'users', localField: 'creator', foreignField: '_id', as: 'creatorInfo' } },
+        { $unwind: { path: '$creatorInfo', preserveNullAndEmptyArrays: true } },
+        { $project: {
+          title: 1, status: 1, priority: 1, dueDate: 1, createdAt: 1, completedAt: 1,
+          actualHours: 1, estimatedHours: 1,
+          channelName: '$channelInfo.name',
+          assigneeName: '$assigneeInfo.username',
+          creatorName: '$creatorInfo.username',
+          subtaskTotal: { $size: { $ifNull: ['$subtasks', []] } },
+          subtaskCompleted: {
+            $size: {
+              $filter: { input: { $ifNull: ['$subtasks', []] }, as: 'st', cond: { $eq: ['$$st.completed', true] } }
+            }
+          },
+          commentCount: { $size: { $ifNull: ['$comments', []] } },
+        }},
+        { $sort: { createdAt: -1 } },
+        { $limit: 50 },
       ]),
-    ]);
+    ];
+
+    const [totalTasks, taskStatusCounts, taskPriorityCounts, overdueTasks, completedTasks, avgCompletionAgg, tasksByUserAgg, hoursAgg, subtaskAgg, taskListAgg] = await Promise.all(aggs);
 
     const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 10000) / 100 : 0;
     const avgCompletionTimeDays = avgCompletionAgg[0]?.avgMs ? Math.round(avgCompletionAgg[0].avgMs / (1000 * 60 * 60 * 24) * 100) / 100 : 0;
@@ -277,14 +350,19 @@ async function generateReportData(
     data.tasks = {
       total: totalTasks,
       completed: completedTasks,
-      overdue: overdueTasks,
+      overdue: wantOverdueAnalysis ? overdueTasks : 0,
       completionRate: taskCompletionRate,
       avgCompletionTimeDays,
-      byStatus: taskStatusMap,
-      byPriority: taskPriorityMap,
-      byUser: tasksByUserAgg,
-      hoursTracked: Math.round((hoursAgg[0]?.totalActual || 0) * 100) / 100,
-      hoursEstimated: Math.round((hoursAgg[0]?.totalEstimated || 0) * 100) / 100,
+      byStatus: wantStatusBreakdown ? taskStatusMap : undefined,
+      byPriority: wantPriorityAnalysis ? taskPriorityMap : undefined,
+      byUser: wantAssigneeStats ? tasksByUserAgg : [],
+      hoursTracked: wantHoursTracking ? Math.round((hoursAgg[0]?.totalActual || 0) * 100) / 100 : 0,
+      hoursEstimated: wantHoursTracking ? Math.round((hoursAgg[0]?.totalEstimated || 0) * 100) / 100 : 0,
+      subtasks: {
+        total: subtaskAgg[0]?.totalSubtasks || 0,
+        completed: subtaskAgg[0]?.completedSubtasks || 0,
+      },
+      taskList: taskListAgg || [],
     };
   }
 
@@ -297,11 +375,25 @@ async function generateReportData(
   let tasksByUserAgg: any[] = [];
 
   if (includeSurveys) {
-    const surveyMatch: any = { createdAt: { $gte: dateRange.start, $lte: dateRange.end } };
+    const surveyMatch: any = {
+      $or: [
+        { channel: { $in: userChannelIds } },
+        { creator: userId },
+      ],
+      createdAt: { $gte: dateRange.start, $lte: dateRange.end },
+    };
     if (filters.users?.length) {
-      surveyMatch.creator = { $in: filters.users };
-    } else {
-      surveyMatch.creator = userId;
+      surveyMatch.$or = [
+        { creator: { $in: filters.users } },
+        { channel: { $in: userChannelIds } },
+      ];
+    }
+    if (filters.channels?.length) {
+      const filteredChannelIds = userChannelIds.filter(id => filters.channels.includes(id.toString()));
+      surveyMatch.$or = [
+        { channel: { $in: filteredChannelIds } },
+        { creator: { $in: filters.users || [userId] } },
+      ];
     }
 
     const [totalSurveysCount, surveyStatusCounts, totalResponses, avgScoreAgg] = await Promise.all([
@@ -436,7 +528,7 @@ function calculateNextGeneration(schedule: {
 export const createReport = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { title, description, type, dateRange, filters, reportCategory } = req.body;
+    const { title, description, type, dateRange, filters, reportCategory, params } = req.body;
 
     if (!title || !type || !dateRange?.start || !dateRange?.end) {
       return res
@@ -445,7 +537,7 @@ export const createReport = async (req: AuthRequest, res: Response) => {
     }
 
     const parsedDateRange = { start: new Date(dateRange.start), end: new Date(dateRange.end) };
-    const reportData = await generateReportData(userId, parsedDateRange, filters || {}, reportCategory || 'full');
+    const reportData = await generateReportData(userId, parsedDateRange, filters || {}, reportCategory || 'full', params || {});
 
     const report = await Report.create({
       title,
@@ -573,7 +665,10 @@ export const signReport = async (req: AuthRequest, res: Response) => {
     const payload = JSON.stringify(report.data) + userId + timestamp.toISOString();
     const hash = crypto.createHash('sha256').update(payload).digest('hex');
 
-    report.signature = { hash, timestamp };
+    const signer = await User.findById(userId).select('username email').lean();
+    const signedBy = (signer as any)?.username || (signer as any)?.email || userId;
+
+    report.signature = { hash, timestamp, signedBy } as any;
     await report.save();
 
     res.json({ success: true, data: report.signature });
@@ -656,76 +751,151 @@ export const exportReport = async (req: AuthRequest, res: Response) => {
       req.ip, req.headers['user-agent']);
 
     if (format === 'csv') {
+      const esc = (v: any) => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+      };
       const rows: string[] = [];
-      rows.push('Metric,Value');
-      rows.push(`Title,${report.title}`);
-      rows.push(`Type,${report.type}`);
-      rows.push(`Date Range,${report.dateRange.start} - ${report.dateRange.end}`);
+
+      // Encabezado del reporte
+      rows.push('REPORTE: ' + esc(report.title));
+      rows.push('Tipo,' + esc(report.type));
+      rows.push('Categoria,' + esc(report.reportCategory));
+      rows.push('Periodo,' + esc(`${report.dateRange.start} al ${report.dateRange.end}`));
+      rows.push('');
+
+      // Resumen ejecutivo
+      rows.push('=== RESUMEN EJECUTIVO ===');
+      rows.push('Metrica,Valor');
       if (report.data.messages) {
-        rows.push(`Total Messages,${report.data.messages.total || 0}`);
-        rows.push(`Total Unique Senders,${report.data.messages.uniqueSenders || 0}`);
-        rows.push(`Total Channels,${report.data.messages.totalChannels || 0}`);
-        rows.push(`Active Channels,${report.data.messages.activeChannels || 0}`);
-        rows.push(`Messages Per User,${report.data.messages.messagesPerUser || 0}`);
+        rows.push('Total Mensajes,' + esc(report.data.messages.total || 0));
+        rows.push('Usuarios Unicos,' + esc(report.data.messages.uniqueSenders || 0));
+        rows.push('Canales Totales,' + esc(report.data.messages.totalChannels || 0));
+        rows.push('Canales Activos,' + esc(report.data.messages.activeChannels || 0));
+        rows.push('Mensajes por Usuario,' + esc(report.data.messages.messagesPerUser || 0));
       }
       if (report.data.tasks) {
-        rows.push(`Total Tasks,${report.data.tasks.total || 0}`);
-        rows.push(`Completed Tasks,${report.data.tasks.completed || 0}`);
-        rows.push(`Task Completion Rate,${report.data.tasks.completionRate || 0}%`);
-        rows.push(`Overdue Tasks,${report.data.tasks.overdue || 0}`);
+        rows.push('Total Tareas,' + esc(report.data.tasks.total || 0));
+        rows.push('Tareas Completadas,' + esc(report.data.tasks.completed || 0));
+        rows.push('Tasa de Completado,' + esc(`${report.data.tasks.completionRate || 0}%`));
+        rows.push('Tareas Vencidas,' + esc(report.data.tasks.overdue || 0));
+        rows.push('Horas Estimadas,' + esc(report.data.tasks.hoursEstimated || 0));
+        rows.push('Horas Registradas,' + esc(report.data.tasks.hoursTracked || 0));
       }
       if (report.data.surveys) {
-        rows.push(`Total Surveys,${report.data.surveys.total || 0}`);
-        rows.push(`Survey Responses,${report.data.surveys.totalResponses || 0}`);
+        rows.push('Total Encuestas,' + esc(report.data.surveys.total || 0));
+        rows.push('Total Respuestas,' + esc(report.data.surveys.totalResponses || 0));
       }
       if (report.data.ai) {
-        rows.push(`AI Queries,${report.data.ai.totalQueries || 0}`);
-        rows.push(`AI Total Cost,${report.data.ai.totalCost || 0}`);
-        rows.push(`AI Total Tokens,${report.data.ai.totalTokens || 0}`);
+        rows.push('Consultas IA,' + esc(report.data.ai.totalQueries || 0));
+        rows.push('Costo Total IA (USD),' + esc(report.data.ai.totalCost || 0));
+        rows.push('Tokens Totales,' + esc(report.data.ai.totalTokens || 0));
+        rows.push('Tiempo Prom. Respuesta (ms),' + esc(report.data.ai.avgResponseTime || 0));
+        rows.push('Tasa de Exito,' + esc(`${report.data.ai.successRate || 0}%`));
       }
       if (report.data.audit) {
-        rows.push(`Audit Events,${report.data.audit.totalEvents || 0}`);
-        rows.push(`Failed Logins,${report.data.audit.failedLogins || 0}`);
+        rows.push('Eventos de Auditoria,' + esc(report.data.audit.totalEvents || 0));
+        rows.push('Logins Fallidos,' + esc(report.data.audit.failedLogins || 0));
+        rows.push('Cambios de Permisos,' + esc(report.data.audit.permissionChanges || 0));
       }
       if (report.data.kpis) {
-        rows.push(`Active Users,${report.data.kpis.activeUsers || 0}`);
-        rows.push(`Security Score,${report.data.kpis.securityScore || 'healthy'}`);
+        rows.push('Usuarios Activos,' + esc(report.data.kpis.activeUsers || 0));
+        rows.push('Puntuacion de Seguridad,' + esc(report.data.kpis.securityScore || 'healthy'));
       }
+      rows.push('');
+
+      // Actividad diaria
       if (report.data.messages?.messagesPerDay?.length) {
-        rows.push('');
-        rows.push('Messages Per Day');
-        rows.push('Date,Count');
+        rows.push('=== ACTIVIDAD DIARIA ===');
+        rows.push('Fecha,Mensajes');
         for (const d of report.data.messages.messagesPerDay) {
           rows.push(`${d.date},${d.count}`);
         }
+        rows.push('');
       }
+
+      // Canales mas activos
       if (report.data.messages?.topChannels?.length) {
-        rows.push('');
-        rows.push('Top Channels');
-        rows.push('Name,Platform,Count');
+        rows.push('=== CANALES MAS ACTIVOS ===');
+        rows.push('Canal,Plataforma,Mensajes');
         for (const ch of report.data.messages.topChannels) {
-          rows.push(`${ch.name},${ch.platform || ''},${ch.count}`);
+          rows.push(`${esc(ch.name)},${esc(ch.platform || '')},${ch.count}`);
         }
+        rows.push('');
       }
+
+      // Usuarios mas activos
       if (report.data.messages?.topUsers?.length) {
-        rows.push('');
-        rows.push('Top Users');
-        rows.push('Username,Message Count');
+        rows.push('=== USUARIOS MAS ACTIVOS ===');
+        rows.push('Usuario,Mensajes');
         for (const u of report.data.messages.topUsers) {
-          rows.push(`${u.username},${u.messageCount}`);
+          rows.push(`${esc(u.username)},${u.messageCount}`);
         }
-      }
-      if (report.data.messages?.hourlyActivity?.length) {
         rows.push('');
-        rows.push('Hourly Activity');
-        rows.push('Hour,Count');
+      }
+
+      // Actividad por hora
+      if (report.data.messages?.hourlyActivity?.length) {
+        rows.push('=== ACTIVIDAD POR HORA ===');
+        rows.push('Hora,Mensajes');
         for (const h of report.data.messages.hourlyActivity) {
-          rows.push(`${h.hour},${h.count}`);
+          rows.push(`${h.hour}:00,${h.count}`);
+        }
+        rows.push('');
+      }
+
+      // Desglose de tareas
+      if (report.data.tasks) {
+        rows.push('=== DESGLOSE DE TAREAS ===');
+        rows.push('Estado,Cantidad');
+        rows.push(`Pendientes,${report.data.tasks.byStatus?.pending || 0}`);
+        rows.push(`En Progreso,${report.data.tasks.byStatus?.in_progress || 0}`);
+        rows.push(`Completadas,${report.data.tasks.byStatus?.completed || 0}`);
+        rows.push(`Canceladas,${report.data.tasks.byStatus?.cancelled || 0}`);
+        rows.push('');
+
+        if (report.data.tasks.byPriority) {
+          rows.push('=== TAREAS POR PRIORIDAD ===');
+          rows.push('Prioridad,Cantidad');
+          rows.push(`Baja,${report.data.tasks.byPriority.low || 0}`);
+          rows.push(`Media,${report.data.tasks.byPriority.medium || 0}`);
+          rows.push(`Alta,${report.data.tasks.byPriority.high || 0}`);
+          rows.push(`Urgente,${report.data.tasks.byPriority.urgent || 0}`);
+          rows.push('');
+        }
+
+        if (report.data.tasks.byUser?.length) {
+          rows.push('=== TAREAS POR USUARIO ===');
+          rows.push('Usuario,Total,Completadas');
+          for (const u of report.data.tasks.byUser) {
+            rows.push(`${esc(u.username)},${u.count},${u.completed}`);
+          }
+          rows.push('');
         }
       }
 
+      // Modelos IA
+      if (report.data.ai?.byModel?.length) {
+        rows.push('=== CONSULTAS POR MODELO IA ===');
+        rows.push('Modelo,Consultas,Tokens,Costo (USD)');
+        for (const m of report.data.ai.byModel) {
+          rows.push(`${esc(m.modelName)},${m.count},${m.totalTokens},${m.totalCost}`);
+        }
+        rows.push('');
+      }
+
+      // Auditoria por categoria
+      if (report.data.audit?.byCategory?.length) {
+        rows.push('=== EVENTOS DE AUDITORIA POR CATEGORIA ===');
+        rows.push('Categoria,Cantidad');
+        for (const c of report.data.audit.byCategory) {
+          rows.push(`${esc(c.category)},${c.count}`);
+        }
+        rows.push('');
+      }
+
       const csv = rows.join('\n');
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="${report.title.replace(/[^a-zA-Z0-9]/g, '_')}.csv"`

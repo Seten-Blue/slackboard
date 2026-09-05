@@ -80,7 +80,7 @@ export const login = async (req: Request, res: Response) => {
 
     const user: any = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
-      logAction(user?._id?.toString() || 'unknown', 'login.failed', 'auth', undefined, 'User',
+      logAction(user?._id?.toString() || null, 'login.failed', 'auth', undefined, 'User',
         { email }, req.ip, req.headers['user-agent'], false, 'Credenciales invalidas');
       return res.status(401).json({ success: false, message: 'Credenciales invalidas' });
     }

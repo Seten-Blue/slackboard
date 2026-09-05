@@ -260,7 +260,7 @@ export const getTraffic = async (req: AuthRequest, res: Response) => {
       slack: !!(process.env.SLACK_BOT_TOKEN && process.env.SLACK_BOT_TOKEN.startsWith('xoxb-')),
       discord: !!(process.env.DISCORD_BOT_TOKEN),
       ai: !!(process.env.GEMINI_API_KEY),
-      whatsapp: !!(process.env.WHATSAPP_PHONE_NUMBER_ID),
+      whatsapp: !!(process.env.META_PHONE_NUMBER_ID),
     };
 
     res.json({

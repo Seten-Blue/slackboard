@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import AuditLog, { IAuditLog } from '../models/AuditLog';
 import { AuthRequest } from '../middleware/auth';
 
@@ -15,19 +16,25 @@ export const logAction = async (
   userAgent?: string,
   success: boolean = true,
   errorMessage?: string
-): Promise<IAuditLog> => {
-  return AuditLog.create({
-    actor: actorId,
-    action,
-    category,
-    target: target || null,
-    targetType: targetType || null,
-    details: details || null,
-    ip: ip || null,
-    userAgent: userAgent || null,
-    success,
-    errorMessage: errorMessage || null,
-  });
+): Promise<IAuditLog | null> => {
+  const actor = mongoose.isValidObjectId(actorId) ? actorId : null;
+  try {
+    return await AuditLog.create({
+      actor,
+      action,
+      category,
+      target: target || null,
+      targetType: targetType || null,
+      details: details || null,
+      ip: ip || null,
+      userAgent: userAgent || null,
+      success,
+      errorMessage: errorMessage || null,
+    });
+  } catch (error: any) {
+    console.error('⚠️ No se pudo guardar el log de auditoria:', error.message);
+    return null;
+  }
 };
 
 // ==================== LIST ====================

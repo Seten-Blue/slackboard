@@ -1,0 +1,6 @@
+node_modules
+.git
+*.md
+DOCUMENTACIÓN
+slackboard_backup
+slackboard-mockups

@@ -101,12 +101,29 @@ async function getValidAccessToken(userId: string): Promise<string> {
   const isExpired = !user.discordTokenExpiresAt || new Date(user.discordTokenExpiresAt).getTime() < Date.now() + 60_000;
 
   if (isExpired) {
-    const refreshed = await discordOAuthService.refreshToken(user.discordRefreshToken);
-    user.discordAccessToken = refreshed.access_token;
-    user.discordRefreshToken = refreshed.refresh_token;
-    user.discordTokenExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
-    await user.save();
-    return refreshed.access_token;
+    try {
+      const refreshed = await discordOAuthService.refreshToken(user.discordRefreshToken);
+      user.discordAccessToken = refreshed.access_token;
+      user.discordRefreshToken = refreshed.refresh_token;
+      user.discordTokenExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
+      await user.save();
+      return refreshed.access_token;
+    } catch (refreshErr: any) {
+      console.error('❌ Refresh token de Discord invalido/expirado:', refreshErr.message);
+      // El refresh token fue revocado o expiro (p. ej. al regenerar las credenciales
+      // del bot en el Developer Portal). Para que el usuario pueda volver a conectar
+      // su cuenta, limpiamos la vinculacion guardada; si no, el modal se quedaria
+      // bloqueado mostrando "token vencido" y nunca volveria a ofrecer "Conectar".
+      await User.findByIdAndUpdate(userId, {
+        discordUserId: null,
+        discordUsername: null,
+        discordAvatar: null,
+        discordAccessToken: null,
+        discordRefreshToken: null,
+        discordTokenExpiresAt: null,
+      });
+      throw new Error('La vinculacion de Discord vencio (el token expiro o fue revocado). Vuelve a conectar tu cuenta de Discord.');
+    }
   }
 
   return user.discordAccessToken;

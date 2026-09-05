@@ -30,6 +30,14 @@ import aiMetricsRouter from './routes/aiMetrics';
 // Configurar variables de entorno
 dotenv.config();  
 
+// Manejo global de rechazos: nunca dejar caer el servidor por un fallo aislado
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled promise rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('⚠️ Excepcion no capturada:', error);
+});
+
 // Inicializar Express
 const app: Express = express();
 const httpServer = createServer(app);
