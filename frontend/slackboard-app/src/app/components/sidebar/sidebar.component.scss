@@ -657,4 +657,14 @@ button:focus-visible,
   outline-offset: 2px;
 }
 
+// Toasts de Trello: entrada marcada para que se noten a la primera
+@keyframes trello-toast-in {
+  from { opacity: 0; transform: translateX(28px) scale(0.96); }
+  60%  { opacity: 1; transform: translateX(-3px) scale(1.01); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-trello-toast {
+  animation: trello-toast-in 320ms var(--ease);
+}
+
 

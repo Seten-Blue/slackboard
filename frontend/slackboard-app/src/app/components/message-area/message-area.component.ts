@@ -2,6 +2,7 @@ import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewCh
 import { Router } from '@angular/router';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
+import { SoundService } from '../../services/sound.service';
 import { Subscription } from 'rxjs';
 
 interface Particle {
@@ -148,7 +149,8 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
     private chatService: ChatService,
     private socketService: SocketService,
     private ngZone: NgZone,
-    private router: Router
+    private router: Router,
+    private soundService: SoundService
   ) {
     this.currentUser = this.chatService.getCurrentUser();
   }
@@ -302,6 +304,9 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
         if (!isDuplicate) {
           this.messages.push(incoming);
           this.shouldScrollToBottom = true;
+          if (!incoming.sender || incoming.sender?._id !== this.currentUser?._id) {
+            this.soundService.play('message');
+          }
         }
       }
     });
@@ -336,6 +341,9 @@ export class MessageAreaComponent implements OnInit, OnDestroy, AfterViewChecked
       const index = this.messages.findIndex(m => m._id === data.messageId);
       if (index !== -1) {
         this.messages[index] = { ...this.messages[index], pollData: data.pollData };
+        if (data.userId && this.currentUser?._id && data.userId !== this.currentUser._id) {
+          this.soundService.play('poll');
+        }
       }
     });
 

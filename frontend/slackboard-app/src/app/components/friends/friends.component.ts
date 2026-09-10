@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FriendshipService } from '../../services/friendship.service';
 import { SocketService } from '../../services/socket.service';
+import { SoundService } from '../../services/sound.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -24,13 +25,21 @@ export class FriendsComponent implements OnInit, OnDestroy {
   profilePanelUsername: string | null = null;
   profilePanelAvatar: string | null = null;
 
-  constructor(private friendship: FriendshipService, private socketService: SocketService) {}
+  constructor(private friendship: FriendshipService, private socketService: SocketService, private soundService: SoundService) {}
 
   ngOnInit() {
     this.loadAll();
     this.subs.push(
-      this.socketService.onFriendshipNewRequest().subscribe(() => this.loadAll()),
-      this.socketService.onFriendshipUpdate().subscribe(() => this.loadAll()),
+      this.socketService.onFriendshipNewRequest().subscribe(() => {
+        this.loadAll();
+        this.soundService.play('friendRequest');
+      }),
+      this.socketService.onFriendshipUpdate().subscribe((data: any) => {
+        this.loadAll();
+        if (data?.status === 'accepted') {
+          this.soundService.play('friendAccepted');
+        }
+      }),
       this.socketService.onFriendshipRemoved().subscribe(() => this.loadAll()),
     );
   }

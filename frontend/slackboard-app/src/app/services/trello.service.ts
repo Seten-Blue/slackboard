@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -8,7 +9,7 @@ import { Observable } from 'rxjs';
 export class TrelloService {
   private apiUrl = 'http://localhost:3000/api';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private authService: AuthService) {}
 
   getBoards(): Observable<any> {
     return this.http.get(`${this.apiUrl}/trello/boards`);
@@ -65,7 +66,9 @@ export class TrelloService {
   }
 
   getAttachmentViewUrl(cardId: string, attachmentId: string): string {
-    return `${this.apiUrl}/trello/cards/${cardId}/attachments/${attachmentId}/view`;
+    const jwt = this.authService.token || '';
+    const sep = 'token=' + encodeURIComponent(jwt);
+    return `${this.apiUrl}/trello/cards/${cardId}/attachments/${attachmentId}/view?${sep}`;
   }
 
   updateCheckItem(cardId: string, checklistId: string, itemId: string, state: string): Observable<any> {

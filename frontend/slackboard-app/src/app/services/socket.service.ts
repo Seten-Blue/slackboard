@@ -23,6 +23,7 @@ export class SocketService {
   private surveyStatusChanged$ = new Subject<any>();
   private surveyResponseUpdated$ = new Subject<any>();
   private taskStatusChanged$ = new Subject<any>();
+  private trelloNotification$ = new Subject<any>();
   private connected$ = new Subject<void>();
 
   private pendingJoins: string[] = [];
@@ -77,6 +78,7 @@ export class SocketService {
     this.socket.on('survey-status-changed', (data: any) => this.surveyStatusChanged$.next(data));
     this.socket.on('survey-response-updated', (data: any) => this.surveyResponseUpdated$.next(data));
     this.socket.on('task:status-changed', (data: any) => this.taskStatusChanged$.next(data));
+    this.socket.on('trello:notification', (data: any) => this.trelloNotification$.next(data));
   }
 
   private flushPendingJoins() {
@@ -172,6 +174,10 @@ export class SocketService {
 
   onTaskStatusChanged(): Observable<any> {
     return this.taskStatusChanged$.asObservable();
+  }
+
+  onTrelloNotification(): Observable<any> {
+    return this.trelloNotification$.asObservable();
   }
 
   onConnected(): Observable<any> {

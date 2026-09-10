@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { TrelloService } from '../../services/trello.service';
 import { AuthService } from '../../services/auth.service';
+import { TrelloNotificationsService } from '../../services/trello-notifications.service';
 
 interface TrelloBoard {
   id: string;
@@ -35,6 +36,26 @@ interface TrelloCard {
 }
 
 type BoardBackground = 'particles' | 'aurora' | 'nebula' | 'midnight';
+
+// Cache local del tablero: evita recargar todo desde Trello al volver a
+// entrar y mantiene las imagenes/portadas disponibles al instante.
+const TRELLO_CACHE_TTL_MS = 10 * 60 * 1000;
+const TRELLO_CACHE_PREFIX = 'trello-cache';
+const TRELLO_CACHE_BOARDS_KEY = `${TRELLO_CACHE_PREFIX}:boards`;
+const TRELLO_CACHE_SELECTED_KEY = `${TRELLO_CACHE_PREFIX}:selected-board`;
+
+interface BoardContentsCache {
+  ts: number;
+  lists: TrelloList[];
+  cards: TrelloCard[];
+  members: any[];
+  labels: any[];
+}
+
+interface BoardsCache {
+  ts: number;
+  boards: TrelloBoard[];
+}
 
 interface Particle {
   x: number;
@@ -106,11 +127,16 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   uploadingFile = false;
 
   cardActions: any[] = [];
+  recentNotifications: any[] = [];
   loadingActions = false;
   newComment = '';
   sendingComment = false;
 
   lightboxUrl: string | null = null;
+  lightboxZoom = 1;
+
+  failedAttachmentImages: Set<string> = new Set();
+  failedCommentImages: Set<string> = new Set();
 
   showAddList = false;
   newListName = '';
@@ -127,10 +153,20 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   private animationFrameId: number | null = null;
   private resizeListener = () => this.resizeCanvas();
 
-  constructor(private trelloService: TrelloService, private authService: AuthService) {}
+  constructor(private trelloService: TrelloService, private authService: AuthService, public trelloNotif: TrelloNotificationsService) {}
 
   ngOnInit() {
     this.checkTrelloStatus();
+
+    this.trelloNotif.list$.subscribe((list) => {
+      this.recentNotifications = list;
+    });
+
+    // Al entrar al modulo, las notificaciones ya se "vieron": el badge del
+    // menu se limpia, pero los marcadores sobre las tarjetas permanecen.
+    this.trelloNotif.count$.subscribe((count) => {
+      if (count > 0) this.trelloNotif.markRead();
+    });
   }
 
   ngAfterViewInit(): void {
@@ -225,19 +261,39 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
         this.boards = [];
         this.selectedBoard = null;
         this.showSetup = true;
+        this.clearTrelloCache();
       }
     });
   }
 
+  private clearTrelloCache() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(TRELLO_CACHE_PREFIX)) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignorar
+    }
+  }
+
   loadBoards() {
     this.loadingBoards = true;
+
+    const cached = this.readCache<BoardsCache>(TRELLO_CACHE_BOARDS_KEY);
+    const previouslySelected = localStorage.getItem(TRELLO_CACHE_SELECTED_KEY);
+
+    if (cached && cached.boards.length > 0) {
+      this.renderBoards(cached.boards, previouslySelected);
+    }
+
     this.trelloService.getBoards().subscribe({
       next: (response) => {
-        this.boards = (response.data || []).filter((b: TrelloBoard) => !b.closed);
-        this.loadingBoards = false;
-        if (this.boards.length > 0) {
-          this.selectBoard(this.boards[0]);
-        }
+        const boards = (response.data || []).filter((b: TrelloBoard) => !b.closed);
+        this.renderBoards(boards, previouslySelected);
+        this.writeCache(TRELLO_CACHE_BOARDS_KEY, { ts: Date.now(), boards });
       },
       error: (error) => {
         console.error('Error cargando tableros de Trello:', error);
@@ -249,27 +305,61 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  private renderBoards(boards: TrelloBoard[], previouslySelected: string | null) {
+    this.boards = boards;
+    this.loadingBoards = false;
+    if (!boards.length) return;
+    const toSelect = previouslySelected
+      ? boards.find((b) => b.id === previouslySelected)
+      : undefined;
+    this.selectBoard(toSelect || boards[0]);
+  }
+
   selectBoard(board: TrelloBoard) {
+    if (this.selectedBoard?.id === board.id) return;
     this.selectedBoard = board;
     this.showBoardPicker = false;
+    localStorage.setItem(TRELLO_CACHE_SELECTED_KEY, board.id);
     this.loadBoardContents();
     this.loadBoardBackground();
   }
 
   loadBoardContents() {
     if (!this.selectedBoard) return;
-    this.loadingBoard = true;
-    this.lists = [];
-    this.cards = [];
-    this.boardLabels = [];
-    this.boardMembers = [];
+
+    const cacheKey = `${TRELLO_CACHE_PREFIX}:board-${this.selectedBoard.id}`;
+    const cached = this.readCache<BoardContentsCache>(cacheKey);
+
+    if (cached) {
+      this.applyBoardContents(cached);
+      this.loadingBoard = false;
+      this.refreshBoardContents(cacheKey);
+    } else {
+      this.loadingBoard = true;
+      this.lists = [];
+      this.cards = [];
+      this.boardLabels = [];
+      this.boardMembers = [];
+      this.refreshBoardContents(cacheKey);
+    }
+  }
+
+  private refreshBoardContents(cacheKey: string) {
+    if (!this.selectedBoard) return;
 
     this.trelloService.getBoardContents(this.selectedBoard.id).subscribe({
       next: (response) => {
-        this.lists = (response.data.lists || []).sort((a: TrelloList, b: TrelloList) => a.pos - b.pos);
-        this.cards = (response.data.cards || []).filter((c: TrelloCard) => !c.closed);
-        this.boardMembers = response.data.members || [];
+        const prev = this.readCache<BoardContentsCache>(cacheKey);
+        const contents: BoardContentsCache = {
+          ts: Date.now(),
+          lists: (response.data.lists || []).sort((a: TrelloList, b: TrelloList) => a.pos - b.pos),
+          cards: (response.data.cards || []).filter((c: TrelloCard) => !c.closed),
+          members: response.data.members || [],
+          labels: (this.boardLabels && this.boardLabels.length > 0) ? this.boardLabels : (prev?.labels || []),
+        };
+        this.applyBoardContents(contents);
         this.loadingBoard = false;
+        this.writeCache(cacheKey, contents);
       },
       error: (error) => {
         console.error('Error cargando el tablero:', error);
@@ -280,11 +370,45 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     this.trelloService.getBoardLabels(this.selectedBoard.id).subscribe({
       next: (response) => {
         this.boardLabels = response.data || [];
+        const stored = this.readCache<BoardContentsCache>(cacheKey);
+        if (stored) {
+          stored.labels = this.boardLabels;
+          stored.ts = Date.now();
+          this.writeCache(cacheKey, stored);
+        }
       },
       error: (error) => {
         console.error('Error cargando etiquetas:', error);
       }
     });
+  }
+
+  private applyBoardContents(contents: BoardContentsCache) {
+    this.lists = contents.lists || [];
+    this.cards = contents.cards || [];
+    this.boardMembers = contents.members || [];
+    this.boardLabels = contents.labels || [];
+  }
+
+  private readCache<T>(key: string): T | null {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as any;
+      if (!parsed || typeof parsed.ts !== 'number') return null;
+      if (Date.now() - parsed.ts > TRELLO_CACHE_TTL_MS) return null;
+      return parsed as T;
+    } catch {
+      return null;
+    }
+  }
+
+  private writeCache(key: string, data: any) {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch {
+      // cache llena o no disponible: ignorar
+    }
   }
 
   cardsInList(listId: string): TrelloCard[] {
@@ -346,8 +470,8 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   memberAvatarUrl(member: any): string {
-    if (!member.avatarHash) return '';
-    return `https://trello.com/1/thumb/${member.avatarHash}/30.png`;
+    const name = member.fullName || member.username || '?';
+    return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&fontWeight=600&backgroundColor=6366f1`;
   }
 
   memberInitials(member: any): string {
@@ -370,6 +494,23 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
   coverColor(card: TrelloCard): string | null {
     if (!card.cover) return null;
     return card.cover.color || null;
+  }
+
+  // Portada en maxima calidad (para el panel y el lightbox)
+  coverFullUrl(card: TrelloCard): string | null {
+    if (!card?.cover) return null;
+    if (card.cover.url) return card.cover.url;
+    const scaled = (card.cover.scaled || []).filter((s: any) => s?.url);
+    if (!scaled.length) return null;
+    const largest = scaled.reduce((a: any, b: any) =>
+      ((b.width || 0) * (b.height || 0)) > ((a.width || 0) * (a.height || 0)) ? b : a
+    );
+    return largest.url || null;
+  }
+
+  // Imagen grande del lightbox: portada a maxima resolucion, si no la original
+  coverLightboxUrl(card: TrelloCard): string | null {
+    return this.coverFullUrl(card);
   }
 
   // ---------- Description preview ----------
@@ -442,6 +583,7 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     this.editedCardDueComplete = card.dueComplete;
     this.loadCardAttachments(card.id);
     this.loadCardActions(card.id);
+    this.trelloNotif.acknowledge(card.id);
   }
 
   closeCardPanel() {
@@ -536,22 +678,101 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
 
   openLightbox(url: string | null, event: Event) {
     event.stopPropagation();
-    if (url) this.lightboxUrl = url;
+    if (url) {
+      this.lightboxUrl = url;
+      this.lightboxZoom = 1;
+    }
   }
 
   closeLightbox() {
     this.lightboxUrl = null;
+    this.lightboxZoom = 1;
+  }
+
+  zoomIn() {
+    this.lightboxZoom = Math.min(4, this.roundZoom(this.lightboxZoom + 0.5));
+  }
+
+  zoomOut() {
+    this.lightboxZoom = Math.max(0.5, this.roundZoom(this.lightboxZoom - 0.5));
+  }
+
+  resetZoom() {
+    this.lightboxZoom = 1;
+  }
+
+  lightboxOnWheel(event: WheelEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const delta = event.deltaY < 0 ? 0.25 : -0.25;
+    this.lightboxZoom = Math.max(0.5, Math.min(4, this.roundZoom(this.lightboxZoom + delta)));
+  }
+
+  private roundZoom(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  // ---------- Fallbacks de imagenes rotas ----------
+
+  attachmentImageFailed(attachment: any): boolean {
+    return !!attachment && this.failedAttachmentImages.has(attachment.id);
+  }
+
+  markAttachmentImageFailed(attachment: any) {
+    if (attachment?.id) this.failedAttachmentImages.add(attachment.id);
+  }
+
+  commentImageKey(action: any): string {
+    return action?.id || JSON.stringify(action?.data?.text || '');
+  }
+
+  commentImageFailed(action: any): boolean {
+    return this.failedCommentImages.has(this.commentImageKey(action));
+  }
+
+  markCommentImageFailed(action: any) {
+    if (this.commentImageKey(action)) this.failedCommentImages.add(this.commentImageKey(action));
   }
 
   // ---------- Comment image parsing ----------
 
+  private readonly MARKDOWN_IMG_RE = /!\[[^\]]*\]\((https?:\/\/[^)\s]+?\.(?:png|jpe?g|gif|webp|svg)(?:\?[^)\s]*)?)\)/i;
+  private readonly RAW_IMAGE_URL_RE = /https?:\/\/[^\s)'">]+?\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s)'">]*)?/i;
+
   commentHasImages(action: any): boolean {
-    const text = action?.data?.text || '';
-    return /\.(png|jpe?g|gif|webp|svg)(\?[^)]*)?$/i.test(text.trim());
+    return !!this.extractCommentImageUrl(action);
   }
 
+  // URL de la imagen del comentario: se usa el enlace directo de trello.com
+  // (funciona con la sesion de Trello del navegador y se cachea); si no
+  // puede cargar, el onerror activa el fallback "Ver en Trello".
   commentImageUrl(action: any): string {
-    return (action?.data?.text || '').trim();
+    const url = this.extractCommentImageUrl(action);
+    if (!url) return '';
+    return url.replace(/[)]$/, '').trim();
+  }
+
+  // URL original (para abrir en Trello cuando la imagen no se puede mostrar)
+  commentOriginalUrl(action: any): string {
+    return this.extractCommentImageUrl(action) || '';
+  }
+
+  // Texto del comentario sin el codigo markdown/imagenes de la URL
+  commentText(action: any): string {
+    const text = action?.data?.text || '';
+    return text
+      .replace(this.MARKDOWN_IMG_RE, '')
+      .replace(this.RAW_IMAGE_URL_RE, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  private extractCommentImageUrl(action: any): string | null {
+    const text = action?.data?.text || '';
+    const markdown = text.match(this.MARKDOWN_IMG_RE);
+    const found = markdown ? markdown[1] : text.match(this.RAW_IMAGE_URL_RE);
+    if (!found) return null;
+    return found.replace(/[)]$/, '').trim();
   }
 
   archiveCard(card: TrelloCard) {
@@ -690,18 +911,13 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  commentText(action: any): string {
-    return action?.data?.text || '';
-  }
-
   actionAuthor(action: any): string {
     return action?.memberCreator?.fullName || action?.memberCreator?.username || 'Alguien';
   }
 
   actionAuthorAvatar(action: any): string {
-    const hash = action?.memberCreator?.avatarHash;
-    if (!hash) return '';
-    return `https://trello.com/1/thumb/${hash}/30.png`;
+    const name = action?.memberCreator?.fullName || action?.memberCreator?.username || '?';
+    return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&fontWeight=600&backgroundColor=6366f1`;
   }
 
   actionAuthorInitials(action: any): string {
@@ -769,13 +985,20 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ← NUEVO: URL segura para <img src> — adjuntos subidos van por nuestro
-  // proxy autenticado; adjuntos tipo "link externo" se muestran directo.
-  attachmentSrc(attachment: any): string {
-    if (this.selectedCard && (attachment.isUpload || this.isTrelloHosted(attachment.url))) {
-      return this.trelloService.getAttachmentViewUrl(this.selectedCard.id, attachment.id);
+  // URL que usan los <img>: las imagenes alojadas por Trello se cargan
+  // directo desde trello.com (su navegador ya tiene la sesion de Trello, y
+  // el navegador las cachea). Si no carga, el onerror activa el fallback.
+  // Enlaces externos se muestran tal cual.
+  attachmentSrc(attachment: any): string | null {
+    if (!this.selectedCard) return null;
+    if (attachment?.url && !this.isTrelloHosted(attachment.url)) return attachment.url;
+    if ((attachment?.previews || []).length) {
+      const largest = [...attachment.previews].sort((a: any, b: any) =>
+        ((b.width || 0) * (b.height || 0)) - ((a.width || 0) * (a.height || 0))
+      )[0];
+      if (largest?.url) return largest.url;
     }
-    return attachment.url;
+    return attachment?.url || null;
   }
 
   private isTrelloHosted(url: string): boolean {
@@ -972,5 +1195,46 @@ export class TrelloComponent implements OnInit, AfterViewInit, OnDestroy {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+  }
+
+  // ============ SEÑALIZADOR DE CAMBIOS RECIENTES ============
+
+  hasRecentChange(card: TrelloCard): boolean {
+    return !!card && this.recentNotifications.some((n) => n.cardId === card.id);
+  }
+
+  latestChange(card: TrelloCard): any | null {
+    return this.recentNotifications.find((n) => n.cardId === card.id) || null;
+  }
+
+  changedCardIds(): Set<string> {
+    return new Set(this.recentNotifications.map((n) => n.cardId));
+  }
+
+  recentChangesHere(): any[] {
+    if (!this.selectedBoard) return [];
+    return this.recentNotifications.filter((n) => n.boardId === this.selectedBoard?.id);
+  }
+
+  cardClass(card: TrelloCard): string {
+    const base = 'group relative bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all';
+    if (this.hasRecentChange(card)) {
+      return `${base} border-2 border-amber-400 ring-2 ring-amber-400/50`;
+    }
+    return `${base} border border-ink-950/5`;
+  }
+
+  openChange(n: any): void {
+    if (n?.cardId) this.trelloNotif.acknowledge(n.cardId);
+    const card = this.cards.find((c) => c.id === n?.cardId);
+    if (card) {
+      this.openCard(card);
+      return;
+    }
+    if (n?.cardUrl) window.open(n.cardUrl, '_blank');
+  }
+
+  clearChangeMarkers(): void {
+    this.trelloNotif.clear();
   }
 }

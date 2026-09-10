@@ -7,6 +7,8 @@ import { FriendshipService } from '../../services/friendship.service';
 import { SlackService } from '../../services/slack.service';
 import { WhatsappService } from '../../services/whatsapp.service';
 import { AuthService } from '../../services/auth.service';
+import { SoundService } from '../../services/sound.service';
+import { TrelloNotificationsService } from '../../services/trello-notifications.service';
 
 
 
@@ -94,6 +96,8 @@ export class SidebarComponent implements OnInit {
   showSlackModal = false;
   slackLinked: boolean | null = null; // null = todavia no se consulto
   pendingFriendCount = 0;
+  trelloToasts: any[] = [];
+  trelloUnread = 0;
   
 
   get selectedPlatform(): Platform {
@@ -108,7 +112,9 @@ export class SidebarComponent implements OnInit {
     private whatsappService: WhatsappService,
     public authService: AuthService,
     private socketService: SocketService,
-    private friendshipService: FriendshipService
+    private friendshipService: FriendshipService,
+    private soundService: SoundService,
+    private trelloNotifs: TrelloNotificationsService
   ) {}
 
   ngOnInit(): void {
@@ -131,6 +137,16 @@ export class SidebarComponent implements OnInit {
     this.socketService.onFriendshipNewRequest().subscribe(() => this.loadPendingFriendCount());
     this.socketService.onFriendshipUpdate().subscribe(() => this.loadPendingFriendCount());
     this.socketService.onFriendshipRemoved().subscribe(() => this.loadPendingFriendCount());
+
+    this.socketService.onTrelloNotification().subscribe((data: any) => {
+      this.addTrelloToast(data);
+      this.soundService.play('trello');
+      this.trelloNotifs.push(data);
+    });
+
+    this.trelloNotifs.count$.subscribe((count) => {
+      this.trelloUnread = count;
+    });
 
     // Si venimos de un redirect de OAuth (Discord/Slack nos mandaron de
     // vuelta a /chat), reabrimos el modal correspondiente.
@@ -421,5 +437,41 @@ export class SidebarComponent implements OnInit {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  addTrelloToast(data: any): void {
+    const actionId = data?.actionId || '';
+    const ts = data?.ts || '';
+    const alreadyShown = this.trelloToasts.some(
+      (t) => (actionId && t.actionId === actionId) || (!actionId && t.cardUrl === data?.cardUrl && t.ts === ts),
+    );
+    if (alreadyShown) return;
+    const toast = {
+      id: Date.now() + Math.random(),
+      actionId: actionId || `${data?.cardUrl || ''}|${ts}`,
+      title: data?.title || 'Cambio en el tablero de Trello',
+      detail: data?.detail || '',
+      boardName: data?.boardName || '',
+      cardUrl: data?.cardUrl || '',
+      ts,
+    };
+    this.trelloToasts.push(toast);
+    if (this.trelloToasts.length > 4) this.trelloToasts.shift();
+    setTimeout(() => this.removeTrelloToast(toast.id), 20000);
+  }
+
+  removeTrelloToast(id: number): void {
+    this.trelloToasts = this.trelloToasts.filter(t => t.id !== id);
+  }
+
+  dismissTrelloToasts(): void {
+    this.trelloToasts = [];
+  }
+
+  openTrelloToast(toast: any): void {
+    if (toast.cardUrl) {
+      window.open(toast.cardUrl, '_blank');
+    }
+    this.removeTrelloToast(toast.id);
   }
 }

@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { SurveysService } from '../../services/surveys.service';
 import { SocketService } from '../../services/socket.service';
+import { SoundService } from '../../services/sound.service';
 import { AuthService } from '../../services/auth.service';
 import { Subscription } from 'rxjs';
 import { ChartConfiguration } from 'chart.js';
@@ -78,7 +79,8 @@ export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     private surveysService: SurveysService,
     private socketService: SocketService,
-    private authService: AuthService
+    private authService: AuthService,
+    private soundService: SoundService
   ) {}
 
   Math = Math;
@@ -100,6 +102,7 @@ export class DashboardSurveysComponent implements OnInit, OnChanges, OnDestroy {
         if (data.survey && !this.surveys.find(s => s._id === data.survey._id)) {
           this.surveys.unshift(data.survey);
           this.loadStats();
+          this.soundService.play('survey');
         }
       }),
       this.socketService.onSurveyStatusChanged().subscribe((data: any) => {

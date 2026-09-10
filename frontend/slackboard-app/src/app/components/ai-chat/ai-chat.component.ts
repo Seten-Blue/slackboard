@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
+import { SoundService } from '../../services/sound.service';
 import { Subscription, interval } from 'rxjs';
 
 interface AIMessage {
@@ -34,7 +35,8 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   constructor(
     private chatService: ChatService,
-    private socketService: SocketService
+    private socketService: SocketService,
+    private soundService: SoundService
   ) {}
 
   ngOnInit(): void {
@@ -72,6 +74,9 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       if (data.channelId === this.channel._id) {
         this.addMessageIfNew(data.message);
         this.onResponseReceived();
+        if (this.isAiMessage(data.message)) {
+          this.soundService.play('message');
+        }
       }
     });
     this.subs.push(sub);
@@ -91,6 +96,10 @@ export class AiChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.loading = false;
       }
     });
+  }
+
+  private isAiMessage(msg: any): boolean {
+    return !!(msg && (msg.isAI === true || msg.sender?.isAI === true || msg.sender?.username === 'Zork'));
   }
 
   private addMessageIfNew(msg: AIMessage): void {

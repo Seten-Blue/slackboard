@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { SocketService } from '../../services/socket.service';
+import { SoundService } from '../../services/sound.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -27,7 +28,8 @@ export class ThreadPanelComponent implements OnInit, OnDestroy, AfterViewChecked
 
   constructor(
     private chatService: ChatService,
-    private socketService: SocketService
+    private socketService: SocketService,
+    private soundService: SoundService
   ) {
     this.currentUser = this.chatService.getCurrentUser();
   }
@@ -60,6 +62,7 @@ export class ThreadPanelComponent implements OnInit, OnDestroy, AfterViewChecked
         if (!exists) {
           this.replies.push(data.reply);
           this.shouldScrollToBottom = true;
+          this.soundService.play('threadReply');
         }
       }
     });
