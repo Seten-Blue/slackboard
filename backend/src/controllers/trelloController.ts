@@ -1,14 +1,24 @@
 import { Response } from 'express';
+import jwt from 'jsonwebtoken';
 import trelloService from '../services/trelloService';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { encryptToken, decryptToken, isEncryptedToken } from '../utils/crypto';
 
 async function getUserTrelloToken(userId: string): Promise<{ token?: string; hasToken: boolean }> {
   const user = await User.findById(userId).select('trelloToken');
-  if (user && (user as any).trelloToken) {
-    return { token: (user as any).trelloToken, hasToken: true };
+  const raw = user ? (user as any).trelloToken : null;
+  let token: string | null = null;
+  try {
+    token = raw ? decryptToken(raw) : null;
+  } catch (decryptErr: any) {
+    console.error('❌ No se pudo descifrar el token de Trello:', decryptErr.message);
+    token = null;
   }
-  return { hasToken: false };
+  if (token && raw && !isEncryptedToken(raw)) {
+    await User.updateOne({ _id: userId }, { trelloToken: encryptToken(raw) });
+  }
+  return { token: token ?? undefined, hasToken: !!token };
 }
 
 function requireTrello(res: any, hasToken: boolean): boolean {
@@ -39,11 +49,29 @@ export const getBoardContents = async (req: AuthRequest, res: Response) => {
     const { boardId } = req.params;
     const creds = await getUserTrelloToken(req.userId!);
     if (!requireTrello(res, creds.hasToken)) return;
-    const [lists, cards, members] = await Promise.all([
+    const [lists, cardsRaw, members] = await Promise.all([
       trelloService.getLists(boardId, creds.token),
       trelloService.getCardsByBoard(boardId, creds.token),
       trelloService.getBoardMembers(boardId, creds.token),
     ]);
+
+    // /boards/{id}/cards devuelve cover sin los `scaled` (no renderiza la
+    // portada). Para cada tarjeta con portada por adjunto pega /cards/{id}
+    // en paralelo y enriquece el cover para que el frontend pueda pintarla.
+    const cards = cardsRaw.slice();
+    const needCover = cards.filter((c: any) => c && c.cover && (c.cover.idAttachment || c.cover.idUploadedBackground) && !c.cover.scaled && !c.cover.url);
+    if (needCover.length > 0) {
+      const settled = await Promise.allSettled(needCover.map((c: any) => trelloService.getCardCover(c.id, creds.token)));
+      const coverByCard = new Map<string, any>();
+      settled.forEach((s, i) => {
+        if (s.status === 'fulfilled' && s.value?.cover) coverByCard.set(needCover[i].id, s.value.cover);
+      });
+      cards.forEach((c: any) => {
+        const full = coverByCard.get(c.id);
+        if (full) c.cover = full;
+      });
+    }
+
     res.json({ success: true, data: { lists, cards, members } });
   } catch (error: any) {
     console.error('Error obteniendo contenido del tablero:', error.message);
@@ -269,7 +297,20 @@ export const uploadCardAttachment = async (req: AuthRequest, res: Response) => {
 export const viewCardAttachment = async (req: AuthRequest, res: Response) => {
   try {
     const { cardId, attachmentId } = req.params;
-    const userId = req.userId;
+
+    // Los <img src> no pueden enviar Authorization, asi que el JWT se
+    // acepta tambien por query string (solo en este endpoint publico).
+    let userId = req.userId;
+    const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+    if (!userId && queryToken) {
+      try {
+        const payload: any = jwt.verify(queryToken, process.env.JWT_SECRET || '');
+        userId = payload?.userId;
+      } catch (tokenError) {
+        // token invalido: se continua sin usuario y se devuelve el 403 amigable
+      }
+    }
+
     const creds = userId ? await getUserTrelloToken(userId) : { hasToken: false };
 
     const attachments = await trelloService.getAttachments(cardId, creds.token);
@@ -279,10 +320,43 @@ export const viewCardAttachment = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Adjunto no encontrado' });
     }
 
-    const { buffer, contentType } = await trelloService.fetchAttachmentBinary(attachment.url, creds.token);
+    // Orden de intento: original (mejor calidad) y luego los "previews" mas
+    // grandes como respaldo si Trello bloquea el download directo.
+    const previews = Array.isArray(attachment.previews)
+      ? [...attachment.previews].sort((a: any, b: any) => (b.bytes || 0) - (a.bytes || 0))
+      : [];
+    const candidates = [attachment.url, ...previews.map((p: any) => p.url)];
+
+    let buffer: Buffer | undefined;
+    let contentType = 'application/octet-stream';
+    let lastError: any;
+
+    for (const url of candidates) {
+      if (!url) continue;
+      try {
+        const result = await trelloService.fetchAttachmentBinary(url, creds.token);
+        buffer = result.buffer;
+        contentType = result.contentType;
+        break;
+      } catch (fetchError: any) {
+        lastError = fetchError;
+      }
+    }
+
+    if (!buffer) {
+      const isPermission = /401|403|missing scopes|permission requested/i.test(lastError?.message || '');
+      return res.status(isPermission ? 403 : 502).json({
+        success: false,
+        code: isPermission ? 'TRELLO_PERMISSION_DENIED' : 'TRELLO_DOWNLOAD_FAILED',
+        message: isPermission
+          ? 'El token de Trello no tiene permiso para descargar esta imagen. Vuelve a vincular tu cuenta o ábrela directamente en Trello.'
+          : 'No se pudo descargar el adjunto desde Trello.',
+      });
+    }
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'private, max-age=86400, stale-while-revalidate=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(buffer);
   } catch (error: any) {
     console.error('Error obteniendo adjunto:', error.message);

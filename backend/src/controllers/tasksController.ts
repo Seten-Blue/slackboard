@@ -126,7 +126,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
 
       if (chDoc?.slackChannelId) {
         try {
-          await slackService.sendMessage(chDoc.name, taskText);
+          await slackService.sendMessageToChannel(chDoc, taskText);
         } catch (err: any) {
           console.warn('No se pudo enviar tarea a Slack:', err.message);
         }
@@ -487,7 +487,7 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
         }
         if (chDoc?.slackChannelId) {
           try {
-            await slackService.sendMessage(chDoc.name, statusText);
+            await slackService.sendMessageToChannel(chDoc, statusText);
           } catch (err: any) {
             console.warn('No se pudo notificar cambio de estado a Slack:', err.message);
           }

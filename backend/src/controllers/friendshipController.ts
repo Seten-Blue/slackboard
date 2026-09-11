@@ -17,7 +17,7 @@ export const sendRequest = async (req: AuthRequest, res: Response) => {
     const from = req.userId!;
     const { to } = req.body;
     if (!to) return res.status(400).json({ success: false, message: 'Falta el destinatario' });
-    if (from === to) return res.status(400).json({ success: false, message: 'No podes agregarte a vos mismo' });
+    if (from === to) return res.status(400).json({ success: false, message: 'No puedes agregarte a ti mismo' });
 
     const target = await User.findById(to).select('_id');
     if (!target) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
@@ -86,7 +86,7 @@ export const acceptRequest = async (req: AuthRequest, res: Response) => {
     }
 
     if (friendship.initiator.equals(uid)) {
-      return res.status(400).json({ success: false, message: 'No podes aceptar tu propia solicitud' });
+      return res.status(400).json({ success: false, message: 'No puedes aceptar tu propia solicitud' });
     }
 
     friendship.status = 'accepted';
@@ -139,7 +139,7 @@ export const rejectRequest = async (req: AuthRequest, res: Response) => {
     }
 
     if (friendship.initiator.equals(uid)) {
-      return res.status(400).json({ success: false, message: 'No podes rechazar tu propia solicitud' });
+      return res.status(400).json({ success: false, message: 'No puedes rechazar tu propia solicitud' });
     }
 
     friendship.status = 'rejected';
@@ -163,7 +163,7 @@ export const cancelRequest = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const friendship = await Friendship.findById(id);
     if (!friendship) return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
-    if (friendship.status !== 'pending') return res.status(400).json({ success: false, message: 'Solo podes cancelar solicitudes pendientes' });
+    if (friendship.status !== 'pending') return res.status(400).json({ success: false, message: 'Solo puedes cancelar solicitudes pendientes' });
 
     const uid = new mongoose.Types.ObjectId(userId);
     if (!friendship.userA.equals(uid) && !friendship.userB.equals(uid)) {

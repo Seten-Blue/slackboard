@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { logAction } from '../controllers/auditLogController';
 import User from '../models/User';
 import trelloService from '../services/trelloService';
+import { encryptToken } from '../utils/crypto';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
 
@@ -76,9 +77,9 @@ router.post('/trello/finish', requireAuth, async (req: any, res: any) => {
 
     const trelloUser = await response.json();
 
-    // Save only the token (API key is global in .env)
+    // Save the token encrypted at rest (API key is global in .env)
     await User.findByIdAndUpdate(req.userId, {
-      trelloToken: token,
+      trelloToken: encryptToken(token),
       trelloApiKey: trelloService.getApiKey(),
     });
 

@@ -10,6 +10,8 @@ export interface IChannel extends Document {
   createdBy: mongoose.Types.ObjectId;
   slackChannelId?: string;
   discordChannelId?: string;
+  discordGuildId?: string;
+  discordGuildName?: string;
   discordWebhookId?: string;
   discordWebhookToken?: string;
   slackTeamId?: string;
@@ -18,6 +20,7 @@ export interface IChannel extends Document {
   platform: ChannelPlatform;
   aiEnabled?: boolean;
   isAIChannel?: boolean;
+  readUntil?: Map<string, Date>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -59,6 +62,8 @@ const ChannelSchema: Schema = new Schema(
       default: null,
       index: true,
     },
+    discordGuildId: { type: String, default: null, index: true },
+    discordGuildName: { type: String, default: null },
     discordWebhookId: { type: String, default: null },
     discordWebhookToken: { type: String, default: null },
     slackTeamId: { type: String, default: null, index: true },
@@ -78,6 +83,12 @@ const ChannelSchema: Schema = new Schema(
       type: Boolean,
       default: false,
       index: true,
+    },
+    // Marcas de "leido hasta" por usuario para calcular no leidos por canal
+    readUntil: {
+      type: Map,
+      of: Date,
+      default: {},
     },
   },
   {

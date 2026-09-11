@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const web_api_1 = require("@slack/web-api");
 const dotenv_1 = __importDefault(require("dotenv"));
 const crypto_1 = __importDefault(require("crypto"));
+const User_1 = __importDefault(require("../models/User"));
+const crypto_2 = require("../utils/crypto");
 dotenv_1.default.config();
 class SlackService {
     normalizeChannelName(name) {
@@ -139,6 +141,121 @@ class SlackService {
         catch (error) {
             console.error('Error obteniendo historial de Slack:', error.message);
             return [];
+        }
+    }
+    // Resuelve el token correcto para un canal: el del workspace vinculado por
+    // OAuth (via slackTeamId) o el bot global como fallback. Asi los mensajes se
+    // envian al workspace correcto aunque el bot global no tenga acceso al canal.
+    async resolveTokenForChannel(channel) {
+        const teamId = channel && channel.slackTeamId;
+        if (teamId) {
+            try {
+                const user = await User_1.default.findOne({ 'slackWorkspaces.teamId': teamId }).select('slackWorkspaces');
+                const ws = (user?.slackWorkspaces || []).find((w) => w.teamId === teamId);
+                if (ws?.botAccessToken) {
+                    const plain = (0, crypto_2.isEncryptedToken)(ws.botAccessToken) ? (0, crypto_2.decryptToken)(ws.botAccessToken) : ws.botAccessToken;
+                    if (plain)
+                        return plain;
+                }
+            }
+            catch (err) {
+                console.warn('⚠️  No se pudo resolver el token del workspace de Slack:', err.message);
+            }
+        }
+        return this.token;
+    }
+    buildMessageText(text, username, attachments) {
+        const senderPrefix = username ? `*${username}*: ` : '';
+        const attachmentSuffix = attachments && attachments.length > 0
+            ? '\n' + attachments.map((url) => `📎 ${url}`).join('\n')
+            : '';
+        return senderPrefix + text + attachmentSuffix;
+    }
+    // Envia el texto a un channelId de Slack con el token adecuado, uniendo al
+    // bot al canal si hace falta (not_in_channel) y mapeando missing_scope.
+    async postTextMessage(token, channelId, text, username) {
+        const client = new web_api_1.WebClient(token);
+        const payload = {
+            channel: channelId,
+            text,
+            username: username || 'SlackBoard Bot',
+            icon_emoji: ':robot_face:',
+        };
+        try {
+            return await client.chat.postMessage(payload);
+        }
+        catch (error) {
+            if (error?.data?.error === 'not_in_channel') {
+                console.log(`🔄 Bot no estaba en el canal ${channelId}. Intentando entrar...`);
+                try {
+                    await client.conversations.join({ channel: channelId });
+                    return await client.chat.postMessage(payload);
+                }
+                catch (joinError) {
+                    if (joinError?.data?.error === 'missing_scope') {
+                        throw new Error('El token de Slack no tiene el scope channels:join. Anadelo en OAuth & Permissions y vuelve a instalar la app.');
+                    }
+                    throw new Error(`El bot no pudo entrar al canal ${channelId}. Invitalo manualmente desde Slack o verifica los permisos.`);
+                }
+            }
+            if (error?.data?.error === 'missing_scope') {
+                throw new Error('El token de Slack no tiene los scopes necesarios. Revisa channels:read, channels:join, chat:write y users:read en OAuth & Permissions.');
+            }
+            throw error;
+        }
+    }
+    // Enviar a Slack usando el Channel de SlackBoard (se postea directo al
+    // slackChannelId con el token correcto, sin depender del nombre).
+    async sendMessageToChannel(channel, text, username, attachments) {
+        if (!channel || !channel.slackChannelId)
+            return null;
+        if (!this.isConfigured()) {
+            console.log('Slack no configurado, mensaje solo local:', { channel, text });
+            return null;
+        }
+        const token = await this.resolveTokenForChannel(channel);
+        const fullText = this.buildMessageText(text, username, attachments);
+        console.log(`📤 Enviando mensaje a Slack (canal ${channel.slackChannelId}):`, text);
+        const result = await this.postTextMessage(token, channel.slackChannelId, fullText, username);
+        console.log('✅ Mensaje enviado a Slack:', result.ts);
+        return result;
+    }
+    // Enviar una encuesta a Slack directo al slackChannelId del Channel.
+    async sendPollMessageToChannel(channel, pollData, username) {
+        if (!channel || !channel.slackChannelId || !pollData)
+            return null;
+        if (!this.isConfigured())
+            return null;
+        const NUM_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+        const optionLines = (pollData.options || [])
+            .map((opt, i) => {
+            const emoji = NUM_EMOJIS[i] || `${i + 1}\uFE0F\u20E3`;
+            const text = (opt.text || '').trim() || `Opcion ${i + 1}`;
+            return `${emoji} ${text}`;
+        })
+            .join('\n');
+        const lines = [
+            `📊 ${pollData.question || 'Encuesta'}`,
+            '',
+            optionLines,
+            '',
+        ];
+        if (pollData.allowMultiple)
+            lines.push('☑ Multiple respuesta');
+        if (pollData.isAnonymous)
+            lines.push('🔒 Anonima');
+        if (pollData.duration)
+            lines.push(`⏱ ${pollData.duration}h`);
+        lines.push('', 'Reacciona con el numero de tu opcion para votar');
+        try {
+            const token = await this.resolveTokenForChannel(channel);
+            const result = await this.postTextMessage(token, channel.slackChannelId, lines.join('\n'), username || 'SlackBoard Bot');
+            console.log(`✅ Encuesta enviada a Slack: ${result.ts}`);
+            return result.ts || null;
+        }
+        catch (error) {
+            console.error('❌ Error enviando encuesta a Slack:', error.message);
+            return null;
         }
     }
     async getUserInfo(userId) {

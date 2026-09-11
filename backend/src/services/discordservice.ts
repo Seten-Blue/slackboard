@@ -12,6 +12,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   Interaction,
+  PermissionFlagsBits,
 } from 'discord.js';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -155,6 +156,11 @@ class discordService {
     );
 
     await this.client.login(this.token);
+
+    // Rellenar el servidor (guild) en los canales de Discord ya sincronizados
+    this.backfillDiscordGuilds().catch((e) =>
+      console.warn('⚠️ Error en backfill de servidor de Discord:', e.message)
+    );
   }
 
   private guildAllowed(guildId?: string | null): boolean {
@@ -174,11 +180,19 @@ class discordService {
       ? `DM con ${(discordChannel as DMChannel).recipient?.username || 'usuario'}`
       : `# ${(discordChannel as TextChannel).name}`;
 
+    // El servidor (guild) al que pertenece el canal, si aplica
+    const guildObj = (discordChannel as any).guild;
+    const guildId = !isDM && guildObj?.id ? String(guildObj.id) : undefined;
+    const resolvedGuildName = (!isDM && (guildObj?.name || guildName)) ? String(guildObj?.name || guildName) : undefined;
+
     let channel: any = await Channel.findOne({ discordChannelId });
     if (channel) {
       if (!channel.displayName) {
         channel.displayName = rawName;
       }
+      // Sincronizamos SIEMPRE el servidor real del canal para que el frontend agrupe bien
+      if (guildId) channel.discordGuildId = guildId;
+      if (resolvedGuildName) channel.discordGuildName = resolvedGuildName;
       if (requestingUserId && !channel.members.some((m: any) => m.toString() === requestingUserId)) {
         channel.members.push(new mongoose.Types.ObjectId(requestingUserId));
       }
@@ -196,6 +210,8 @@ class discordService {
         existingByName.discordChannelId = discordChannelId;
         existingByName.platform = 'discord';
       }
+      if (guildId) existingByName.discordGuildId = guildId;
+      if (resolvedGuildName) existingByName.discordGuildName = resolvedGuildName;
       if (!existingByName.displayName) {
         existingByName.displayName = rawName;
       }
@@ -230,10 +246,53 @@ class discordService {
       members,
       createdBy: adminUser._id,
       discordChannelId,
+      discordGuildId: guildId,
+      discordGuildName: resolvedGuildName,
     });
 
-    console.log(`➕ Canal nuevo creado desde Discord: ${fallbackName} (${discordChannelId})`);
+    console.log(`➕ Canal nuevo creado desde Discord: ${fallbackName} (${discordChannelId}${guildId ? ` · servidor ${resolvedGuildName || guildId}` : ''})`);
     return channel;
+  }
+
+  // ============ RELLENADO DE SERVICOR (guild) EN CANALES ANTIGUOS ============
+  private async backfillDiscordGuilds(): Promise<void> {
+    if (!this.client) return;
+    const stale = await Channel.find({
+      platform: 'discord',
+      discordChannelId: { $ne: null, $nin: [null, ''] },
+      discordGuildId: { $in: [null, '', undefined] },
+    });
+    if (!stale.length) return;
+
+    for (const ch of stale) {
+      try {
+        const discordChannel: any = await this.getClient().channels.fetch(String(ch.discordChannelId));
+        const guild = discordChannel?.guild;
+        if (guild?.id) {
+          ch.discordGuildId = String(guild.id);
+          ch.discordGuildName = String(guild.name);
+          await ch.save();
+          console.log(`🔗 Canal "${ch.name}" vinculado al servidor de Discord: ${guild.name}`);
+        }
+      } catch (e: any) {
+        console.warn(`⚠️ No se pudo resolver el servidor del canal ${ch.discordChannelId}: ${e.message}`);
+      }
+    }
+  }
+
+  // ============ PODA DE CANALES DE DISCORD QUE YA NO EXISTEN ============
+  private async pruneStaleGuildChannels(guildId: string, existingIds: Set<string>): Promise<void> {
+    try {
+      const linked = await Channel.find({ platform: 'discord', discordGuildId: guildId });
+      for (const ch of linked) {
+        if (ch.discordChannelId && !existingIds.has(String(ch.discordChannelId))) {
+          console.log(`🗑️ Canal de Discord obsoleto eliminado: ${ch.name} (${ch.discordChannelId}) ya no existe en ${guildId}`);
+          await Channel.findByIdAndDelete(ch._id);
+        }
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Error podando canales obsoletos de ${guildId}: ${e.message}`);
+    }
   }
   
   // ============ Autor de Discord <-> User de SlackBoard ============
@@ -796,7 +855,7 @@ class discordService {
       // Verify the clicking user is the recipient
       const mongoUser = await User.findOne({ discordUserId });
       if (!mongoUser || (mongoUser as any)._id.toString() !== friendship.userB.toString()) {
-        await interaction.reply({ content: 'Esta solicitud no es para vos.', ephemeral: true });
+        await interaction.reply({ content: 'Esta solicitud no es para ti.', ephemeral: true });
         return;
       }
 
@@ -1169,16 +1228,18 @@ class discordService {
       if (!this.guildAllowed(guild.id)) continue;
 
       const channels = await guild.channels.fetch();
+      const existingIds = new Set<string>();
       for (const [, ch] of channels) {
         if (!ch || ch.type !== ChannelType.GuildText) continue;
+        existingIds.add(ch.id);
         const channelDoc = await this.resolveOrCreateDiscordChannel(ch as TextChannel, guild.name, requestingUserId);
         synced.push(channelDoc);
-      
-          }
+      }
+      if (requestingUserId) {
+        await this.pruneStaleGuildChannels(guild.id, existingIds);
+      }
 
-
-          
-    }
+           }
     return synced;
   
     
@@ -1198,15 +1259,20 @@ class discordService {
 
     const synced: any[] = [];
     const channels = await guild.channels.fetch();
+    const existingIds = new Set<string>();
     for (const [, ch] of channels) {
       if (!ch || ch.type !== ChannelType.GuildText) continue;
+      existingIds.add(ch.id);
       const channelDoc = await this.resolveOrCreateDiscordChannel(ch as TextChannel, guild.name, requestingUserId);
       synced.push(channelDoc);
+    }
+    if (requestingUserId) {
+      await this.pruneStaleGuildChannels(guild.id, existingIds);
     }
     return synced;
   }
 
-  async createChannel(name: string, isPrivate: boolean = false): Promise<{ channelId: string; name: string }> {
+    async createChannel(name: string, isPrivate: boolean = false, guildId?: string): Promise<{ channelId: string; name: string }> {
     if (!this.isConfigured()) {
       throw new Error('Discord no esta configurado');
     }
@@ -1214,13 +1280,25 @@ class discordService {
     const normalized = normalizeChannelName(name);
 
     let guild = null;
-    if (this.guildIdFilter) {
-      guild = this.getClient().guilds.cache.get(this.guildIdFilter);
-    }
-    if (!guild) {
-      const guilds = this.getClient().guilds.cache;
-      if (guilds.size > 0) {
-        guild = guilds.first();
+    // Si se pidio una guild concreta, el bot debe estar en ella y poder gestionar canales
+    if (guildId) {
+      guild = this.getClient().guilds.cache.get(guildId);
+      if (!guild) {
+        throw new Error('El bot no pertenece al servidor de Discord seleccionado');
+      }
+      const missing = this.getMissingBotPermissions(guild);
+      if (missing.includes(PermissionFlagsBits.ManageChannels)) {
+        throw new Error('El bot no tiene el permiso "Gestionar canales" en ese servidor de Discord');
+      }
+    } else {
+      if (this.guildIdFilter) {
+        guild = this.getClient().guilds.cache.get(this.guildIdFilter);
+      }
+      if (!guild) {
+        const guilds = this.getClient().guilds.cache;
+        if (guilds.size > 0) {
+          guild = guilds.first();
+        }
       }
     }
 
@@ -1235,7 +1313,7 @@ class discordService {
         topic: `Canal creado desde SlackBoard`,
       });
 
-      console.log(`Canal creado en Discord: ${normalized} -> ${channel.id}`);
+      console.log(`Canal creado en Discord (${guild.name}): ${normalized} -> ${channel.id}`);
 
       return { channelId: channel.id, name: normalized };
     } catch (error: any) {
@@ -1243,6 +1321,101 @@ class discordService {
       throw new Error(`Error creando canal en Discord: ${error.message}`);
     }
   }
+
+  /** Renombra un canal de Discord (bot debe tener permiso de gestionar canales). */
+  async renameChannel(channelId: string, newName: string): Promise<void> {
+    if (!this.isConfigured()) throw new Error('Discord no esta configurado');
+    const cached = this.getClient().channels.cache.get(channelId);
+    if (!cached || !cached.isTextBased() || cached.isDMBased()) {
+      throw new Error('El canal de Discord no esta en cache (el bot no lo ve o no lo reconoce)');
+    }
+    const channel = cached as TextChannel;
+    const guild = this.getClient().guilds.cache.get(channel.guildId);
+    if (guild && this.getMissingBotPermissions(guild as any).includes(PermissionFlagsBits.ManageChannels)) {
+      throw new Error('El bot no tiene el permiso "Gestionar canales" en ese servidor de Discord');
+    }
+    await channel.setName(newName);
+    console.log(`Canal de Discord renombrado: ${channelId} -> ${newName}`);
+  }
+
+  /** Elimina un canal de Discord (bot debe tener permiso de gestionar canales). */
+  async deleteDiscordChannel(channelId: string): Promise<void> {
+    if (!this.isConfigured()) throw new Error('Discord no esta configurado');
+    const cached = this.getClient().channels.cache.get(channelId);
+    if (!cached || !cached.isTextBased() || cached.isDMBased()) {
+      throw new Error('El canal de Discord no esta en cache o no es un canal de servidor');
+    }
+    const channel = cached as TextChannel;
+    const guild = this.getClient().guilds.cache.get(channel.guildId);
+    if (guild && this.getMissingBotPermissions(guild as any).includes(PermissionFlagsBits.ManageChannels)) {
+      throw new Error('El bot no tiene el permiso "Gestionar canales" en ese servidor de Discord');
+    }
+    await (channel as any).delete();
+    console.log(`Canal de Discord eliminado: ${channelId}`);
+  }
+
+   /** Permisos bigint que le faltan al bot en la guild (los que importan para gestionar canales).
+   * @returns bigint[] (usar .includes(PermissionFlagsBits.X))
+   */
+  getMissingBotPermissions(guild: any): bigint[] {
+    if (!this.client) return [PermissionFlagsBits.ViewChannel];
+    const perms = this.client.guilds.cache.get(guild.id);
+    if (!perms) return [PermissionFlagsBits.ViewChannel];
+
+    // Miembros permisivos = union de @everyone + roles del propio bot
+    let effective: any = null;
+    try {
+      effective = perms.members.me?.permissions || null;
+    } catch {
+      effective = null;
+    }
+    if (!effective) {
+      // Fallback: usar los permisos generales de la guild
+      effective = (perms as any).permissions || null;
+    }
+
+    const required = [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.ManageChannels,
+      PermissionFlagsBits.CreateInstantInvite,
+    ];
+    if (!effective) return required.slice();
+
+    return required.filter((p) => !effective.has(p));
+  }
+
+  /** ¿El bot puede gestionar canales en esta guild? */
+  canManageChannelsIn(guildId: string): boolean {
+    if (!this.isConfigured()) return false;
+    const guild = this.getClient().guilds.cache.get(guildId);
+    if (!guild) return false;
+    return !this.getMissingBotPermissions(guild as any).includes(PermissionFlagsBits.ManageChannels);
+  }
+
+  /** Detalle de permisos del bot para la UI (nombres legibles de lo que falta). */
+  getBotPermissionSummary(guildId: string): { canManageChannels: boolean; missing: string[] } {
+    if (!this.isConfigured()) {
+      return { canManageChannels: false, missing: ['Discord no esta configurado'] };
+    }
+    const guild = this.getClient().guilds.cache.get(guildId);
+    if (!guild) {
+      return { canManageChannels: false, missing: ['El bot no esta en el servidor'] };
+    }
+    const missingBig = this.getMissingBotPermissions(guild as any);
+    const flagName = (flag: bigint): string => {
+      for (const [k, v] of Object.entries(PermissionFlagsBits)) {
+        if (v === flag) return k;
+      }
+      return String(flag);
+    };
+    return {
+      canManageChannels: !missingBig.includes(PermissionFlagsBits.ManageChannels),
+      missing: missingBig.map(flagName),
+    };
+  }
+
 }
 
 export default new discordService();

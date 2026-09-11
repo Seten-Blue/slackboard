@@ -19,6 +19,7 @@ import uploadRouter from './routes/upload';
 import whatsappRouter from './routes/whatsapp';
 import { ensureAIChannel } from './services/aiService';
 import discordservice from './services/discordservice';
+import { startTrelloWatcher } from './services/trelloWatcher';
 import authRouter from './routes/auth';
 import friendshipRouter from './routes/friendship';
 import reportsRouter from './routes/reports';
@@ -81,6 +82,13 @@ mongoose.connect(MONGODB_URI)
       await discordservice.connect(io);
     } catch (err: any) {
       console.error('⚠️  No se pudo conectar el bot de Discord:', err.message);
+    }
+
+    // Vigilante de Trello: notifica modificaciones relevantes del tablero vinculado
+    try {
+      startTrelloWatcher(io);
+    } catch (err: any) {
+      console.error('⚠️  No se pudo iniciar el vigilante de Trello:', err.message);
     }
   })
   .catch((error) => {
@@ -154,7 +162,9 @@ io.on('connection', (socket) => {
 
   // Enviar mensaje
   socket.on('send-message', (data: any) => {
-    socket.to(data.channelId).emit('new-message', data);
+    // Se emite a TODA la sala (incluido el emisor) para que los contadores
+    // de mensajes por canal se mantengan consistentes en el frontend.
+    io.to(data.channelId).emit('new-message', data);
   });
 
   // Usuario escribiendo

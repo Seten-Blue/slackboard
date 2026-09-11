@@ -5,7 +5,7 @@
       <div>
         <h2 class="font-display font-semibold text-lg text-ink-950 flex items-center gap-2">
           <span class="text-ink-950/30 font-mono text-base">{{ currentChannel.isPrivate ? '🔒' : '#' }}</span>
-          {{ currentChannel.name }}
+          {{ currentChannel.displayName || currentChannel.name }}
         </h2>
         <p class="text-sm text-ink-950/50" *ngIf="currentChannel.description">{{ currentChannel.description }}</p>
       </div>

@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import discordOAuthService from '../services/discordOAuthService';
 import discordservice from '../services/discordservice';
 import { logAction } from './auditLogController';
+import { encryptToken, decryptToken, isEncryptedToken } from '../utils/crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-env';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
@@ -77,8 +78,8 @@ export const oauthCallback = async (req: Request, res: Response) => {
     currentUser.discordUserId = discordUser.id;
     currentUser.discordUsername = discordUser.username;
     currentUser.discordAvatar = discordUser.avatar;
-    currentUser.discordAccessToken = tokenData.access_token;
-    currentUser.discordRefreshToken = tokenData.refresh_token;
+    currentUser.discordAccessToken = encryptToken(tokenData.access_token);
+    currentUser.discordRefreshToken = encryptToken(tokenData.refresh_token);
     currentUser.discordTokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
     await currentUser.save();
 
@@ -92,19 +93,41 @@ export const oauthCallback = async (req: Request, res: Response) => {
   }
 };
 
+function clearDiscordLink(userId: string): Promise<any> {
+  return User.findByIdAndUpdate(userId, {
+    discordUserId: null,
+    discordUsername: null,
+    discordAvatar: null,
+    discordAccessToken: null,
+    discordRefreshToken: null,
+    discordTokenExpiresAt: null,
+  });
+}
+
 async function getValidAccessToken(userId: string): Promise<string> {
   const user: any = await User.findById(userId);
   if (!user?.discordAccessToken) {
     throw new Error('Este usuario no vinculo su cuenta de Discord todavia.');
   }
 
+  let plainAccess: string | null = null;
+  try {
+    plainAccess = decryptToken(user.discordAccessToken);
+  } catch (decryptErr: any) {
+    console.error('❌ No se pudo descifrar el token de Discord:', decryptErr.message);
+    await clearDiscordLink(userId);
+    throw new Error('La vinculacion de Discord no pudo descifrarse (la clave de cifrado cambio o el token esta danado). Vuelve a conectar tu cuenta de Discord.');
+  }
+
   const isExpired = !user.discordTokenExpiresAt || new Date(user.discordTokenExpiresAt).getTime() < Date.now() + 60_000;
 
   if (isExpired) {
     try {
-      const refreshed = await discordOAuthService.refreshToken(user.discordRefreshToken);
-      user.discordAccessToken = refreshed.access_token;
-      user.discordRefreshToken = refreshed.refresh_token;
+      const plainRefresh = decryptToken(user.discordRefreshToken);
+      if (!plainRefresh) throw new Error('Sin refresh token de Discord');
+      const refreshed = await discordOAuthService.refreshToken(plainRefresh);
+      user.discordAccessToken = encryptToken(refreshed.access_token);
+      user.discordRefreshToken = encryptToken(refreshed.refresh_token);
       user.discordTokenExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
       await user.save();
       return refreshed.access_token;
@@ -114,19 +137,19 @@ async function getValidAccessToken(userId: string): Promise<string> {
       // del bot en el Developer Portal). Para que el usuario pueda volver a conectar
       // su cuenta, limpiamos la vinculacion guardada; si no, el modal se quedaria
       // bloqueado mostrando "token vencido" y nunca volveria a ofrecer "Conectar".
-      await User.findByIdAndUpdate(userId, {
-        discordUserId: null,
-        discordUsername: null,
-        discordAvatar: null,
-        discordAccessToken: null,
-        discordRefreshToken: null,
-        discordTokenExpiresAt: null,
-      });
+      await clearDiscordLink(userId);
       throw new Error('La vinculacion de Discord vencio (el token expiro o fue revocado). Vuelve a conectar tu cuenta de Discord.');
     }
   }
 
-  return user.discordAccessToken;
+  // Migracion perezosa: tokens historicamente guardados en texto plano pasan a cifrado.
+  if (!isEncryptedToken(user.discordAccessToken) || !isEncryptedToken(user.discordRefreshToken)) {
+    user.discordAccessToken = encryptToken(user.discordAccessToken);
+    user.discordRefreshToken = encryptToken(user.discordRefreshToken);
+    await user.save();
+  }
+
+  return plainAccess!;
 }
 
 export const getMyGuilds = async (req: AuthRequest, res: Response) => {
@@ -134,17 +157,46 @@ export const getMyGuilds = async (req: AuthRequest, res: Response) => {
     const accessToken = await getValidAccessToken(req.userId!);
     const guilds = await discordOAuthService.fetchGuilds(accessToken);
 
-    const data = guilds.map((g) => ({
-      id: g.id,
-      name: g.name,
-      icon: g.icon,
-      botPresent: discordservice.isBotInGuild(g.id),
-      inviteUrl: discordOAuthService.buildBotInviteUrl(g.id),
-    }));
+    const data = guilds.map((g) => {
+      // Rol real del usuario en ese servidor de Discord (del bitfield de permisos OAuth)
+      const bit = parseGuildPermissions(g.permissions);
+      const isOwner = g.owner === true;
+      const hasAdmin = bit & 1n << 3n;              // Administrator
+      const hasManageChannels = bit & 1n << 4n;     // Manage Channels
+      const canManage = isOwner || !!hasAdmin || !!hasManageChannels;
+
+      const roleLabel = isOwner
+        ? 'Dueño'
+        : hasAdmin
+          ? 'Administrador'
+          : hasManageChannels
+            ? 'Gestor de canales'
+            : 'Miembro';
+
+      return {
+        id: g.id,
+        name: g.name,
+        icon: g.icon,
+        botPresent: discordservice.isBotInGuild(g.id),
+        inviteUrl: discordOAuthService.buildBotInviteUrl(g.id),
+        isOwner,
+        canManage,
+        roleLabel,
+      };
+    });
 
     res.json({ success: true, data });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// Convierte el string de permisos de Discord (base 10) al bitfield BigInt
+const parseGuildPermissions = (permissions?: string): bigint => {
+  try {
+    return BigInt(permissions || '0');
+  } catch {
+    return 0n;
   }
 };
 

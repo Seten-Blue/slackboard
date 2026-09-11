@@ -13,6 +13,7 @@ router.get('/:id', channelController_1.getChannelById);
 router.post('/', channelController_1.createChannel);
 router.put('/:id', channelController_1.updateChannel);
 router.post('/:id/leave', channelController_1.leaveChannel);
+router.post('/:id/read', channelController_1.markChannelRead);
 router.post('/add-member', channelController_1.addMemberToChannel);
 router.delete('/:id', channelController_1.deleteChannel);
 exports.default = router;

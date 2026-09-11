@@ -70,6 +70,8 @@ const ChannelSchema = new mongoose_1.Schema({
         default: null,
         index: true,
     },
+    discordGuildId: { type: String, default: null, index: true },
+    discordGuildName: { type: String, default: null },
     discordWebhookId: { type: String, default: null },
     discordWebhookToken: { type: String, default: null },
     slackTeamId: { type: String, default: null, index: true },
@@ -89,6 +91,12 @@ const ChannelSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
         index: true,
+    },
+    // Marcas de "leido hasta" por usuario para calcular no leidos por canal
+    readUntil: {
+        type: Map,
+        of: Date,
+        default: {},
     },
 }, {
     timestamps: true,

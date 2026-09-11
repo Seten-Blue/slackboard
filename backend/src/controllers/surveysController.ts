@@ -153,7 +153,7 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
           if (channelDoc?.slackChannelId) {
             const slackService = require('../services/slackService').default;
             if (slackService.isConfigured()) {
-              const slackTs = await slackService.sendPollMessage(channelDoc.name, chatMsg.pollData as any, senderUsername);
+              const slackTs = await slackService.sendPollMessageToChannel(channelDoc, chatMsg.pollData as any, senderUsername);
               if (slackTs) {
                 await Message.findByIdAndUpdate(chatMsg._id, { slackMessageTs: slackTs });
               }

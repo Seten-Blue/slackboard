@@ -269,7 +269,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     logAction(user._id.toString(), 'password_changed', 'auth', user._id.toString(), 'User',
       {}, req.ip, req.headers['user-agent']);
 
-    res.json({ success: true, message: 'Contrasena actualizada. Ya podes ingresar con la nueva.' });
+    res.json({ success: true, message: 'Contraseña actualizada. Ya puedes ingresar con la nueva.' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Error al restablecer la contrasena', error: error.message });
   }

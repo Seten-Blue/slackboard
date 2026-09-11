@@ -48,6 +48,7 @@ services:
     volumes:
       - ./frontend/slackboard-app:/app
       - /app/node_modules
+      - /app/.angular/cache
     networks:
       - slackboard-network
     command: npm start

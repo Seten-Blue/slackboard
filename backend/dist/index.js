@@ -22,6 +22,7 @@ const upload_1 = __importDefault(require("./routes/upload"));
 const whatsapp_1 = __importDefault(require("./routes/whatsapp"));
 const aiService_1 = require("./services/aiService");
 const discordservice_1 = __importDefault(require("./services/discordservice"));
+const trelloWatcher_1 = require("./services/trelloWatcher");
 const auth_1 = __importDefault(require("./routes/auth"));
 const friendship_1 = __importDefault(require("./routes/friendship"));
 const reports_1 = __importDefault(require("./routes/reports"));
@@ -32,6 +33,13 @@ const auditLog_1 = __importDefault(require("./routes/auditLog"));
 const aiMetrics_1 = __importDefault(require("./routes/aiMetrics"));
 // Configurar variables de entorno
 dotenv_1.default.config();
+// Manejo global de rechazos: nunca dejar caer el servidor por un fallo aislado
+process.on('unhandledRejection', (reason) => {
+    console.error('⚠️ Unhandled promise rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+    console.error('⚠️ Excepcion no capturada:', error);
+});
 // Inicializar Express
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
@@ -70,6 +78,13 @@ mongoose_1.default.connect(MONGODB_URI)
     }
     catch (err) {
         console.error('⚠️  No se pudo conectar el bot de Discord:', err.message);
+    }
+    // Vigilante de Trello: notifica modificaciones relevantes del tablero vinculado
+    try {
+        (0, trelloWatcher_1.startTrelloWatcher)(io);
+    }
+    catch (err) {
+        console.error('⚠️  No se pudo iniciar el vigilante de Trello:', err.message);
     }
 })
     .catch((error) => {
@@ -134,7 +149,9 @@ io.on('connection', (socket) => {
     });
     // Enviar mensaje
     socket.on('send-message', (data) => {
-        socket.to(data.channelId).emit('new-message', data);
+        // Se emite a TODA la sala (incluido el emisor) para que los contadores
+        // de mensajes por canal se mantengan consistentes en el frontend.
+        io.to(data.channelId).emit('new-message', data);
     });
     // Usuario escribiendo
     socket.on('typing', (data) => {

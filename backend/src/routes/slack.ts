@@ -124,12 +124,16 @@ router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Respons
     const syncedChannels = [];
 
     for (const slackChannel of slackChannels) {
-      let channel: any = await Channel.findOne({ name: slackChannel.name });
+      let channel: any = await Channel.findOne({ slackChannelId: slackChannel.id });
+      if (!channel) {
+        channel = await Channel.findOne({ name: slackChannel.name });
+      }
       
       if (!channel) {
         console.log(`➕ Creando canal: ${slackChannel.name}`);
         channel = await Channel.create({
           name: slackChannel.name,
+          displayName: slackChannel.name,
           description: slackChannel.purpose?.value || '',
           isPrivate: slackChannel.is_private || false,
           members: [adminUser._id, req.userId],
@@ -138,16 +142,22 @@ router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Respons
         });
       } else {
         console.log(`✅ Canal ya existe: ${slackChannel.name}`);
+        const changed: boolean = channel.name !== slackChannel.name || channel.displayName !== slackChannel.name;
         if (!channel.slackChannelId) {
           channel.slackChannelId = slackChannel.id;
           console.log(`🔗 Canal "${channel.name}" vinculado con Slack (${slackChannel.id})`);
+        }
+        if (channel.displayName !== slackChannel.name) {
+          channel.displayName = slackChannel.name;
         }
         // ← NUEVO: agrega como miembro a quien hizo el sync, si todavia no lo era
         const alreadyMember = channel.members.some((m: any) => m.toString() === req.userId);
         if (!alreadyMember && req.userId) {
           channel.members.push(req.userId);
         }
-        await channel.save();
+        if (changed || channel.isModified()) {
+          await channel.save();
+        }
       }
 
       syncedChannels.push(channel);
@@ -155,9 +165,24 @@ router.post('/sync-channels', requireAuth, async (req: AuthRequest, res: Respons
 
     await slackService.refreshChannelMap();
 
+    // Poda: eliminar canales de Slack que ya no existen en Slack.
+    // Solo se podan los canales sin slackTeamId (creados por este sync global);
+    // los canales de workspaces OAuth se podan en sync-workspace por equipo para
+    // no eliminar canales privados a los que el bot global no tiene acceso.
+    const currentIds = new Set<string>(slackChannels.map((s: any) => s.id));
+    const staleChannels = await Channel.find({ platform: 'slack', slackChannelId: { $ne: null }, slackTeamId: null });
+    let prunedCount = 0;
+    for (const ch of staleChannels) {
+      if (ch.slackChannelId && !currentIds.has(String(ch.slackChannelId))) {
+        console.log(`🗑️ Canal de Slack obsoleto eliminado: ${ch.name} (${ch.slackChannelId}) ya no existe en Slack`);
+        await Channel.findByIdAndDelete(ch._id);
+        prunedCount++;
+      }
+    }
+
     res.json({
       success: true,
-      message: `${syncedChannels.length} canales sincronizados`,
+      message: `${syncedChannels.length} canales sincronizados, ${prunedCount} canales obsoletos eliminados`,
       data: syncedChannels
     });
   } catch (error: any) {
@@ -243,7 +268,7 @@ router.post('/events', async (req: Request, res: Response) => {
         const slackUser = await slackService.getUserInfo(userId);
         const mongoUser = slackUser ? await User.findOne({ email: slackUser.profile?.email }) : null;
         if (!mongoUser || !friendship.userB.equals((mongoUser as any)._id)) {
-          return res.status(200).json({ text: 'Esta solicitud no es para vos.' });
+          return res.status(200).json({ text: 'Esta solicitud no es para ti.' });
         }
 
         if (actionId === 'friend_accept') {
@@ -322,8 +347,29 @@ router.post('/events', async (req: Request, res: Response) => {
           const channel: any = await Channel.findOne({ slackChannelId });
 
           if (channel) {
-            if (channel.name !== newName) {
-              channel.name = newName;
+            // Los canales vinculados por OAuth (con slackTeamId) usan un "name"
+            // interno con formato "${equipo}-${canal}" para evitar colisiones entre
+            // workspaces. En ellos solo se actualiza displayName; su nombre interno
+            // se mantiene. Los canales del sync global (sin slackTeamId) usan el
+            // nombre de Slack como nombre, asi que se renombran ambos.
+            // Cuando el canal usa un "name" interno distinto de displayName
+            // (colision de nombre unico entre workspaces/plataformas), solo se
+            // actualiza displayName. Si name y displayName coinciden, se renombran ambos.
+            // Los canales legacy del sync global quedan cubiertos por este mismo caso.
+            const internalName = channel.displayName && channel.name !== channel.displayName;
+            const nameChanged = !internalName && channel.name !== newName;
+            const displayChanged = channel.displayName !== newName;
+            if (nameChanged || displayChanged) {
+              if (nameChanged) {
+                // Verificar que el nuevo nombre no colisione con otro canal
+                const taken = await Channel.findOne({ name: newName, _id: { $ne: channel._id } });
+                if (taken) {
+                  console.warn(`⚠️  No se puede renombrar a ${newName}: otro canal ya usa ese nombre`);
+                } else {
+                  channel.name = newName;
+                }
+              }
+              channel.displayName = newName;
               await channel.save();
               console.log(`✅ Canal renombrado en SlackBoard: ${slackChannelId} -> ${newName}`);
 
@@ -342,6 +388,60 @@ router.post('/events', async (req: Request, res: Response) => {
           } else {
             console.warn(`⚠️  Se recibio channel_rename para un canal no vinculado: ${slackChannelId}`);
           }
+        }
+
+        return res.status(200).send('OK');
+      }
+
+      // Manejar eliminación de canal en Slack
+      if (event.type === 'channel_deleted' && event.channel) {
+        console.log('🗑️  Canal eliminado en Slack:', event.channel);
+
+        const slackChannelId = event.channel;
+        const channel: any = await Channel.findOne({ slackChannelId });
+
+        if (channel) {
+          console.log(`🗑️  Eliminando canal obsoleto de SlackBoard: ${channel.name} (${slackChannelId})`);
+          await Channel.findByIdAndDelete(channel._id);
+
+          const io = req.app.get('io') as Server;
+          if (io) {
+            io.emit('channel-deleted', {
+              channelId: channel._id.toString(),
+              name: channel.name
+            });
+          }
+
+          await slackService.refreshChannelMap();
+        } else {
+          console.log(`ℹ️  Canal eliminado en Slack no estaba vinculado en SlackBoard: ${slackChannelId}`);
+        }
+
+        return res.status(200).send('OK');
+      }
+
+      // Manejar archivado de canal en Slack
+      if (event.type === 'channel_archive' && event.channel) {
+        console.log('📦  Canal archivado en Slack:', event.channel);
+
+        const slackChannelId = event.channel;
+        const channel: any = await Channel.findOne({ slackChannelId });
+
+        if (channel) {
+          console.log(`📦  Archivando canal en SlackBoard: ${channel.name} (${slackChannelId})`);
+          await Channel.findByIdAndDelete(channel._id);
+
+          const io = req.app.get('io') as Server;
+          if (io) {
+            io.emit('channel-deleted', {
+              channelId: channel._id.toString(),
+              name: channel.name
+            });
+          }
+
+          await slackService.refreshChannelMap();
+        } else {
+          console.log(`ℹ️  Canal archivado en Slack no estaba vinculado en SlackBoard: ${slackChannelId}`);
         }
 
         return res.status(200).send('OK');

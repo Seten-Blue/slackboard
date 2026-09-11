@@ -16,10 +16,10 @@ const SLASH_REGEX = /^\/zork\s+([\s\S]+)/i;
 const MENTION_REGEX = /@zork\b/i;
 
 const SWITCH_LINES = [
-  'Se me acabaron los pensamientos de ese modelo, asi que salte a otro nivel de la cabeza.',
-  'Cambie de canal mental por un rato, ahora corro con otro cerebro.',
-  'Se agoto ese modo de pensar por hoy, probando un nivel distinto.',
-  'Reacomode mis circuitos y salte a otro modelo para seguir charlando.',
+  'Se me acabaron los pensamientos de ese modelo, así que salté a otro nivel de la cabeza.',
+  'Cambié de canal mental por un rato, ahora corro con otro cerebro.',
+  'Se agotó ese modo de pensar por hoy, probando un nivel distinto.',
+  'Reacomodé mis circuitos y salté a otro modelo para seguir charlando.',
 ];
 
 let cachedAIUserId: string | null = null;
@@ -65,6 +65,7 @@ export async function ensureAIChannel(userId?: string) {
           createdBy: aiUserId,
           members: userId ? [aiUserId, userId] : [aiUserId],
           isAIChannel: true,
+          platform: 'other',
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -159,7 +160,7 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
   } else {
     const rawQuestion = extractQuestion(text);
     if (rawQuestion === null) return;
-    finalQuestion = rawQuestion.length > 0 ? rawQuestion : '?En que te puedo ayudar?';
+    finalQuestion = rawQuestion.length > 0 ? rawQuestion : '¿En qué puedo ayudarte?';
   }
 
   try {
@@ -191,7 +192,7 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
 
     if (channel.slackChannelId && slackService.isConfigured()) {
       try {
-        await slackService.sendMessage(channel.name, replyText, AI_USERNAME);
+        await slackService.sendMessageToChannel(channel, replyText, AI_USERNAME);
       } catch (slackError: any) {
         console.error('⚠️  No se pudo enviar la respuesta de Zork a Slack:', slackError.message);
       }
@@ -201,8 +202,8 @@ export async function checkAndRespond({ text, channel, io, senderId }: CheckPara
 
     const isQuotaError = error instanceof QuotaExceededError;
     const friendlyMessage = isQuotaError
-      ? 'Uy, hoy ya use todas mis consultas gratis en todos los modelos que tengo disponibles. Proba de nuevo mas tarde, o si sos vos Juan, ya sabes que hacer con la facturacion 😅'
-      : 'Uy, se me trabo algo por un segundo. Proba de nuevo en un rato.';
+      ? 'Uy, hoy ya utilicé todas mis consultas gratuitas en todos los modelos disponibles. Prueba de nuevo más tarde, o si eres Juan, ya sabes qué hacer con la facturación 😅'
+      : 'Uy, algo se me trabó por un segundo. Prueba de nuevo en un rato.';
 
     recordMetric({
       user: senderId || aiUserId,

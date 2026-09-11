@@ -146,13 +146,13 @@ const createMessage = async (req, res) => {
                     const slackService = require('../services/slackService').default;
                     if (slackService.isConfigured()) {
                         if (pollData) {
-                            const slackResult = await slackService.sendPollMessage(channelExists.name, pollData, senderUsername);
+                            const slackResult = await slackService.sendPollMessageToChannel(channelExists, pollData, senderUsername);
                             if (slackResult) {
                                 await Message_1.default.findByIdAndUpdate(message._id, { slackMessageTs: slackResult });
                             }
                         }
                         else {
-                            await slackService.sendMessage(channelExists.name, content, senderUsername, attachments);
+                            await slackService.sendMessageToChannel(channelExists, content, senderUsername, attachments);
                         }
                         console.log('✅ Mensaje sincronizado con Slack');
                     }
@@ -241,7 +241,7 @@ const updateMessage = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
         }
         if (existing.sender.toString() !== req.userId) {
-            return res.status(403).json({ success: false, message: 'No podes editar un mensaje de otro usuario' });
+            return res.status(403).json({ success: false, message: 'No puedes editar un mensaje de otro usuario' });
         }
         existing.content = content;
         existing.isEdited = true;
@@ -270,7 +270,7 @@ const deleteMessage = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
         }
         if (existing.sender.toString() !== req.userId) {
-            return res.status(403).json({ success: false, message: 'No podes eliminar un mensaje de otro usuario' });
+            return res.status(403).json({ success: false, message: 'No puedes eliminar un mensaje de otro usuario' });
         }
         await Message_1.default.findByIdAndDelete(req.params.id);
         res.json({

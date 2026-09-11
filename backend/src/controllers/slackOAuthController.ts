@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import slackOAuthService from '../services/slackOAuthService';
 import Channel from '../models/Channel';
 import { logAction } from './auditLogController';
+import { encryptToken, decryptToken, isEncryptedToken } from '../utils/crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-env';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
@@ -71,7 +72,7 @@ export const oauthCallback = async (req: Request, res: Response) => {
       teamId: tokenData.team.id,
       teamName: tokenData.team.name,
       botUserId: tokenData.bot_user_id,
-      botAccessToken: tokenData.access_token,
+      botAccessToken: encryptToken(tokenData.access_token),
       connectedAt: new Date(),
     };
 
@@ -106,18 +107,44 @@ export const syncMyWorkspace = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'No encontramos ese workspace vinculado a tu cuenta.' });
     }
 
+    let plainToken: string;
+    try {
+      plainToken = decryptToken(workspace.botAccessToken) || '';
+    } catch (decryptErr: any) {
+      console.error('❌ No se pudo descifrar el token del workspace de Slack:', decryptErr.message);
+      await removeWorkspace(req.userId!, teamId);
+      return res.status(401).json({
+        success: false,
+        message: 'La vinculacion del workspace no pudo descifrarse (la clave de cifrado cambio). Desvincula el workspace y vuelve a conectarlo.',
+        error: decryptErr.message,
+      });
+    }
+
     let slackChannels: any[] = [];
     try {
-      slackChannels = await slackOAuthService.fetchWorkspaceChannels(workspace.botAccessToken);
+      slackChannels = await slackOAuthService.fetchWorkspaceChannels(plainToken);
     } catch (syncErr: any) {
       if (/invalid_auth|account_inactive|token_revoked|not_authed/i.test(syncErr.message || '')) {
+        // Token de workspace revocado o invalido: se limpia la vinculacion para
+        // liberar el estado y permitir reconectar sin dejar datos muertos.
+        await removeWorkspace(req.userId!, teamId);
+        logAction(req.userId!, 'slack.workspace_removed_revoked', 'integration', req.userId!, 'User',
+          { teamId, reason: (syncErr.message || '').slice(0, 200) }, req.ip, req.headers['user-agent'] as string);
         return res.status(401).json({
           success: false,
-          message: 'El acceso al workspace de Slack vencio (el token fue revocado o ya no es valido). Desvincula el workspace y vuelve a conectarlo.',
-          error: syncErr.message,
+          message: 'El acceso al workspace de Slack vencio (el token fue revocado o ya no es valido). Se elimino la vinculacion; vuelve a conectarlo cuando quieras.',
         });
       }
       throw syncErr;
+    }
+
+    // Migracion perezosa: tokens historicamente guardados en texto plano pasan a cifrado.
+    if (!isEncryptedToken(workspace.botAccessToken)) {
+      await User.updateOne(
+        { _id: req.userId, 'slackWorkspaces.teamId': teamId },
+        { $set: { 'slackWorkspaces.$.botAccessToken': encryptToken(workspace.botAccessToken) } }
+      );
+      workspace.botAccessToken = encryptToken(workspace.botAccessToken);
     }
 
     const synced: any[] = [];
@@ -125,13 +152,42 @@ export const syncMyWorkspace = async (req: AuthRequest, res: Response) => {
       let channel: any = await Channel.findOne({ slackChannelId: sc.id, slackTeamId: teamId });
 
       if (channel) {
+        let changed = false;
+        if (channel.displayName !== sc.name) {
+          channel.displayName = sc.name;
+          changed = true;
+        }
+        // Migrar nombres legados con prefijo "${equipo}-${canal}" a su nombre
+        // real de Slack (solo si el nombre real esta libre para evitar el indice unico).
+        const legacyName = `${workspace.teamName}-${sc.name}`;
+        if (channel.name === legacyName) {
+          const other = await Channel.findOne({ name: sc.name, _id: { $ne: channel._id } });
+          if (!other) {
+            channel.name = sc.name;
+            changed = true;
+            console.log(`✏️  Canal renombrado a nombre real de Slack: ${legacyName} -> ${sc.name}`);
+          }
+        }
         if (!channel.members.some((m: any) => m.toString() === req.userId)) {
           channel.members.push(req.userId);
+          changed = true;
+        }
+        if (changed) {
           await channel.save();
         }
       } else {
+        // Usar el nombre real de Slack (sin prefijo de equipo) para que coincida
+        // con la UI y con la resolucion de canales al enviar mensajes.
+        let internalName = sc.name;
+        const nameTaken = await Channel.findOne({ name: sc.name });
+        if (nameTaken) {
+          // Colision de nombre unico entre workspaces/plataformas: se conserva un
+          // nombre interno unico y displayName/el envio por slackChannelId cubren el resto.
+          internalName = `${workspace.teamName}-${sc.name}`;
+        }
         channel = await Channel.create({
-          name: `${workspace.teamName}-${sc.name}`,
+          name: internalName,
+          displayName: sc.name,
           description: `Canal sincronizado desde Slack (#${sc.name} en ${workspace.teamName})`,
           isPrivate: sc.is_private || false,
           platform: 'slack',
@@ -140,10 +196,20 @@ export const syncMyWorkspace = async (req: AuthRequest, res: Response) => {
           members: [req.userId],
           createdBy: req.userId,
         });
-        console.log(`➕ Canal nuevo creado desde Slack OAuth: ${channel.name}`);
+        console.log(`➕ Canal nuevo creado desde Slack OAuth: ${channel.name} (displayName: ${channel.displayName})`);
       }
 
       synced.push(channel);
+    }
+
+    // Poda: eliminar canales de Slack de ESTE workspace que ya no existen en Slack
+    const currentIds = new Set<string>(slackChannels.map((s: any) => s.id));
+    const stale = await Channel.find({ platform: 'slack', slackTeamId: teamId });
+    for (const ch of stale) {
+      if (ch.slackChannelId && !currentIds.has(String(ch.slackChannelId))) {
+        console.log(`🗑️ Canal de Slack obsoleto eliminado: ${ch.name} (${ch.slackChannelId}) ya no existe en ${teamId}`);
+        await Channel.findByIdAndDelete(ch._id);
+      }
     }
 
     res.json({ success: true, message: `${synced.length} canales sincronizados`, data: synced });
@@ -154,6 +220,10 @@ export const syncMyWorkspace = async (req: AuthRequest, res: Response) => {
 
 
 };
+
+async function removeWorkspace(userId: string, teamId: string): Promise<void> {
+  await User.findByIdAndUpdate(userId, { $pull: { slackWorkspaces: { teamId } } }, { runValidators: false });
+}
 
 export const unlinkWorkspace = async (req: AuthRequest, res: Response) => {
   try {

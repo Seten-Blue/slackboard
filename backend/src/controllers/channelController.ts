@@ -1,12 +1,39 @@
 import { Response } from 'express';
 import Channel from '../models/Channel';
 import User from '../models/User';
+import Message from '../models/Message';
 import slackService from '../services/slackService';
 import discordService from '../services/discordservice';
 import { AuthRequest } from '../middleware/auth';
-import { logAction } from './auditLogController';
 
-// Obtener SOLO los canales de los que el usuario autenticado es miembro
+// Marcar un canal como leido hasta "ahora" para el usuario autenticado (apaga el badge de no leidos)
+export const markChannelRead = async (req: AuthRequest, res: Response) => {
+  try {
+    const channel = await Channel.findById(req.params.id);
+    if (!channel) {
+      return res.status(404).json({ success: false, message: 'Canal no encontrado' });
+    }
+
+    const isMember = channel.members.some((m: any) => m.toString() === req.userId);
+    if (!isMember) {
+      return res.status(403).json({ success: false, message: 'No tienes acceso a este canal' });
+    }
+
+    if (!channel.readUntil) channel.readUntil = new Map(); 
+    channel.readUntil.set(req.userId as string, new Date());
+    await channel.save();
+
+    res.json({ success: true, message: 'Canal marcado como leido' });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al marcar el canal como leido',
+      error: error.message,
+    });
+  }
+};
+
+// Obtener canales con el contador de #NO LEIDOS# para el usuario autenticado
 export const getAllChannels = async (req: AuthRequest, res: Response) => {
   try {
     const channels = await Channel.find({ members: req.userId })
@@ -14,10 +41,25 @@ export const getAllChannels = async (req: AuthRequest, res: Response) => {
       .populate('members', 'username email avatar status')
       .sort({ createdAt: -1 });
 
+    const userId = req.userId as string;
+
+    // Mensajes ajenos (sender != uid) posteriores al cursor "leido hasta" de cada canal
+    const data = await Promise.all(
+      channels.map(async (channel: any) => {
+        const cursor: Date = channel.readUntil?.get(userId) || new Date(0);
+        const unreadCount = await Message.countDocuments({
+          channel: channel._id,
+          sender: { $ne: userId },
+          createdAt: { $gt: cursor },
+        });
+        return { ...channel.toObject(), unreadCount };
+      })
+    );
+
     res.json({
       success: true,
       count: channels.length,
-      data: channels,
+      data,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -41,7 +83,7 @@ export const getChannelById = async (req: AuthRequest, res: Response) => {
 
     const isMember = channel.members.some((m: any) => m._id.toString() === req.userId);
     if (!isMember) {
-      return res.status(403).json({ success: false, message: 'No tenes acceso a este canal' });
+      return res.status(403).json({ success: false, message: 'No tenés acceso a este canal' });
     }
 
     res.json({ success: true, data: channel });
@@ -54,72 +96,32 @@ export const getChannelById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Crear un nuevo canal -- el creador es siempre el usuario autenticado (JWT), nunca lo que mande el body
+// Crear un nuevo canal — el creador es siempre el usuario autenticado (JWT), nunca lo que mande el body
 export const createChannel = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, isPrivate, platform } = req.body;
+    const { name, description, isPrivate } = req.body;
 
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
-    const isManagerOrAbove = ['owner', 'admin', 'manager'].includes(user.role);
-    if (!isManagerOrAbove) {
-      return res.status(403).json({ success: false, message: 'Se requiere rol manager o superior para crear canales' });
-    }
-
-    const channelPlatform = platform || 'other';
-    let slackChannelId: string | undefined;
-    let discordChannelId: string | undefined;
-    let displayName: string | undefined;
-    let creationError: string | null = null;
-
-    if (channelPlatform === 'slack') {
-      try {
-        const result = await slackService.createChannel(name, isPrivate || false);
-        slackChannelId = result.channelId;
-        displayName = `# ${result.name}`;
-      } catch (err: any) {
-        console.error('No se pudo crear el canal en Slack:', err.message);
-        creationError = `Canal creado localmente pero no en Slack: ${err.message}`;
-      }
-    } else if (channelPlatform === 'discord') {
-      try {
-        const result = await discordService.createChannel(name, isPrivate || false);
-        discordChannelId = result.channelId;
-        displayName = `# ${result.name}`;
-      } catch (err: any) {
-        console.error('No se pudo crear el canal en Discord:', err.message);
-        creationError = `Canal creado localmente pero no en Discord: ${err.message}`;
-      }
-    }
-
     const channel = await Channel.create({
       name,
       description,
       isPrivate: isPrivate || false,
-      platform: channelPlatform,
       createdBy: req.userId,
       members: [req.userId],
-      ...(slackChannelId && { slackChannelId }),
-      ...(discordChannelId && { discordChannelId }),
-      ...(displayName && { displayName }),
     });
 
     const populatedChannel = await Channel.findById(channel._id)
       .populate('createdBy', 'username email avatar')
       .populate('members', 'username email avatar status');
 
-    logAction(req.userId!, 'channel.created', 'create', (channel as any)._id.toString(), 'Channel',
-      { name, platform: channelPlatform, isPrivate: isPrivate || false },
-      req.ip, req.headers['user-agent'] as string);
-
     res.status(201).json({
       success: true,
-      message: creationError || 'Canal creado exitosamente',
+      message: 'Canal creado exitosamente',
       data: populatedChannel,
-      ...(creationError && { warning: creationError }),
     });
   } catch (error: any) {
     if (error.code === 11000) {
@@ -148,7 +150,7 @@ export const updateChannel = async (req: AuthRequest, res: Response) => {
 
     const isMember = channel.members.some((m: any) => m.toString() === req.userId);
     if (!isMember) {
-      return res.status(403).json({ success: false, message: 'No tenes acceso a este canal' });
+      return res.status(403).json({ success: false, message: 'No tenés acceso a este canal' });
     }
 
     const nameChanged = name && name !== channel.name;
@@ -162,7 +164,7 @@ export const updateChannel = async (req: AuthRequest, res: Response) => {
         channel.name = name;
       } catch (error: any) {
         console.error('❌ Error renombrando canal en Slack:', error.message);
-        slackWarning = 'No se pudo renombrar el canal en Slack (el bot no tiene permiso para renombrar canales que no creo). El nombre no se cambio para mantener la sincronizacion.';
+        slackWarning = 'No se pudo renombrar el canal en Slack (el bot no tiene permiso para renombrar canales que no creó). El nombre no se cambió para mantener la sincronización.';
       }
     } else if (nameChanged) {
       channel.name = name;
@@ -197,7 +199,7 @@ export const addMemberToChannel = async (req: AuthRequest, res: Response) => {
 
     const callerIsMember = channel.members.some((m: any) => m.toString() === req.userId);
     if (!callerIsMember) {
-      return res.status(403).json({ success: false, message: 'No tenes acceso a este canal' });
+      return res.status(403).json({ success: false, message: 'No tenés acceso a este canal' });
     }
 
     const user = await User.findById(userId);
@@ -215,10 +217,6 @@ export const addMemberToChannel = async (req: AuthRequest, res: Response) => {
     const updatedChannel = await Channel.findById(channelId)
       .populate('createdBy', 'username email avatar')
       .populate('members', 'username email avatar status');
-
-    logAction(req.userId!, 'channel.member_added', 'modify', channelId, 'Channel',
-      { addedUser: userId, channelName: channel.name },
-      req.ip, req.headers['user-agent']);
 
     res.json({
       success: true,
@@ -244,11 +242,11 @@ export const leaveChannel = async (req: AuthRequest, res: Response) => {
 
     const isMember = channel.members.some((m: any) => m.toString() === req.userId);
     if (!isMember) {
-      return res.status(403).json({ success: false, message: 'No tenes acceso a este canal' });
+      return res.status(403).json({ success: false, message: 'No tenés acceso a este canal' });
     }
 
     if (!channel.slackChannelId) {
-      return res.status(400).json({ success: false, message: 'Este canal no esta vinculado con Slack.' });
+      return res.status(400).json({ success: false, message: 'Este canal no está vinculado con Slack.' });
     }
 
     try {
@@ -259,7 +257,7 @@ export const leaveChannel = async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      message: 'El bot abandono el canal en la app (Slack pudo fallar, revisa logs).',
+      message: 'El bot abandonó el canal en la app (Slack pudo fallar, revisa logs).',
     });
   } catch (error: any) {
     res.status(500).json({
@@ -280,7 +278,7 @@ export const deleteChannel = async (req: AuthRequest, res: Response) => {
 
     const isMember = channel.members.some((m: any) => m.toString() === req.userId);
     if (!isMember) {
-      return res.status(403).json({ success: false, message: 'No tenes acceso a este canal' });
+      return res.status(403).json({ success: false, message: 'No tenés acceso a este canal' });
     }
 
     if (channel.slackChannelId) {
@@ -296,11 +294,6 @@ export const deleteChannel = async (req: AuthRequest, res: Response) => {
     }
 
     await Channel.findByIdAndDelete(req.params.id);
-
-    logAction(req.userId!, 'channel.deleted', 'delete', req.params.id, 'Channel',
-      { name: channel.name },
-      req.ip, req.headers['user-agent']);
-
     res.json({ success: true, message: 'Canal eliminado exitosamente' });
   } catch (error: any) {
     res.status(500).json({

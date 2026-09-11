@@ -44,6 +44,11 @@ export class SidebarComponent implements OnInit {
   editedChannelName = '';
   savingChannel = false;
 
+  confirmDeleteId: string | null = null;
+
+  // Avisos no bloqueantes (reemplazan a alert/confirm nativos que congelan el hilo)
+  uiAlerts: { id: number; kind: 'error' | 'warning' | 'success'; text: string }[] = [];
+
   // ============ MENÚ / SUBMÓDULOS ============
   menuOpened: Record<MenuKey, boolean> = {
     dashboard: false,
@@ -99,6 +104,7 @@ export class SidebarComponent implements OnInit {
   pendingFriendCount = 0;
   trelloToasts: any[] = [];
   trelloUnread = 0;
+  messageToasts: any[] = [];
   
 
   get selectedPlatform(): Platform {
@@ -139,18 +145,32 @@ export class SidebarComponent implements OnInit {
     this.socketService.onFriendshipUpdate().subscribe(() => this.loadPendingFriendCount());
     this.socketService.onFriendshipRemoved().subscribe(() => this.loadPendingFriendCount());
 
-    // Mantener vivo el contador de mensajes por canal
+    // Mantener vivo el contador de mensajes por canal + alertas de mensajes nuevos
     this.socketService.onNewMessage().subscribe((data: any) => {
       this.bumpChannelCount(data?.channelId);
+      this.onChannelMessage(data);
     });
     this.socketService.onThreadReply().subscribe((data: any) => {
-      this.bumpChannelCount(data?.reply?.channel || data?.parentMessageId);
+      const threadChannelId = data?.reply?.channel || data?.parentMessageId;
+      this.bumpChannelCount(threadChannelId);
+      if (threadChannelId && threadChannelId !== this.currentChannel?._id) {
+        this.soundService.play('threadReply');
+      }
     });
 
     this.socketService.onTrelloNotification().subscribe((data: any) => {
       this.addTrelloToast(data);
       this.soundService.play('trello');
       this.trelloNotifs.push(data);
+    });
+
+    this.socketService.onChannelDeleted().subscribe(() => {
+      this.loadChannels();
+      this.chatService.setCurrentChannel(null);
+    });
+
+    this.socketService.onChannelRenamed().subscribe(() => {
+      this.loadChannels();
     });
 
     this.trelloNotifs.count$.subscribe((count) => {
@@ -280,7 +300,7 @@ export class SidebarComponent implements OnInit {
     if (this.selectedPlatform.id === 'whatsapp') {
       this.whatsappService.joinInbox().subscribe({
         next: () => this.loadChannels(),
-        error: (error: any) => alert(error?.error?.message || 'No se pudo conectar el inbox de WhatsApp.')
+        error: (error: any) => this.pushAlert('error', error?.error?.message || 'No se pudo conectar el inbox de WhatsApp.')
       });
       return;
     }
@@ -298,7 +318,7 @@ export class SidebarComponent implements OnInit {
       error: (error) => {
         this.syncingPlatform = false;
         const message = error?.error?.message || `No se pudo sincronizar ${this.selectedPlatform.name}.`;
-        alert(message);
+        this.pushAlert('error', message);
       }
     });
   }
@@ -329,15 +349,31 @@ export class SidebarComponent implements OnInit {
     );
   }
 
+  /** Fermilla de datos que determinan los grupos; si no cambia, se reutiliza la misma referencia. */
+  private _groupsCacheKey = '';
+  private _groupsCache: { name: string; channels: any[] }[] = [];
+
   /**
    * Agrupa los canales de la plataforma por SITIO/SERVIDOR real:
    * - Discord: por servidor (discordGuildName)
    * - Slack: por workspace (slackTeamId -> nombre del workspace vinculado)
    * Asi un "# general" de un servidor ya no se confunde con el de otro.
+   *
+   * IMPORTANTE: esta "getter" esta memoizada. Como mudos de los canales pueden
+   * apuntar a la misma referencia de arrays (this.channels, slackWorkspaces),
+   * se calcula un hash solo con los campos que afectan el agrupado y se reutiliza
+   * el array de grupos si no hubo cambios. De no hacerlo, ngFor + [(ngModel)]
+   * recrearian las views en cada ciclo de deteccion de cambios, provocando un
+   * bucle infinito de change detection (la app se congela).
    */
   get channelGroups(): { name: string; channels: any[] }[] {
-    const list = this.filteredChannels;
     const platform = this.selectedPlatform.id;
+    const key = this._groupsKey(platform);
+    if (key === this._groupsCacheKey) {
+      return this._groupsCache;
+    }
+
+    const list = this.filteredChannels;
     const groups: { name: string; channels: any[] }[] = [];
     const map = new Map<string, any[]>();
 
@@ -358,7 +394,28 @@ export class SidebarComponent implements OnInit {
       map.get(groupName)!.push(ch);
     }
 
+    this._groupsCacheKey = key;
+    this._groupsCache = groups;
     return groups;
+  }
+
+  /** Clave estable con los datos que afectan el agrupado por sitio/servidor. */
+  private _groupsKey(platform: string): string {
+    const parts = [platform];
+    for (const ch of this.channels) {
+      if (ch.isAIChannel) continue;
+      parts.push(
+        ch._id,
+        ch.platform || 'other',
+        ch.discordGuildName || '',
+        ch.slackTeamId || '',
+        ch.name || ''
+      );
+    }
+    for (const w of this.slackWorkspaces) {
+      parts.push('ws', w.teamId, w.teamName || '');
+    }
+    return parts.join('|');
   }
 
   countByPlatform(platformId: string): number {
@@ -372,6 +429,10 @@ export class SidebarComponent implements OnInit {
     return channel._id;
   }
 
+  trackByGroupName(_index: number, group: any) {
+    return group.name;
+  }
+
   /** Incrementa el contador de NO LEIDOS del canal (si no es el canal abierto). */
   bumpChannelCount(channelId: string): void {
     if (!channelId) return;
@@ -382,6 +443,40 @@ export class SidebarComponent implements OnInit {
     }
   }
 
+  /** Notificación con sonido para mensajes que llegan a un canal que no está abierto. */
+  onChannelMessage(data: any): void {
+    const channelId = data?.channelId;
+    if (!channelId) return;
+    // No distraer con el canal abierto (ya lo renderiza message-area)
+    if (channelId === this.currentChannel?._id) return;
+    // Ignorar los propios mensajes (ej. otro tab/ventana)
+    const senderId = data?.message?.sender?._id || data?.message?.userId;
+    if (senderId && this.authService.currentUser?._id && senderId === this.authService.currentUser._id) return;
+
+    this.soundService.play('message');
+
+    const target = this.channels.find((c: any) => c._id === channelId);
+    const channelName = target?.displayName || target?.name || 'canal';
+    const senderName = data?.message?.sender?.username || 'Alguien';
+    const content =
+      data?.message?.content && typeof data.message.content === 'string'
+        ? (data.message.content.length > 80 ? data.message.content.slice(0, 80) + '…' : data.message.content)
+        : '';
+
+    const toastId = Date.now() + Math.random();
+    this.messageToasts.push({
+      id: toastId,
+      channelId,
+      channelName,
+      senderName,
+      content,
+    });
+    if (this.messageToasts.length > 4) this.messageToasts.shift();
+    setTimeout(() => {
+      this.messageToasts = this.messageToasts.filter((t: any) => t.id !== toastId);
+    }, 8000);
+  }
+
   // ============ CHAT (sin cambios de logica) ============
   loadChannels(): void {
     this.loading = true;
@@ -389,6 +484,12 @@ export class SidebarComponent implements OnInit {
       next: (response) => {
         this.channels = response.data || [];
         this.loading = false;
+
+        // Unirse a la sala de TODOS los canales para mantener vivos
+        // los contadores y sonidos de mensajes entrantes sin abrir el canal.
+        (this.channels || []).forEach((ch: any) => {
+          if (ch?._id) this.socketService.joinChannel(ch._id);
+        });
 
         if (this.channels.length > 0 && !this.currentChannel) {
           this.selectChannel(this.channels[0]);
@@ -434,12 +535,12 @@ export class SidebarComponent implements OnInit {
         this.showCreateChannel = false;
         this.selectChannel(response.data);
         if (response.warning) {
-          alert(response.warning);
+          this.pushAlert('warning', response.warning);
         }
       },
       error: (error) => {
         console.error('Error creando canal:', error);
-        alert(error?.error?.message || 'Error al crear el canal');
+        this.pushAlert('error', error?.error?.message || 'Error al crear el canal');
       }
     });
   }
@@ -467,17 +568,28 @@ export class SidebarComponent implements OnInit {
         this.editingChannel = null;
         this.editedChannelName = '';
         this.savingChannel = false;
+        if (response.warning) {
+          this.pushAlert('warning', response.warning);
+        }
       },
       error: (error) => {
         console.error('Error actualizando canal:', error);
-        alert(error?.error?.message || 'No fue posible actualizar el canal.');
+        this.pushAlert('error', error?.error?.message || 'No fue posible actualizar el canal.');
         this.savingChannel = false;
       }
     });
   }
 
+  askDeleteChannel(channel: any): void {
+    this.confirmDeleteId = channel._id;
+  }
+
+  cancelDeleteChannel(): void {
+    this.confirmDeleteId = null;
+  }
+
   deleteChannel(channel: any): void {
-    if (!confirm(`?Abandonar el canal "${channel.name}"?`)) return;
+    this.confirmDeleteId = null;
 
     this.chatService.deleteChannel(channel._id).subscribe({
       next: () => {
@@ -488,9 +600,21 @@ export class SidebarComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error eliminando canal:', error);
-        alert(error?.error?.message || 'No fue posible abandonar el canal.');
+        this.pushAlert('error', error?.error?.message || 'No fue posible abandonar el canal.');
       }
     });
+  }
+
+  pushAlert(kind: 'error' | 'warning' | 'success', text: string): void {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    this.uiAlerts.push({ id, kind, text });
+    setTimeout(() => {
+      this.uiAlerts = this.uiAlerts.filter(a => a.id !== id);
+    }, 6000);
+  }
+
+  dismissAlert(id: number): void {
+    this.uiAlerts = this.uiAlerts.filter(a => a.id !== id);
   }
 
   get aiChannel() {
@@ -535,6 +659,16 @@ export class SidebarComponent implements OnInit {
 
   dismissTrelloToasts(): void {
     this.trelloToasts = [];
+  }
+
+  selectChannelToast(toast: any): void {
+    if (!toast?.channelId) return;
+    const target = this.channels.find((c: any) => c._id === toast.channelId);
+    if (target) this.selectChannel(target);
+  }
+
+  dismissMessageToasts(): void {
+    this.messageToasts = [];
   }
 
   openTrelloToast(toast: any): void {

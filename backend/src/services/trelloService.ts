@@ -73,6 +73,12 @@ class TrelloService {
     return this.request(`/boards/${boardId}/cards?fields=id,name,desc,idList,pos,due,dueComplete,labels,closed,badges,cover,members,idMembers,shortUrl&checklists=all&member_fields=id,fullName,avatarHash,username`, {}, userToken);
   }
 
+  // /boards/{id}/cards NO incluye los scaled de la portada; /cards/{id}
+  // completa SI los incluye. Se usa para enriquecer las portadas.
+  async getCardCover(cardId: string, userToken?: string): Promise<any> {
+    return this.request(`/cards/${cardId}?fields=all`, {}, userToken);
+  }
+
   async getBoardMembers(boardId: string, userToken?: string): Promise<any[]> {
     return this.request(`/boards/${boardId}/members?fields=id,fullName,avatarHash,username`, {}, userToken);
   }
@@ -178,6 +184,22 @@ class TrelloService {
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const arrayBuffer = await response.arrayBuffer();
     return { buffer: Buffer.from(arrayBuffer), contentType };
+  }
+
+  // ---------- Vigilancia de actividad (notificaciones) ----------
+
+  async getMemberId(userToken?: string): Promise<string> {
+    const me = await this.request('/members/me?fields=id,username', {}, userToken);
+    return me?.id || '';
+  }
+
+  async getBoardActions(boardId: string, userToken?: string, since?: string): Promise<any[]> {
+    const sinceParam = since ? `&since=${encodeURIComponent(since)}` : '';
+    return this.request(
+      `/boards/${boardId}/actions?filter=createCard,commentCard,updateCard,addMemberToCard,removeMemberFromCard,addAttachmentToCard&limit=100&card_fields=id,name,idShort,shortLink&fields=id,idMemberCreator,type,date,data,memberCreator${sinceParam}`,
+      {},
+      userToken,
+    );
   }
 }
 
