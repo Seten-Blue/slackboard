@@ -21,4 +21,5 @@ frontend/.env.*
 
 # Node
 node_modules/
-dist/backups/
+dist/
+backups/
