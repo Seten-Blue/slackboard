@@ -95,6 +95,7 @@ export class SidebarComponent implements OnInit {
 
   showSlackModal = false;
   slackLinked: boolean | null = null; // null = todavia no se consulto
+  slackWorkspaces: any[] = []; // workspaces vinculados (teamId -> teamName)
   pendingFriendCount = 0;
   trelloToasts: any[] = [];
   trelloUnread = 0;
@@ -188,7 +189,10 @@ export class SidebarComponent implements OnInit {
 
   private checkSlackStatus(): void {
     this.slackService.getStatus().subscribe({
-      next: (response: any) => (this.slackLinked = (response.workspaces || []).length > 0),
+      next: (response: any) => {
+        this.slackWorkspaces = response.workspaces || [];
+        this.slackLinked = this.slackWorkspaces.length > 0;
+      },
       error: () => (this.slackLinked = null)
     });
   }
@@ -300,24 +304,60 @@ export class SidebarComponent implements OnInit {
   }
 
   /**
-   * Filtra los canales por la plataforma seleccionada.
-   * Si el backend todavia no manda "platform" en ningun canal
-   * (retrocompatibilidad con datos viejos), se muestran todos
-   * para no dejar la lista vacia.
+   * Canales visibles para la plataforma seleccionada, excluyendo los canales
+   * internos de la IA (Zork) que nada tienen que ver con Slack/Discord.
    */
-  get filteredChannels() {
-    const hasPlatformField = this.channels.some(c => c.platform);
-    if (!hasPlatformField) return this.channels;
+  get platformChannels(): any[] {
+    return this.channels.filter((c: any) => !c.isAIChannel && (c.platform || 'other').toLowerCase() === this.selectedPlatform.id);
+  }
 
-    return this.channels.filter(channel =>
+  get filteredChannels() {
+    const real = this.channels.filter((c: any) => !c.isAIChannel);
+    const hasPlatformField = real.some(c => c.platform);
+    if (!hasPlatformField) return real;
+
+    return real.filter(channel =>
       (channel.platform || 'other').toLowerCase() === this.selectedPlatform.id
     );
   }
 
+  /**
+   * Agrupa los canales de la plataforma por SITIO/SERVIDOR real:
+   * - Discord: por servidor (discordGuildName)
+   * - Slack: por workspace (slackTeamId -> nombre del workspace vinculado)
+   * Asi un "# general" de un servidor ya no se confunde con el de otro.
+   */
+  get channelGroups(): { name: string; channels: any[] }[] {
+    const list = this.filteredChannels;
+    const platform = this.selectedPlatform.id;
+    const groups: { name: string; channels: any[] }[] = [];
+    const map = new Map<string, any[]>();
+
+    for (const ch of list) {
+      let groupName: string;
+      if (platform === 'discord') {
+        groupName = ch.discordGuildName || 'Discord';
+      } else if (platform === 'slack') {
+        const ws = this.slackWorkspaces.find((w: any) => w.teamId === ch.slackTeamId);
+        groupName = ws?.teamName || 'Slack';
+      } else {
+        groupName = this.selectedPlatform.name;
+      }
+      if (!map.has(groupName)) {
+        map.set(groupName, []);
+        groups.push({ name: groupName, channels: map.get(groupName)! });
+      }
+      map.get(groupName)!.push(ch);
+    }
+
+    return groups;
+  }
+
   countByPlatform(platformId: string): number {
-    const hasPlatformField = this.channels.some(c => c.platform);
-    if (!hasPlatformField) return this.channels.length;
-    return this.channels.filter(c => (c.platform || 'other').toLowerCase() === platformId).length;
+    const real = this.channels.filter((c: any) => !c.isAIChannel);
+    const hasPlatformField = real.some(c => c.platform);
+    if (!hasPlatformField) return real.length;
+    return real.filter(c => (c.platform || 'other').toLowerCase() === platformId).length;
   }
 
   trackByChannelId(_index: number, channel: any) {
