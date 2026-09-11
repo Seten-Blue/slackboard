@@ -181,7 +181,9 @@
 
             <ul class="channel-list">
               <ng-container *ngFor="let group of channelGroups">
-                <li class="channel-group">
+                <li class="channel-group"
+                    [style.--group-color]="selectedPlatform.color"
+                    *ngIf="group.channels.length > 0">
                   <span class="channel-group__label">{{ group.name }}</span>
                   <span class="channel-group__count">{{ group.channels.length }}</span>
                 </li>
@@ -210,8 +212,9 @@
 
                     <span *ngIf="editingChannel?._id !== channel._id">{{ channel.displayName || channel.name }}</span>                </div>
 
-                  <span *ngIf="channel.members?.length" class="channel-list__count">
-                    {{ channel.members.length }}
+                  <span *ngIf="channel.unreadCount" class="channel-list__count"
+                    [title]="channel.unreadCount + ' mensaje(s) sin leer'">
+                    {{ channel.unreadCount }}
                   </span>
 
                   <div class="channel-list__actions">

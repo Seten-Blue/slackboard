@@ -59,6 +59,11 @@ export class ChatService {
     return this.http.delete(`${this.apiUrl}/channels/${channelId}`);
   }
 
+  /** Marca el canal como leido ("hasta ahora") para el usuario autenticado. */
+  markChannelRead(channelId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/channels/${channelId}/read`, {});
+  }
+
   syncPlatformChannels(platform: string): Observable<any> {
     const supported: Record<string, string> = {
       slack: `${this.apiUrl}/slack/sync-channels`,

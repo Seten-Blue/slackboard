@@ -139,6 +139,14 @@ export class SidebarComponent implements OnInit {
     this.socketService.onFriendshipUpdate().subscribe(() => this.loadPendingFriendCount());
     this.socketService.onFriendshipRemoved().subscribe(() => this.loadPendingFriendCount());
 
+    // Mantener vivo el contador de mensajes por canal
+    this.socketService.onNewMessage().subscribe((data: any) => {
+      this.bumpChannelCount(data?.channelId);
+    });
+    this.socketService.onThreadReply().subscribe((data: any) => {
+      this.bumpChannelCount(data?.reply?.channel || data?.parentMessageId);
+    });
+
     this.socketService.onTrelloNotification().subscribe((data: any) => {
       this.addTrelloToast(data);
       this.soundService.play('trello');
@@ -364,6 +372,16 @@ export class SidebarComponent implements OnInit {
     return channel._id;
   }
 
+  /** Incrementa el contador de NO LEIDOS del canal (si no es el canal abierto). */
+  bumpChannelCount(channelId: string): void {
+    if (!channelId) return;
+    if (channelId === this.currentChannel?._id) return;
+    const target = this.channels.find((c: any) => c._id === channelId);
+    if (target) {
+      target.unreadCount = (target.unreadCount || 0) + 1;
+    }
+  }
+
   // ============ CHAT (sin cambios de logica) ============
   loadChannels(): void {
     this.loading = true;
@@ -384,6 +402,17 @@ export class SidebarComponent implements OnInit {
   }
 
   selectChannel(channel: any): void {
+    if (!channel) return;
+    // Marca como leido en el servidor y en la UI (vacía el badge de no leídos)
+    if (channel._id && this.chatService) {
+      this.chatService.markChannelRead(channel._id).subscribe({
+        next: () => {
+          const target = this.channels.find((c: any) => c._id === channel._id);
+          if (target) target.unreadCount = 0;
+        },
+        error: (err: any) => console.warn('No se pudo marcar el canal como leido:', err),
+      });
+    }
     this.chatService.setCurrentChannel(channel);
     if (!this.router.url.includes('/chat')) {
       this.router.navigate(['/chat']);
